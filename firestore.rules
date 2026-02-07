@@ -4,7 +4,9 @@ service cloud.firestore {
 
     // --- Helper Functions ---
     function isSuperAdmin() {
-      return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.super_admin == true;
+      // Se usa exists() para evitar errores si el documento aún no existe.
+      return exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid)) 
+          && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.super_admin == true;
     }
 
     function getSchoolUserData(schoolId, userId) {
@@ -12,7 +14,6 @@ service cloud.firestore {
     }
 
     function isSchoolAdmin(schoolId) {
-      // Se asegura de que el usuario exista en la escuela antes de leer su rol.
       return exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid))
           && getSchoolUserData(schoolId, request.auth.uid).role == 'school_admin';
     }
@@ -34,22 +35,23 @@ service cloud.firestore {
     // --- Global Collections ---
     match /platformUsers/{userId} {
       allow read: if isSuperAdmin() || request.auth.uid == userId;
-      allow write: if isSuperAdmin(); // Solo super admins pueden cambiar roles globales
+      // Se permite la escritura al super admin o al email designado para la creación inicial.
+      allow write: if isSuperAdmin() || (request.auth.uid == userId && request.auth.token.email == 'abengolea1@gmail.com');
     }
 
     match /schools/{schoolId} {
       allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
-      allow create, update: if isSuperAdmin();
+      // Se permite la creación/actualización al super admin o al email designado.
+      allow create, update: if isSuperAdmin() || request.auth.token.email == 'abengolea1@gmail.com';
       allow delete: if false; // Soft delete cambiando el status
     }
     
     // --- School Sub-collections ---
     
     match /schools/{schoolId}/users/{userId} {
-        // Un usuario siempre puede leer su propio documento de perfil.
-        // Un admin de escuela o super admin puede leer cualquier perfil en la escuela.
         allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || request.auth.uid == userId;
-        allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+        // Se permite la gestión al super admin, admin de escuela o email designado.
+        allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || request.auth.token.email == 'abengolea1@gmail.com';
     }
     
     match /schools/{schoolId}/categories/{categoryId} {
@@ -58,9 +60,7 @@ service cloud.firestore {
     }
 
     match /schools/{schoolId}/players/{playerId} {
-      // Un miembro de la escuela puede ver los jugadores de su escuela.
       allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
-      // Solo admins o coaches pueden crear/modificar jugadores.
       allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
     }
 
@@ -75,7 +75,6 @@ service cloud.firestore {
     
     match /schools/{schoolId}/evaluations/{evalId} {
       allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
-      // Solo un admin o el coach asignado a la categoría del jugador puede crear/actualizar evaluaciones
       allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || (isCoach(schoolId) && isAssignedToCategory(schoolId, request.resource.data.categoryId));
       allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
