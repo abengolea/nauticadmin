@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { onSnapshot, doc, type DocumentData, type FirestoreError } from 'firebase/firestore';
 import { useFirestore } from '@/firebase/provider';
 import { useMemoFirebase } from '@/firebase';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 // Helper to convert Firestore Timestamps to JS Dates
 function processDoc<T>(doc: DocumentData): T {
@@ -38,9 +40,14 @@ export function useDoc<T extends { id: string }>(path: string) {
             } else {
                 setData(null);
             }
+            setError(null);
             setLoading(false);
         }, (err: FirestoreError) => {
-            console.error(`Error fetching document ${path}:`, err);
+            const permissionError = new FirestorePermissionError({
+                path: path,
+                operation: 'get',
+            });
+            errorEmitter.emit('permission-error', permissionError);
             setError(err);
             setLoading(false);
         });

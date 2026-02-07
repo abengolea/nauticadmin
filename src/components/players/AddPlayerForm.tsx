@@ -35,6 +35,8 @@ import { useFirestore } from "@/firebase";
 import { collection, addDoc, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 
 const playerSchema = z.object({
@@ -68,28 +70,35 @@ export function AddPlayerForm() {
         },
     });
 
-    async function onSubmit(values: z.infer<typeof playerSchema>) {
-        try {
-            await addDoc(collection(firestore, "players"), {
-                ...values,
-                birthDate: Timestamp.fromDate(values.birthDate),
-                createdAt: Timestamp.now(),
-            });
+    function onSubmit(values: z.infer<typeof playerSchema>) {
+        const playerData = {
+            ...values,
+            birthDate: Timestamp.fromDate(values.birthDate),
+            createdAt: Timestamp.now(),
+        };
 
-            toast({
-                title: "Jugador añadido",
-                description: `${values.firstName} ${values.lastName} ha sido añadido a la base de datos.`,
-            });
-            router.push("/dashboard/players");
+        addDoc(collection(firestore, "players"), playerData)
+            .then(() => {
+                toast({
+                    title: "Jugador añadido",
+                    description: `${values.firstName} ${values.lastName} ha sido añadido a la base de datos.`,
+                });
+                router.push("/dashboard/players");
+            })
+            .catch((serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: '/players',
+                    operation: 'create',
+                    requestResourceData: playerData,
+                });
+                errorEmitter.emit('permission-error', permissionError);
 
-        } catch (error) {
-            console.error("Error adding document: ", error);
-            toast({
-                variant: "destructive",
-                title: "Error al añadir jugador",
-                description: "Hubo un problema al guardar los datos. Inténtalo de nuevo.",
+                toast({
+                    variant: "destructive",
+                    title: "Error de permisos",
+                    description: "No tienes permiso para añadir jugadores. Contacta a un administrador.",
+                });
             });
-        }
     }
 
     return (

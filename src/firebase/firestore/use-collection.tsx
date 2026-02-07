@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { onSnapshot, collection, query, where, type Query, type DocumentData, orderBy, limit, type FirestoreError } from 'firebase/firestore';
 import { useFirestore } from '@/firebase/provider';
 import { useMemoFirebase } from '@/firebase';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 // Helper to convert Firestore Timestamps to JS Dates
 function processDoc<T>(doc: DocumentData): T {
@@ -52,10 +54,15 @@ export function useCollection<T extends { id: string }>(
         const unsubscribe = onSnapshot(collectionQuery, (snapshot) => {
             const data = snapshot.docs.map(doc => processDoc<T>(doc));
             setData(data);
+            setError(null);
             setLoading(false);
         }, (err: FirestoreError) => {
-            console.error(`Error fetching collection ${path}:`, err);
-            setError(err);
+            const permissionError = new FirestorePermissionError({
+                path: path,
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            setError(err); 
             setLoading(false);
         });
 
