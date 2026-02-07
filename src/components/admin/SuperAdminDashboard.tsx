@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -36,6 +37,7 @@ import { CreateSchoolDialog } from "./CreateSchoolDialog";
 import { useToast } from "@/hooks/use-toast";
 
 export function SuperAdminDashboard() {
+    const router = useRouter();
     const { data: schools, loading: schoolsLoading } = useCollection<School>('schools', { orderBy: ['createdAt', 'desc']});
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -63,6 +65,10 @@ export function SuperAdminDashboard() {
         }
     };
 
+    const handleNavigate = (path: string) => {
+        router.push(path);
+    }
+
     return (
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between space-y-2">
@@ -82,7 +88,7 @@ export function SuperAdminDashboard() {
                         Todas las Escuelas
                     </CardTitle>
                     <CardDescription>
-                        {schools ? `${schools.length} escuelas registradas en la plataforma.` : 'Cargando listado de escuelas...'}
+                        {schoolsLoading ? 'Cargando listado de escuelas...' : `${schools?.length || 0} escuelas registradas. Haz click en una para gestionarla.`}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -93,7 +99,7 @@ export function SuperAdminDashboard() {
                                 <TableHead>Ubicación</TableHead>
                                 <TableHead>Estado</TableHead>
                                 <TableHead>Fecha de Creación</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
+                                <TableHead className="text-right w-[80px]">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -107,10 +113,12 @@ export function SuperAdminDashboard() {
                                 </TableRow>
                             ))}
                             {schools?.map((school) => (
-                                <TableRow key={school.id}>
-                                    <TableCell className="font-medium">{school.name}</TableCell>
-                                    <TableCell>{school.city}, {school.province}</TableCell>
-                                    <TableCell>
+                                <TableRow key={school.id} className="group">
+                                    <TableCell className="font-medium cursor-pointer" onClick={() => handleNavigate(`/dashboard/schools/${school.id}`)}>
+                                        <span className="group-hover:underline">{school.name}</span>
+                                    </TableCell>
+                                    <TableCell className="cursor-pointer" onClick={() => handleNavigate(`/dashboard/schools/${school.id}`)}>{school.city}, {school.province}</TableCell>
+                                    <TableCell className="cursor-pointer" onClick={() => handleNavigate(`/dashboard/schools/${school.id}`)}>
                                         <Badge
                                             variant={school.status === 'active' ? 'secondary' : 'destructive'}
                                             className={`capitalize ${school.status === "active" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""}`}
@@ -118,7 +126,7 @@ export function SuperAdminDashboard() {
                                             {school.status === 'active' ? 'Activa' : 'Suspendida'}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>{format(school.createdAt, 'dd/MM/yyyy', { locale: es })}</TableCell>
+                                    <TableCell className="cursor-pointer" onClick={() => handleNavigate(`/dashboard/schools/${school.id}`)}>{format(school.createdAt, 'dd/MM/yyyy', { locale: es })}</TableCell>
                                     <TableCell className="text-right">
                                        <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
