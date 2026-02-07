@@ -67,7 +67,7 @@ export default function SettingsPage() {
       </h1>
       <Card>
         <CardHeader>
-          <CardTitle>Branding</CardTitle>
+          <CardTitle>Personalización</CardTitle>
           <CardDescription>
             Personaliza la apariencia de la aplicación.
           </CardDescription>

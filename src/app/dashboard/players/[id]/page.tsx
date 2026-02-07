@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cake, Ruler, Scale, Shirt, Footprints, ArrowRightLeft } from "lucide-react";
+import { Cake, Ruler, Scale } from "lucide-react";
 import { SummaryTab } from "@/components/players/PlayerProfile/SummaryTab";
 import { PhysicalTab } from "@/components/players/PlayerProfile/PhysicalTab";
 import { TechnicalTab } from "@/components/players/PlayerProfile/TechnicalTab";
@@ -36,37 +36,37 @@ export default function PlayerProfilePage({ params }: PlayerProfilePageProps) {
         <div className="flex-1">
           <Badge 
             variant={
-              player.status === "active"
+              player.status === "activo"
                 ? "secondary"
-                : player.status === "injured"
+                : player.status === "lesionado"
                 ? "destructive"
                 : "outline"
             }
-            className={`mb-2 ${player.status === "active" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""}`}
+            className={`mb-2 capitalize ${player.status === "activo" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""}`}
           >
             {player.status}
           </Badge>
           <h1 className="text-4xl font-bold font-headline">{player.firstName} {player.lastName}</h1>
           <p className="text-xl text-muted-foreground">{player.primaryPosition} • {player.category}</p>
           <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
-             <div className="flex items-center gap-1"><Cake className="h-4 w-4" /> {calculateAge(player.birthDate)} years old</div>
+             <div className="flex items-center gap-1"><Cake className="h-4 w-4" /> {calculateAge(player.birthDate)} años</div>
              <div className="flex items-center gap-1"><Ruler className="h-4 w-4" /> {player.height} cm</div>
              <div className="flex items-center gap-1"><Scale className="h-4 w-4" /> {player.weight} kg</div>
           </div>
         </div>
         <div className="flex items-start gap-2">
-            <Button>Edit Profile</Button>
-            <Button variant="outline">Generate Report</Button>
+            <Button>Editar Perfil</Button>
+            <Button variant="outline">Generar Informe</Button>
         </div>
       </header>
 
       <Tabs defaultValue="summary" className="w-full">
         <TabsList className="grid w-full grid-cols-5 bg-card">
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-          <TabsTrigger value="physical">Physical</TabsTrigger>
-          <TabsTrigger value="technical">Technical</TabsTrigger>
-          <TabsTrigger value="tactical">Tactical</TabsTrigger>
-          <TabsTrigger value="medical">Medical</TabsTrigger>
+          <TabsTrigger value="summary">Resumen</TabsTrigger>
+          <TabsTrigger value="physical">Físico</TabsTrigger>
+          <TabsTrigger value="technical">Técnico</TabsTrigger>
+          <TabsTrigger value="tactical">Táctico</TabsTrigger>
+          <TabsTrigger value="medical">Médico</TabsTrigger>
         </TabsList>
         <TabsContent value="summary">
           <SummaryTab player={player} />

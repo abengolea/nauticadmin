@@ -17,17 +17,17 @@ export function MedicalTab({ player }: { player: Player }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Medical History</CardTitle>
-        <CardDescription>Injury records for {player.firstName}.</CardDescription>
+        <CardTitle>Historial Médico</CardTitle>
+        <CardDescription>Historial de lesiones para {player.firstName}.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Body Part</TableHead>
-              <TableHead>Injury Date</TableHead>
-              <TableHead>Severity</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Parte del Cuerpo</TableHead>
+              <TableHead>Fecha de Lesión</TableHead>
+              <TableHead>Gravedad</TableHead>
+              <TableHead>Estado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -35,18 +35,18 @@ export function MedicalTab({ player }: { player: Player }) {
               playerInjuries.map((injury) => (
                 <TableRow key={injury.id}>
                   <TableCell className="font-medium">{injury.bodyPart}</TableCell>
-                  <TableCell>{injury.injuryDate.toLocaleDateString()}</TableCell>
+                  <TableCell>{injury.injuryDate.toLocaleDateString('es-ES')}</TableCell>
                   <TableCell className="capitalize">{injury.severity}</TableCell>
                   <TableCell>
                     <Badge
                       variant={
-                        injury.status === "recovering"
+                        injury.status === "recuperando"
                           ? "destructive"
-                          : injury.status === "discharged"
+                          : injury.status === "alta"
                           ? "secondary"
                           : "outline"
                       }
-                       className={injury.status === "discharged" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""}
+                       className={`capitalize ${injury.status === "alta" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""}`}
                     >
                       {injury.status}
                     </Badge>
@@ -56,7 +56,7 @@ export function MedicalTab({ player }: { player: Player }) {
             ) : (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground">
-                  No injury history recorded.
+                  No hay historial de lesiones registrado.
                 </TableCell>
               </TableRow>
             )}

@@ -11,6 +11,13 @@ import {
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 
+const TECHNICAL_LABELS: { [key: string]: string } = {
+    ballControl: "Control de Balón",
+    passing: "Pase",
+    dribbling: "Regate",
+    shooting: "Tiro",
+};
+
 export function TechnicalTab({ player }: { player: Player }) {
   
   const lastEval = technicalEvaluations[technicalEvaluations.length - 1];
@@ -19,24 +26,24 @@ export function TechnicalTab({ player }: { player: Player }) {
     <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-2">
             <CardHeader>
-                <CardTitle>Evaluation History</CardTitle>
-                <CardDescription>Recent technical assessments for {player.firstName}.</CardDescription>
+                <CardTitle>Historial de Evaluaciones</CardTitle>
+                <CardDescription>Evaluaciones técnicas recientes para {player.firstName}.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Date</TableHead>
+                            <TableHead>Fecha</TableHead>
                             <TableHead>Control</TableHead>
-                            <TableHead>Passing</TableHead>
-                            <TableHead>Dribbling</TableHead>
-                            <TableHead>Shooting</TableHead>
+                            <TableHead>Pase</TableHead>
+                            <TableHead>Regate</TableHead>
+                            <TableHead>Tiro</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {technicalEvaluations.map((ev) => (
                             <TableRow key={ev.id}>
-                                <TableCell>{ev.date.toLocaleDateString()}</TableCell>
+                                <TableCell>{ev.date.toLocaleDateString('es-ES')}</TableCell>
                                 <TableCell>{ev.scores.ballControl}/10</TableCell>
                                 <TableCell>{ev.scores.passing}/10</TableCell>
                                 <TableCell>{ev.scores.dribbling}/10</TableCell>
@@ -49,21 +56,21 @@ export function TechnicalTab({ player }: { player: Player }) {
         </Card>
         <Card>
             <CardHeader>
-                <CardTitle>Latest Assessment</CardTitle>
-                 <CardDescription>{lastEval.date.toLocaleDateString()}</CardDescription>
+                <CardTitle>Última Evaluación</CardTitle>
+                 <CardDescription>{lastEval.date.toLocaleDateString('es-ES')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 {Object.entries(lastEval.scores).map(([key, value]) => (
                     <div key={key} className="space-y-1">
                         <div className="flex justify-between text-sm">
-                            <span className="capitalize text-muted-foreground">{key.replace(/([A-Z])/g, ' $1')}</span>
+                            <span className="capitalize text-muted-foreground">{TECHNICAL_LABELS[key] || key}</span>
                             <span className="font-medium">{value}/10</span>
                         </div>
                         <Progress value={value * 10} className="h-2" />
                     </div>
                 ))}
                 <div className="pt-4">
-                    <h4 className="font-semibold">Coach Notes:</h4>
+                    <h4 className="font-semibold">Notas del Entrenador:</h4>
                     <p className="text-sm text-muted-foreground italic">&quot;{lastEval.observations}&quot;</p>
                 </div>
             </CardContent>

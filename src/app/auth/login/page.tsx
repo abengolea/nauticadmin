@@ -84,7 +84,7 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-sm shadow-2xl border-2">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline">Login</CardTitle>
+        <CardTitle className="text-2xl font-headline">Iniciar Sesión</CardTitle>
         <CardDescription>
           Ingresa tu correo electrónico para acceder a tu cuenta.
         </CardDescription>
@@ -92,7 +92,7 @@ export default function LoginPage() {
       <CardContent>
         <form onSubmit={handleEmailLogin} className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Correo Electrónico</Label>
             <Input
               id="email"
               type="email"
@@ -104,7 +104,7 @@ export default function LoginPage() {
           </div>
           <div className="grid gap-2">
             <div className="flex items-center">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Contraseña</Label>
               <Link href="#" className="ml-auto inline-block text-sm underline">
                 ¿Olvidaste tu contraseña?
               </Link>
@@ -118,10 +118,10 @@ export default function LoginPage() {
             />
           </div>
           <Button type="submit" className="w-full">
-            Login
+            Iniciar Sesión
           </Button>
           <Button variant="outline" className="w-full" type="button" onClick={handleGoogleLogin}>
-            Login con Google
+            Iniciar Sesión con Google
           </Button>
         </form>
         <div className="mt-4 text-center text-sm">

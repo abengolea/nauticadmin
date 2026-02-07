@@ -22,11 +22,11 @@ export function PlayerTable({ players }: { players: Player[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Position</TableHead>
-            <TableHead>Age</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Categoría</TableHead>
+            <TableHead>Posición</TableHead>
+            <TableHead>Edad</TableHead>
+            <TableHead>Estado</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -51,13 +51,13 @@ export function PlayerTable({ players }: { players: Player[] }) {
               <TableCell>
                 <Badge
                   variant={
-                    player.status === "active"
+                    player.status === "activo"
                       ? "secondary"
-                      : player.status === "injured"
+                      : player.status === "lesionado"
                       ? "destructive"
                       : "outline"
                   }
-                  className={player.status === "active" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""}
+                  className={`capitalize ${player.status === "activo" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""}`}
                 >
                   {player.status}
                 </Badge>

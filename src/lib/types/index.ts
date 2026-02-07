@@ -5,7 +5,7 @@ export type Player = {
   birthDate: Date;
   category: string; // "U10"
   primaryPosition: string; // "Delantero"
-  status: "active" | "inactive" | "injured";
+  status: "activo" | "inactivo" | "lesionado";
   avatarUrl: string;
   height: number;
   weight: number;
@@ -46,7 +46,7 @@ export type TacticalEvaluation = {
 export type Session = {
   id: string;
   date: Date;
-  type: "training" | "match";
+  type: "entrenamiento" | "partido";
   category: string;
   opponent?: string;
 };
@@ -55,6 +55,6 @@ export type Injury = {
   id: string;
   bodyPart: string;
   injuryDate: Date;
-  status: "active" | "recovering" | "discharged";
+  status: "activo" | "recuperando" | "alta";
   severity: "leve" | "moderada" | "grave";
 }

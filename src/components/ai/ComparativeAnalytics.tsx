@@ -28,12 +28,12 @@ function SubmitButton() {
     <Button type="submit" disabled={pending} className="w-full">
       {pending ? (
         <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analizando...
         </>
       ) : (
         <>
           <Sparkles className="mr-2 h-4 w-4" />
-          Generate Analysis
+          Generar Análisis
         </>
       )}
     </Button>
@@ -48,10 +48,10 @@ export function ComparativeAnalytics({ playerId }: { playerId: string }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 font-headline">
           <BrainCircuit className="h-6 w-6 text-primary" />
-          AI Performance Analytics
+          Análisis de Rendimiento (IA)
         </CardTitle>
         <CardDescription>
-          Compare player trends against club medians to identify areas for improvement.
+          Compara tendencias de jugadores contra las medianas del club para identificar áreas de mejora.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -60,16 +60,16 @@ export function ComparativeAnalytics({ playerId }: { playerId: string }) {
           <input type="hidden" name="clubId" value="club-123" />
           
           <div className="space-y-2">
-            <Label htmlFor="testType">Select Test Type</Label>
+            <Label htmlFor="testType">Seleccionar Tipo de Prueba</Label>
             <Select name="testType" required>
               <SelectTrigger id="testType">
-                <SelectValue placeholder="Select a test" />
+                <SelectValue placeholder="Selecciona una prueba" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="sprint_10m">Sprint 10m</SelectItem>
-                <SelectItem value="vertical_jump">Vertical Jump</SelectItem>
-                <SelectItem value="yoyo_test">Yo-Yo Test</SelectItem>
-                <SelectItem value="illinois_agility">Illinois Agility</SelectItem>
+                <SelectItem value="vertical_jump">Salto Vertical</SelectItem>
+                <SelectItem value="yoyo_test">Test Yo-Yo</SelectItem>
+                <SelectItem value="illinois_agility">Agilidad Illinois</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -79,7 +79,7 @@ export function ComparativeAnalytics({ playerId }: { playerId: string }) {
 
         {(state.success || state.error) && (
           <div className="mt-6">
-            <Label>AI Generated Analysis</Label>
+            <Label>Análisis Generado por IA</Label>
             <Textarea
               readOnly
               value={state.analysis || state.error}

@@ -10,9 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
 import {
-  Sidebar,
   SidebarHeader,
   SidebarContent,
   SidebarMenu,
@@ -23,11 +21,11 @@ import {
 import { RiverPlateLogo } from "../icons/RiverPlateLogo";
 
 const menuItems = [
-  { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/dashboard/players", label: "Players", icon: Users },
-  { href: "/dashboard/sessions", label: "Sessions", icon: Calendar },
-  { href: "/dashboard/medical", label: "Medical", icon: HeartPulse },
-  { href: "/dashboard/reports", label: "Reports", icon: FileText },
+  { href: "/dashboard", label: "Panel Principal", icon: Home },
+  { href: "/dashboard/players", label: "Jugadores", icon: Users },
+  { href: "/dashboard/sessions", label: "Sesiones", icon: Calendar },
+  { href: "/dashboard/medical", label: "Médico", icon: HeartPulse },
+  { href: "/dashboard/reports", label: "Informes", icon: FileText },
 ];
 
 export function SidebarNav() {
@@ -65,11 +63,11 @@ export function SidebarNav() {
             <Link href="/dashboard/settings" legacyBehavior passHref>
               <SidebarMenuButton
                 isActive={pathname.startsWith("/dashboard/settings")}
-                tooltip="Settings"
+                tooltip="Ajustes"
                 className="font-headline"
               >
                 <Settings />
-                <span>Settings</span>
+                <span>Ajustes</span>
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
