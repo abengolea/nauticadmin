@@ -67,7 +67,7 @@ export function useUserProfile() {
   }, [loading, user, platformUser, schoolUser]);
 
 
-  const isReady = !loading && !!profile;
+  const isReady = !loading;
 
   return {
     user,

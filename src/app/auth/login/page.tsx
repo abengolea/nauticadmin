@@ -14,8 +14,6 @@ import { Timestamp } from "firebase/firestore";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, Shield } from "lucide-react";
 
-const DEFAULT_SCHOOL_ID = 'escuela-123-sn';
-
 export default function LoginPage() {
   const router = useRouter();
   const auth = useAuth();
@@ -34,42 +32,28 @@ export default function LoginPage() {
 
 
   const createInitialData = async (user: User) => {
-    const batch = writeBatch(firestore);
-    const schoolRef = doc(firestore, 'schools', DEFAULT_SCHOOL_ID);
-    const schoolSnap = await getDoc(schoolRef);
-
-    if (!schoolSnap.exists()) {
-      batch.set(schoolRef, {
-        name: 'Escuela de River - San Nicolás',
-        city: 'San Nicolás de los Arroyos',
-        province: 'Buenos Aires',
-        address: 'Calle Falsa 123',
-        status: 'active',
-        createdAt: Timestamp.now(),
-      });
-    }
-
-    const schoolUserRef = doc(firestore, `schools/${DEFAULT_SCHOOL_ID}/users`, user.uid);
-    const schoolUserSnap = await getDoc(schoolUserRef);
-
-    if (!schoolUserSnap.exists()) {
-      batch.set(schoolUserRef, {
-        displayName: user.displayName || user.email?.split('@')[0],
-        email: user.email,
-        role: 'school_admin',
-        assignedCategories: [],
-      });
-    }
-    
+    // This function now only handles the bootstrap logic for the super admin.
+    // When the designated super admin email logs in for the first time,
+    // this creates the platformUser document that grants them super admin privileges.
     if (user.email === 'abengolea1@gmail.com') {
       const platformUserRef = doc(firestore, 'platformUsers', user.uid);
+      
+      // We must get the doc first to avoid overwriting it if it already exists.
       const platformUserSnap = await getDoc(platformUserRef);
       if (!platformUserSnap.exists()) {
-        batch.set(platformUserRef, { super_admin: true });
+        try {
+          await setDoc(platformUserRef, { super_admin: true });
+        } catch (error) {
+          // Re-throw the error to be caught by the handleLogin catch block.
+          // This will ensure the user is logged out if this critical step fails.
+          console.error("Failed to create super admin role:", error);
+          throw new Error("No se pudo crear el rol de super administrador.");
+        }
       }
     }
-
-    await batch.commit();
+    // For all other users, they are either existing users with roles, or new
+    // users who must wait for an admin to assign them a role. No initial
+    // data is created for them on login. The signup flow handles new users.
   };
 
   const handleLogin = async (loginFn: () => Promise<User>) => {
@@ -84,7 +68,7 @@ export default function LoginPage() {
         toast({
           variant: "destructive",
           title: "Error de Configuración",
-          description: "No se pudo guardar tu perfil. Inténtalo de nuevo o contacta a soporte.",
+          description: dataError.message || "No se pudo guardar tu perfil. Inténtalo de nuevo o contacta a soporte.",
           duration: 9000,
         });
         await auth.signOut(); // Log out user to prevent inconsistent state

@@ -2,7 +2,7 @@
 import { Header } from "@/components/layout/Header";
 import { SidebarNav } from "@/components/layout/SidebarNav";
 import { SidebarProvider, Sidebar, SidebarInset } from "@/components/ui/sidebar";
-import { useUser } from "@/firebase";
+import { useUserProfile } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -11,16 +11,24 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading } = useUser();
+  const { profile, isReady, user } = useUserProfile();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
+    // If loading is done and there's no user, redirect to login
+    if (isReady && !user) {
       router.push("/auth/login");
+      return;
     }
-  }, [user, loading, router]);
+    // If loading is done, there IS a user, but they have no profile (no roles)
+    // redirect them to the pending page. 
+    if (isReady && user && !profile) {
+      router.push("/auth/pending-approval");
+    }
+  }, [isReady, user, profile, router]);
 
-  if (loading || !user) {
+  // Show loading screen while we check for user and profile
+  if (!isReady || !profile) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
