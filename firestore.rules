@@ -3,8 +3,9 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     function isUserInRole(userId, role) {
+      // Use direct property access instead of .get() method which is for map fields
       return exists(/databases/$(database)/documents/users/$(userId)) &&
-             get(/databases/$(database)/documents/users/$(userId)).data.get('role', '') == role;
+             get(/databases/$(database)/documents/users/$(userId)).data.role == role;
     }
 
     function isUserAdmin(userId) {
