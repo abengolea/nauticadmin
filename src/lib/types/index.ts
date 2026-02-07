@@ -31,6 +31,18 @@ export type TechnicalEvaluation = {
   observations?: string;
 };
 
+export type TacticalEvaluation = {
+  id: string;
+  date: Date;
+  scores: {
+    positioning: number;
+    decisionMaking: number;
+    gameReading: number;
+    defensiveAwareness: number;
+  };
+  observations?: string;
+};
+
 export type Session = {
   id: string;
   date: Date;

@@ -1,4 +1,4 @@
-import type { Player, PhysicalTest, Session, Injury, TechnicalEvaluation } from "@/lib/types";
+import type { Player, PhysicalTest, Session, Injury, TechnicalEvaluation, TacticalEvaluation } from "@/lib/types";
 
 export const players: Player[] = [
   {
@@ -73,6 +73,21 @@ export const technicalEvaluations: TechnicalEvaluation[] = [
         date: new Date("2023-11-01"), 
         scores: { ballControl: 9, passing: 9, dribbling: 8, shooting: 8 },
         observations: "Improved shooting accuracy in training. Showing more confidence in 1v1 situations."
+    },
+];
+
+export const tacticalEvaluations: TacticalEvaluation[] = [
+    { 
+        id: "ta1", 
+        date: new Date("2023-10-10"), 
+        scores: { positioning: 8, decisionMaking: 7, gameReading: 9, defensiveAwareness: 6 },
+        observations: "Strong understanding of positional play in attack. Needs to improve defensive tracking."
+    },
+    { 
+        id: "ta2", 
+        date: new Date("2023-11-10"), 
+        scores: { positioning: 9, decisionMaking: 8, gameReading: 9, defensiveAwareness: 7 },
+        observations: "Shows better decision making under pressure. Defensive contribution has improved."
     },
 ];
 

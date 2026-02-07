@@ -10,6 +10,8 @@ import { SummaryTab } from "@/components/players/PlayerProfile/SummaryTab";
 import { PhysicalTab } from "@/components/players/PlayerProfile/PhysicalTab";
 import { TechnicalTab } from "@/components/players/PlayerProfile/TechnicalTab";
 import { calculateAge } from "@/lib/utils";
+import { TacticalTab } from "@/components/players/PlayerProfile/TacticalTab";
+import { MedicalTab } from "@/components/players/PlayerProfile/MedicalTab";
 
 type PlayerProfilePageProps = {
   params: {
@@ -76,24 +78,10 @@ export default function PlayerProfilePage({ params }: PlayerProfilePageProps) {
           <TechnicalTab player={player} />
         </TabsContent>
         <TabsContent value="tactical">
-          <Card>
-            <CardHeader>
-              <CardTitle>Tactical Evaluation</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>Tactical evaluation data will be displayed here.</p>
-            </CardContent>
-          </Card>
+          <TacticalTab player={player} />
         </TabsContent>
         <TabsContent value="medical">
-           <Card>
-            <CardHeader>
-              <CardTitle>Medical History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>Medical history and injury records will be displayed here.</p>
-            </CardContent>
-          </Card>
+           <MedicalTab player={player} />
         </TabsContent>
       </Tabs>
     </div>
