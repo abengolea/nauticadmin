@@ -1,5 +1,3 @@
-import { type Timestamp } from "firebase/firestore";
-
 export interface PlatformUser {
   id: string; // auth uid
   super_admin: boolean;
@@ -13,7 +11,7 @@ export interface School {
   address: string;
   logoUrl?: string;
   status: 'active' | 'suspended';
-  createdAt: Timestamp;
+  createdAt: Date;
 }
 
 // Representa la membresía y el rol de un usuario en una escuela específica.
@@ -37,7 +35,7 @@ export interface Player {
   id: string;
   firstName: string;
   lastName: string;
-  birthDate: Date | Timestamp;
+  birthDate: Date;
   categoryId: string; // ID de la categoría actual
   tutorContact: {
     name: string;
@@ -46,7 +44,7 @@ export interface Player {
   status: 'active' | 'inactive';
   photoUrl?: string;
   observations?: string;
-  createdAt: Timestamp;
+  createdAt: Date;
   createdBy: string; // uid
   // No está en el modelo de Firestore, se añade en el frontend.
   escuelaId?: string; 
@@ -55,8 +53,8 @@ export interface Player {
 export interface Training {
     id: string;
     categoryId: string;
-    date: Timestamp;
-    createdAt: Timestamp;
+    date: Date;
+    createdAt: Date;
     createdBy: string; // uid
 }
 
@@ -71,7 +69,7 @@ export interface Evaluation {
   id:string;
   playerId: string;
   categoryId: string;
-  date: Timestamp;
+  date: Date;
   coachComments: string;
   physical?: {
     height?: { value: number, unit: 'cm' };
@@ -95,9 +93,9 @@ export interface Evaluation {
     type: 'verbal_aggression' | 'physical_aggression';
     comment: string;
     reportedBy: string; // uid
-    reportedAt: Timestamp;
+    reportedAt: Date;
   };
-  createdAt: Timestamp;
+  createdAt: Date;
   createdBy: string; // uid
 }
 

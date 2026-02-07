@@ -82,7 +82,7 @@ export function SuperAdminDashboard() {
                                             {school.status === 'active' ? 'Activa' : 'Suspendida'}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>{format(school.createdAt.toDate(), 'dd/MM/yyyy', { locale: es })}</TableCell>
+                                    <TableCell>{format(school.createdAt, 'dd/MM/yyyy', { locale: es })}</TableCell>
                                     <TableCell className="text-right">
                                         {/* Acciones futuras como "Gestionar" irán aquí */}
                                     </TableCell>
