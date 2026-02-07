@@ -1,26 +1,48 @@
-import { notFound } from "next/navigation";
-import { getPlayerById } from "@/lib/mock-data";
+"use client";
+
+import { notFound, useParams } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cake, Ruler, Scale } from "lucide-react";
+import { Cake, Ruler, Scale, Shirt, Footprints, ArrowRightLeft } from "lucide-react";
 import { SummaryTab } from "@/components/players/PlayerProfile/SummaryTab";
 import { PhysicalTab } from "@/components/players/PlayerProfile/PhysicalTab";
 import { TechnicalTab } from "@/components/players/PlayerProfile/TechnicalTab";
 import { calculateAge } from "@/lib/utils";
 import { TacticalTab } from "@/components/players/PlayerProfile/TacticalTab";
 import { MedicalTab } from "@/components/players/PlayerProfile/MedicalTab";
+import { useDoc } from "@/firebase";
+import type { Player } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
-type PlayerProfilePageProps = {
-  params: {
-    id: string;
-  };
-};
+export default function PlayerProfilePage() {
+  const params = useParams();
+  const id = params.id as string;
+  const { data: player, loading } = useDoc<Player>(`players/${id}`);
 
-export default function PlayerProfilePage({ params }: PlayerProfilePageProps) {
-  const player = getPlayerById(params.id);
+  if (loading) {
+    return (
+        <div className="flex flex-col gap-8">
+            <header className="flex flex-col md:flex-row gap-6">
+                <Skeleton className="h-32 w-32 rounded-full" />
+                <div className="flex-1 space-y-3">
+                    <Skeleton className="h-6 w-24 rounded" />
+                    <Skeleton className="h-10 w-1/2 rounded" />
+                    <Skeleton className="h-6 w-1/3 rounded" />
+                     <div className="mt-4 flex items-center gap-4">
+                        <Skeleton className="h-5 w-20 rounded" />
+                        <Skeleton className="h-5 w-20 rounded" />
+                        <Skeleton className="h-5 w-20 rounded" />
+                     </div>
+                </div>
+            </header>
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-64 w-full rounded-lg" />
+        </div>
+    );
+  }
 
   if (!player) {
     notFound();

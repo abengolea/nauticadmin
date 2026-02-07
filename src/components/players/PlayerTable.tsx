@@ -13,9 +13,51 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Player } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { calculateAge } from "@/lib/utils";
+import { useCollection } from "@/firebase";
+import { Skeleton } from "../ui/skeleton";
 
-export function PlayerTable({ players }: { players: Player[] }) {
+export function PlayerTable() {
   const router = useRouter();
+  const { data: players, loading, error } = useCollection<Player>('players', {
+    orderBy: ['createdAt', 'desc']
+  });
+
+  if (loading) {
+    return (
+        <div className="rounded-md border">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Categoría</TableHead>
+                        <TableHead>Posición</TableHead>
+                        <TableHead>Edad</TableHead>
+                        <TableHead>Estado</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {[...Array(5)].map((_, i) => (
+                        <TableRow key={i}>
+                            <TableCell><Skeleton className="h-8 w-48" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </div>
+    )
+  }
+
+  if (error) {
+    return <div className="text-destructive p-4">Error al cargar los jugadores: {error.message}</div>
+  }
+  
+  if (!players || players.length === 0) {
+      return <div className="text-center text-muted-foreground p-4">No hay jugadores para mostrar.</div>
+  }
 
   return (
     <div className="rounded-md border">

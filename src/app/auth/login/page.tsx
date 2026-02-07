@@ -35,7 +35,7 @@ export default function LoginPage() {
         displayName: user.displayName || user.email?.split('@')[0],
         email: user.email,
         photoURL: user.photoURL,
-        role: 'coach',
+        role: 'entrenador',
       });
     } else {
       // Existing user, just update some fields, but crucially, not the role

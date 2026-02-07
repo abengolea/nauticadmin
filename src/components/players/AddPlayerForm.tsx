@@ -1,0 +1,287 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { es } from 'date-fns/locale';
+import { useFirestore } from "@/firebase";
+import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
+
+
+const playerSchema = z.object({
+  firstName: z.string().min(1, "El nombre es requerido."),
+  lastName: z.string().min(1, "El apellido es requerido."),
+  birthDate: z.date({ required_error: "La fecha de nacimiento es requerida."}),
+  city: z.string().min(1, "La ciudad es requerida."),
+  category: z.string().min(1, "La categoría es requerida."),
+  primaryPosition: z.string().min(1, "La posición es requerida."),
+  status: z.enum(["activo", "inactivo", "lesionado"]),
+  height: z.coerce.number().positive("Debe ser un número positivo.").optional(),
+  weight: z.coerce.number().positive("Debe ser un número positivo.").optional(),
+  avatarUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal('')),
+});
+
+export function AddPlayerForm() {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const router = useRouter();
+
+    const form = useForm<z.infer<typeof playerSchema>>({
+        resolver: zodResolver(playerSchema),
+        defaultValues: {
+            firstName: "",
+            lastName: "",
+            city: "",
+            category: "U18",
+            primaryPosition: "",
+            status: "activo",
+            avatarUrl: "",
+        },
+    });
+
+    async function onSubmit(values: z.infer<typeof playerSchema>) {
+        try {
+            await addDoc(collection(firestore, "players"), {
+                ...values,
+                birthDate: Timestamp.fromDate(values.birthDate),
+                createdAt: Timestamp.now(),
+            });
+
+            toast({
+                title: "Jugador añadido",
+                description: `${values.firstName} ${values.lastName} ha sido añadido a la base de datos.`,
+            });
+            router.push("/dashboard/players");
+
+        } catch (error) {
+            console.error("Error adding document: ", error);
+            toast({
+                variant: "destructive",
+                title: "Error al añadir jugador",
+                description: "Hubo un problema al guardar los datos. Inténtalo de nuevo.",
+            });
+        }
+    }
+
+    return (
+        <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <div className="grid md:grid-cols-2 gap-8">
+                <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Nombre</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Lionel" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Apellido</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Messi" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="birthDate"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                        <FormLabel>Fecha de Nacimiento</FormLabel>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                            <FormControl>
+                                <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                )}
+                                >
+                                {field.value ? (
+                                    format(field.value, "PPP", { locale: es })
+                                ) : (
+                                    <span>Elige una fecha</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                            </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) =>
+                                date > new Date() || date < new Date("1950-01-01")
+                                }
+                                initialFocus
+                            />
+                            </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="city"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Ciudad</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Rosario" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Categoría</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecciona una categoría" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                <SelectItem value="U14">Sub-14</SelectItem>
+                                <SelectItem value="U16">Sub-16</SelectItem>
+                                <SelectItem value="U18">Sub-18</SelectItem>
+                                <SelectItem value="U20">Sub-20</SelectItem>
+                                <SelectItem value="Reserva">Reserva</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="primaryPosition"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Posición Principal</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Delantero" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Estado</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecciona un estado" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                <SelectItem value="activo">Activo</SelectItem>
+                                <SelectItem value="inactivo">Inactivo</SelectItem>
+                                <SelectItem value="lesionado">Lesionado</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="height"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Altura (cm)</FormLabel>
+                        <FormControl>
+                        <Input type="number" placeholder="170" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="weight"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Peso (kg)</FormLabel>
+                        <FormControl>
+                        <Input type="number" placeholder="72" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="avatarUrl"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>URL del Avatar (Opcional)</FormLabel>
+                        <FormControl>
+                        <Input placeholder="https://..." {...field} />
+                        </FormControl>
+                        <FormDescription>URL pública de la imagen del jugador.</FormDescription>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+            </div>
+            
+            <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {form.formState.isSubmitting ? "Guardando..." : "Añadir Jugador"}
+            </Button>
+        </form>
+        </Form>
+    );
+}

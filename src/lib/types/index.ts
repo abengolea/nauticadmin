@@ -9,6 +9,7 @@ export type Player = {
   avatarUrl: string;
   height: number;
   weight: number;
+  city: string;
 };
 
 export type PhysicalTest = {

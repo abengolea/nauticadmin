@@ -1,56 +1,5 @@
 import type { Player, PhysicalTest, Session, Injury, TechnicalEvaluation, TacticalEvaluation } from "@/lib/types";
 
-export const players: Player[] = [
-  {
-    id: "1",
-    firstName: "Lionel",
-    lastName: "Messi",
-    birthDate: new Date("1987-06-24"),
-    category: "U18",
-    primaryPosition: "Delantero",
-    status: "activo",
-    avatarUrl: "https://picsum.photos/seed/p1/100/100",
-    height: 170,
-    weight: 72,
-  },
-  {
-    id: "2",
-    firstName: "Julián",
-    lastName: "Álvarez",
-    birthDate: new Date("2000-01-31"),
-    category: "U18",
-    primaryPosition: "Delantero",
-    status: "activo",
-    avatarUrl: "https://picsum.photos/seed/p2/100/100",
-    height: 170,
-    weight: 71,
-  },
-  {
-    id: "3",
-    firstName: "Emiliano",
-    lastName: "Martínez",
-    birthDate: new Date("1992-09-02"),
-    category: "U18",
-    primaryPosition: "Arquero",
-    status: "lesionado",
-    avatarUrl: "https://picsum.photos/seed/p3/100/100",
-    height: 195,
-    weight: 88,
-  },
-  {
-    id: "4",
-    firstName: "Enzo",
-    lastName: "Fernández",
-    birthDate: new Date("2001-01-17"),
-    category: "U18",
-    primaryPosition: "Mediocampista",
-    status: "activo",
-    avatarUrl: "https://picsum.photos/seed/p4/100/100",
-    height: 178,
-    weight: 77,
-  },
-];
-
 export const physicalTests: PhysicalTest[] = [
   { id: "t1", testType: "Sprint 10m", date: new Date("2023-08-15"), value: 1.8, unit: "s" },
   { id: "t2", testType: "Sprint 10m", date: new Date("2023-09-15"), value: 1.75, unit: "s" },
@@ -100,5 +49,3 @@ export const injuries: Injury[] = [
     { id: "i1", bodyPart: "Tobillo derecho", injuryDate: new Date("2023-09-20"), status: "alta", severity: "leve" },
     { id: "i2", bodyPart: "Isquiotibial izquierdo", injuryDate: new Date("2023-11-05"), status: "recuperando", severity: "moderada" },
 ];
-
-export const getPlayerById = (id: string) => players.find(p => p.id === id);

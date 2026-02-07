@@ -1,84 +1,94 @@
 {
     "entities": {
       "Player": {
-        "title": "Player",
-        "description": "Represents a player in the system.",
+        "title": "Jugador",
+        "description": "Representa a un jugador en el sistema.",
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "El ID único del jugador."
           },
           "firstName": {
-            "type": "string"
+            "type": "string",
+            "description": "El nombre del jugador."
           },
           "lastName": {
-            "type": "string"
+            "type": "string",
+            "description": "El apellido del jugador."
           },
           "birthDate": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "description": "La fecha de nacimiento del jugador."
           },
           "category": {
-            "type": "string"
+            "type": "string",
+            "description": "La categoría a la que pertenece el jugador (ej. U18)."
           },
           "primaryPosition": {
-            "type": "string"
+            "type": "string",
+            "description": "La posición principal del jugador."
           },
           "status": {
             "type": "string",
             "enum": [
-              "active",
-              "inactive",
-              "injured"
-            ]
+              "activo",
+              "inactivo",
+              "lesionado"
+            ],
+            "description": "El estado actual del jugador."
           },
           "avatarUrl": {
             "type": "string",
-            "format": "uri"
+            "format": "uri",
+            "description": "URL de la foto de perfil del jugador."
           },
           "height": {
-            "type": "number"
+            "type": "number",
+            "description": "La altura del jugador en centímetros."
           },
           "weight": {
-            "type": "number"
+            "type": "number",
+            "description": "El peso del jugador en kilogramos."
+          },
+          "city": {
+            "type": "string",
+            "description": "La ciudad de residencia del jugador."
           }
         },
         "required": [
-          "id",
           "firstName",
           "lastName",
           "birthDate",
           "category",
           "primaryPosition",
-          "status",
-          "avatarUrl",
-          "height",
-          "weight"
+          "status"
         ]
       },
       "UserProfile": {
-        "title": "User Profile",
-        "description": "Represents a user's profile information.",
+        "title": "Perfil de Usuario",
+        "description": "Representa la información del perfil de un usuario.",
         "type": "object",
         "properties": {
           "displayName": {
             "type": "string",
-            "description": "The user's display name."
+            "description": "El nombre a mostrar del usuario."
           },
           "email": {
             "type": "string",
             "format": "email",
-            "description": "The user's email address."
+            "description": "La dirección de correo electrónico del usuario."
           },
           "photoURL": {
             "type": "string",
             "format": "uri",
-            "description": "URL of the user's profile picture."
+            "description": "URL de la foto de perfil del usuario."
           },
           "role": {
             "type": "string",
-            "description": "The user's role in the application.",
-            "enum": ["admin", "coach"]
+            "description": "El rol del usuario en la aplicación.",
+            "enum": ["admin", "entrenador"]
           }
         }
       }
@@ -94,13 +104,13 @@
         "schema": {
           "$ref": "#/entities/Player"
         },
-        "description": "Stores all players."
+        "description": "Almacena a todos los jugadores."
       },
        "/users/{userId}": {
         "schema": {
           "$ref": "#/entities/UserProfile"
         },
-        "description": "Stores user profile information."
+        "description": "Almacena la información del perfil de usuario."
       }
     }
 }
