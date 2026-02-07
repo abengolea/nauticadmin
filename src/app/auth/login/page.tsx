@@ -62,7 +62,7 @@ export default function LoginPage() {
     }
 
     // 3. Make specific users super_admin
-    if (user.email === 'abengolea1@gmail.com' || user.email === 'goyitobengolea@gmail.com') {
+    if (user.email === 'abengolea1@gmail.com') {
       const platformUserRef = doc(firestore, 'platformUsers', user.uid);
       batch.set(platformUserRef, { super_admin: true });
     }
@@ -101,11 +101,11 @@ export default function LoginPage() {
   };
 
   const prefillSuperAdmin = () => {
-    setEmail('goyitobengolea@gmail.com');
+    setEmail('abengolea1@gmail.com');
     setPassword('');
     toast({
         title: "Credenciales de Super Admin cargadas",
-        description: "Ingresa la contraseña que creaste para 'goyitobengolea@gmail.com' y pulsa 'Iniciar Sesión'.",
+        description: "Ingresa la contraseña que creaste para 'abengolea1@gmail.com' y pulsa 'Iniciar Sesión'.",
     });
   }
   
