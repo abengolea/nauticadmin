@@ -15,23 +15,24 @@ export default function SchoolAdminPage() {
   const params = useParams();
   const router = useRouter();
   const schoolId = params.schoolId as string;
-  const { isSuperAdmin, isReady: profileReady } = useUserProfile();
+  const { user, isSuperAdmin, isReady: profileReady } = useUserProfile();
 
   const { data: school, loading: schoolLoading } = useDoc<School>(`schools/${schoolId}`);
 
   // Redirect if user is not a super admin and loading is done
   useEffect(() => {
-    if (profileReady && !isSuperAdmin) {
+    // Add exception for super admin email to prevent race condition redirects
+    if (profileReady && !isSuperAdmin && user?.email !== 'abengolea1@gmail.com') {
       router.push('/dashboard');
     }
-  }, [profileReady, isSuperAdmin, router]);
+  }, [profileReady, isSuperAdmin, user, router]);
 
 
   const isLoading = schoolLoading || !profileReady;
 
   // Don't render the component if the user is not a super admin
-  // This prevents flashing the content before redirecting
-  if (profileReady && !isSuperAdmin) {
+  // This prevents flashing the content before redirecting. Add exception for super admin email.
+  if (profileReady && !isSuperAdmin && user?.email !== 'abengolea1@gmail.com') {
     return null;
   }
 
