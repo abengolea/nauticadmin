@@ -12,76 +12,92 @@ service cloud.firestore {
     }
 
     function isSchoolAdmin(schoolId) {
-      return exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid)) &&
-             getSchoolUserData(schoolId, request.auth.uid).role == 'school_admin';
+      let userData = getSchoolUserData(schoolId, request.auth.uid);
+      return userData.role == 'school_admin';
     }
 
     function isCoach(schoolId) {
-      return exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid)) &&
-             getSchoolUserData(schoolId, request.auth.uid).role == 'coach';
+      let userData = getSchoolUserData(schoolId, request.auth.uid);
+      return userData.role == 'coach';
     }
 
     function isMemberOfSchool(schoolId) {
-      return isSchoolAdmin(schoolId) || isCoach(schoolId);
+      return exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid));
+    }
+    
+    function isAssignedToCategory(schoolId, categoryId) {
+      let userData = getSchoolUserData(schoolId, request.auth.uid);
+      return userData.role == 'coach' && categoryId in userData.assignedCategories;
     }
 
-    function isAssignedToCategory(schoolId, categoryId) {
-      return categoryId in getSchoolUserData(schoolId, request.auth.uid).assignedCategories;
-    }
-    
-    // --- Collection Group Functions ---
-    // Rule for any read on a collection group, e.g. /schools/{schoolId}/players
-    function canReadCollectionGroup(collectionName) {
-      // Example: User is trying to read from /schools/sanjuan/players/player123
-      // resource.data.__name__[6] will be 'sanjuan' (the schoolId)
-      let schoolId = resource.data.__name__[6];
-      return isSuperAdmin() || isMemberOfSchool(schoolId);
-    }
-    
     // --- Global Collections ---
     match /platformUsers/{userId} {
       allow read: if isSuperAdmin() || request.auth.uid == userId;
-      allow write: if isSuperAdmin();
+      allow write: if isSuperAdmin(); // Solo super admins pueden cambiar roles globales
     }
 
     match /schools/{schoolId} {
       allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
-      allow create, update: if isSuperAdmin(); // Only super admins can create/edit school details
-      allow delete: if false; // Schools should be soft-deleted by changing status
+      allow create, update: if isSuperAdmin();
+      allow delete: if false; // Soft delete cambiando el status
     }
-
-    // --- School Sub-Collections ---
     
-    // School user profiles can be read by any member of the school, but only written by admins.
+    // --- School Sub-collections ---
+    match /schools/{schoolId}/{document=**} {
+        // Regla general: solo miembros de la escuela o super admins pueden acceder a sus datos
+        allow read, write: if isSuperAdmin() || isMemberOfSchool(schoolId);
+    }
+    
     match /schools/{schoolId}/users/{userId} {
         allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
-        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+        allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
     
-    // Categories can be read by any member of the school, but only written by admins.
     match /schools/{schoolId}/categories/{categoryId} {
         allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
-        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
-    }
-    
-    // Player data is the most sensitive.
-    match /schools/{schoolId}/players/{playerId} {
-      allow read, update: if isSuperAdmin() || isMemberOfSchool(schoolId);
-      allow create, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+        allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
 
-    // --- Rules for collections that are not yet implemented in the MVP ---
-    // These are placeholders for when trainings and evaluations are added.
+    match /schools/{schoolId}/players/{playerId} {
+      allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      
+      // Un coach puede ver jugadores pero no crearlos/borrarlos directamente
+      allow read: if isCoach(schoolId);
+    }
+
     match /schools/{schoolId}/trainings/{trainingId} {
-       allow read, write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || (isCoach(schoolId) && isAssignedToCategory(schoolId, request.resource.data.categoryId));
+    }
+
+    match /schools/{schoolId}/trainings/{trainingId}/attendance/{playerId} {
+      allow read, write: if isSuperAdmin() || isSchoolAdmin(schoolId) || (isCoach(schoolId) && isAssignedToCategory(schoolId, get(/databases/$(database)/documents/schools/$(schoolId)/trainings/$(trainingId)).data.categoryId));
     }
     
     match /schools/{schoolId}/evaluations/{evalId} {
+      allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+      // Solo un admin o el coach asignado a la categoría del jugador puede crear/actualizar evaluaciones
+      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || (isCoach(schoolId) && isAssignedToCategory(schoolId, request.resource.data.categoryId));
+      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+    }
+
+    match /schools/{schoolId}/invites/{inviteId} {
        allow read, write: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
     
-    match /schools/{schoolId}/invites/{inviteId} {
+     match /schools/{schoolId}/testTemplates/{templateId} {
+        allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+    }
+    
+    match /schools/{schoolId}/reportRuns/{runId} {
        allow read, write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+    }
+
+    match /schools/{schoolId}/reports/{reportId} {
+        allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
   }
 }

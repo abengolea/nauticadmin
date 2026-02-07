@@ -5,23 +5,31 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cake, User, Contact } from "lucide-react";
+import { Cake, User, Contact, Bot } from "lucide-react";
 import { calculateAge } from "@/lib/utils";
-import { useDoc, useUserProfile } from "@/firebase";
-import type { Player } from "@/lib/types";
+import { useDoc, useUserProfile, useCollection } from "@/firebase";
+import type { Player, Evaluation } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SummaryTab } from "@/components/players/PlayerProfile/SummaryTab";
+import { AnalyticsTab } from "@/components/players/PlayerProfile/AnalyticsTab";
 
 export default function PlayerProfilePage() {
   const params = useParams();
   const id = params.id as string;
-  const { activeSchoolId, isReady } = useUserProfile();
+  const { activeSchoolId, isReady: profileReady } = useUserProfile();
   
-  const { data: player, loading } = useDoc<Player>(
-      isReady && activeSchoolId ? `schools/${activeSchoolId}/players/${id}` : ''
+  const { data: player, loading: playerLoading } = useDoc<Player>(
+      profileReady && activeSchoolId ? `schools/${activeSchoolId}/players/${id}` : ''
   );
 
-  if (loading || !isReady) {
+  const { data: evaluations, loading: evalsLoading } = useCollection<Evaluation>(
+    profileReady && activeSchoolId ? `schools/${activeSchoolId}/evaluations` : '',
+    { where: ['playerId', '==', id], orderBy: ['date', 'desc'], limit: 10 }
+  );
+
+  const isLoading = playerLoading || !profileReady || evalsLoading;
+
+  if (isLoading) {
     return (
         <div className="flex flex-col gap-8">
             <header className="flex flex-col md:flex-row gap-6">
@@ -37,7 +45,7 @@ export default function PlayerProfilePage() {
                      </div>
                 </div>
             </header>
-            <Skeleton className="h-10 w-full max-w-sm rounded-md" />
+            <Skeleton className="h-10 w-full max-w-md rounded-md" />
             <Skeleton className="h-64 w-full rounded-lg" />
         </div>
     );
@@ -82,15 +90,21 @@ export default function PlayerProfilePage() {
       </header>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-card">
+        <TabsList className="grid w-full grid-cols-3 bg-card">
           <TabsTrigger value="summary">Resumen</TabsTrigger>
           <TabsTrigger value="evaluations">Evaluaciones</TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-2">
+            Análisis IA <Bot className="h-4 w-4" />
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="summary">
           <SummaryTab player={playerWithSchool} />
         </TabsContent>
         <TabsContent value="evaluations">
-            <p className="p-4 text-center text-muted-foreground">La sección de evaluaciones está en construcción.</p>
+            <p className="p-4 text-center text-muted-foreground">La sección de historial de evaluaciones está en construcción.</p>
+        </TabsContent>
+        <TabsContent value="analytics">
+          <AnalyticsTab player={playerWithSchool} evaluations={evaluations || []} />
         </TabsContent>
       </Tabs>
     </div>

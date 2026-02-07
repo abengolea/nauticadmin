@@ -1,7 +1,7 @@
 import { type Timestamp } from "firebase/firestore";
 
 export interface PlatformUser {
-  id: string;
+  id: string; // auth uid
   super_admin: boolean;
 }
 
@@ -16,13 +16,15 @@ export interface School {
   createdAt: Timestamp;
 }
 
-// User's role within a specific school
+// Representa la membresía y el rol de un usuario en una escuela específica.
 export interface SchoolUser {
-  id: string; // same as auth uid
+  id: string; // auth uid
   displayName: string;
   email: string;
   role: 'school_admin' | 'coach';
-  assignedCategories: string[]; // array of categoryIds
+  // Los IDs de las categorías que un 'coach' tiene asignadas.
+  // Para 'school_admin' puede estar vacío o no aplicar.
+  assignedCategories: string[]; 
 }
 
 export interface Category {
@@ -33,11 +35,10 @@ export interface Category {
 
 export interface Player {
   id: string;
-  // schoolId is implicitly known from the collection path
-  categoryId: string;
   firstName: string;
   lastName: string;
   birthDate: Date | Timestamp;
+  categoryId: string; // ID de la categoría actual
   tutorContact: {
     name: string;
     phone: string;
@@ -47,8 +48,8 @@ export interface Player {
   observations?: string;
   createdAt: Timestamp;
   createdBy: string; // uid
-  // This is not part of the data model, but useful for the UI
-  escuelaId?: string;
+  // No está en el modelo de Firestore, se añade en el frontend.
+  escuelaId?: string; 
 }
 
 export interface Training {
@@ -60,47 +61,52 @@ export interface Training {
 }
 
 export interface Attendance {
-    id: string; // same as playerId
-    status: 'present' | 'absent';
+    id: string; // player id
+    status: 'presente' | 'ausente' | 'justificado';
     reason?: string;
 }
 
+// Unifica todas las evaluaciones en un solo documento por fecha.
 export interface Evaluation {
-  id: string;
+  id:string;
   playerId: string;
   categoryId: string;
   date: Timestamp;
-  physical?: {
-    height?: number; // cm
-    weight?: number; // kg
-    speed20m?: number; // seconds
-    resistanceBeepTest?: number; // level
-    agility?: number; // seconds
-  };
-  technical: {
-    ballControl: 1 | 2 | 3 | 4 | 5;
-    passing: 1 | 2 | 3 | 4 | 5;
-    dribbling: 1 | 2 | 3 | 4 | 5;
-    shooting: 1 | 2 | 3 | 4 | 5;
-    coordination: 1 | 2 | 3 | 4 | 5;
-  };
-  tactical: {
-    positioning: 1 | 2 | 3 | 4 | 5;
-    decisionMaking: 1 | 2 | 3 | 4 | 5;
-    teamwork: 1 | 2 | 3 | 4 | 5;
-  };
   coachComments: string;
+  physical?: {
+    height?: { value: number, unit: 'cm' };
+    weight?: { value: number, unit: 'kg' };
+    speed20m?: { value: number, unit: 's' };
+    resistanceBeepTest?: { value: number, unit: 'level' };
+    agilityTest?: { value: number, unit: 's' };
+  };
+  technical?: Record<string, 1 | 2 | 3 | 4 | 5>;
+  tactical?: Record<string, 1 | 2 | 3 | 4 | 5>;
+  socioEmotional?: {
+    respect: 1 | 2 | 3 | 4;
+    responsibility: 1 | 2 | 3 | 4;
+    teamwork: 1 | 2 | 3 | 4;
+    empathy: 1 | 2 | 3 | 4;
+    resilience: 1 | 2 | 3 | 4;
+    learningAttitude: 1 | 2 | 3 | 4;
+    evidence?: string[]; // Chips o comentarios cortos
+  };
+  criticalIncident?: {
+    type: 'verbal_aggression' | 'physical_aggression';
+    comment: string;
+    reportedBy: string; // uid
+    reportedAt: Timestamp;
+  };
   createdAt: Timestamp;
   createdBy: string; // uid
 }
 
-// This is a merged type for easy access in the UI
+
+// Perfil de usuario unificado para usar en el frontend
 export interface UserProfile extends SchoolUser {
     uid: string;
     isSuperAdmin: boolean;
-    // We'll add the active school here
     activeSchoolId?: string;
-    // A list of all schools the user is a member of
     memberships: SchoolMembership[];
 }
 
