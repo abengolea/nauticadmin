@@ -25,8 +25,8 @@ export async function getPlayerAnalysis(formData: FormData) {
   } catch (error) {
     console.error("Error getting player analysis:", error);
     if (error instanceof z.ZodError) {
-      return { success: false, error: "Invalid input." };
+      return { success: false, error: "Entrada inválida." };
     }
-    return { success: false, error: "Failed to generate analysis due to a server error." };
+    return { success: false, error: "No se pudo generar el análisis debido a un error del servidor." };
   }
 }

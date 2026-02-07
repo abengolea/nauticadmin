@@ -18,7 +18,7 @@ import {
 
 const chartConfig = {
   value: {
-    label: "Value",
+    label: "Valor",
     color: "hsl(var(--primary))",
   },
 } satisfies ChartConfig;
@@ -31,7 +31,7 @@ type EvolutionChartProps = {
 export function EvolutionChart({ data, dataKey }: EvolutionChartProps) {
   const formattedData = data.map(item => ({
     ...item,
-    date: item.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    date: item.date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })
   }));
 
   return (
