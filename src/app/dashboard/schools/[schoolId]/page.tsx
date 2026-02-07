@@ -10,29 +10,31 @@ import { ChevronLeft } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SchoolUsersList } from "@/components/admin/SchoolUsersList";
 import { useEffect } from "react";
+import { SchoolCategoriesManager } from "@/components/admin/SchoolCategoriesManager";
 
 export default function SchoolAdminPage() {
   const params = useParams();
   const router = useRouter();
   const schoolId = params.schoolId as string;
-  const { user, isSuperAdmin, isReady: profileReady } = useUserProfile();
+  const { isSuperAdmin, profile, isReady: profileReady } = useUserProfile();
 
   const { data: school, loading: schoolLoading } = useDoc<School>(`schools/${schoolId}`);
 
-  // Redirect if user is not a super admin and loading is done
+  const canManageSchool = isSuperAdmin || (profile?.role === 'school_admin' && profile?.activeSchoolId === schoolId);
+
+  // Redirect if user is not authorized and loading is done
   useEffect(() => {
-    // Add exception for super admin email to prevent race condition redirects
-    if (profileReady && !isSuperAdmin && user?.email !== 'abengolea1@gmail.com') {
+    if (profileReady && !canManageSchool) {
       router.push('/dashboard');
     }
-  }, [profileReady, isSuperAdmin, user, router]);
+  }, [profileReady, canManageSchool, router]);
 
 
   const isLoading = schoolLoading || !profileReady;
 
-  // Don't render the component if the user is not a super admin
-  // This prevents flashing the content before redirecting. Add exception for super admin email.
-  if (profileReady && !isSuperAdmin && user?.email !== 'abengolea1@gmail.com') {
+  // Don't render the component if the user is not authorized.
+  // This prevents flashing the content before redirecting.
+  if (profileReady && !canManageSchool) {
     return null;
   }
 
@@ -55,10 +57,16 @@ export default function SchoolAdminPage() {
       </div>
       
       {isLoading ? (
-        <Card>
-            <CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader>
-            <CardContent><Skeleton className="h-40 w-full" /></CardContent>
-        </Card>
+        <div className="space-y-4">
+            <Card>
+                <CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader>
+                <CardContent><Skeleton className="h-40 w-full" /></CardContent>
+            </Card>
+            <Card>
+                <CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader>
+                <CardContent><Skeleton className="h-40 w-full" /></CardContent>
+            </Card>
+        </div>
       ) : !school ? (
         <Card>
             <CardHeader>
@@ -67,9 +75,10 @@ export default function SchoolAdminPage() {
             </CardHeader>
         </Card>
       ) : (
-        <>
+        <div className="space-y-4">
             <SchoolUsersList schoolId={schoolId} />
-        </>
+            <SchoolCategoriesManager schoolId={schoolId} />
+        </div>
       )}
     </div>
   );
