@@ -25,11 +25,12 @@ export default function LandingPage() {
         </nav>
       </header>
       <main className="flex-1">
-        <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
+        <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container px-4 md:px-6">
             <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-2">
+                   <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm font-medium">Para Entrenadores y Admins</div>
                   <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline text-primary">
                     Gestiona el Futuro del Fútbol
                   </h1>
@@ -54,6 +55,40 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/40">
+          <div className="container px-4 md:px-6">
+            <div className="grid items-center gap-6 lg:grid-cols-[1fr_500px] lg:gap-12 xl:grid-cols-[1fr_550px]">
+              <Image
+                src="https://picsum.photos/seed/player-progress/1200/800"
+                width={550}
+                height={310}
+                alt="Player"
+                data-ai-hint="soccer player checking phone"
+                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover object-center sm:w-full lg:order-first"
+              />
+              <div className="flex flex-col justify-center space-y-4">
+                <div className="space-y-2">
+                  <div className="inline-block rounded-lg bg-primary/10 text-primary px-3 py-1 text-sm font-medium">Para Jugadores y Familias</div>
+                  <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl font-headline">¿Sos Jugador de la Escuela?</h2>
+                  <p className="max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                    Controla tu seguimiento, mira tus evaluaciones y comunicate con tus entrenadores. El registro de jugadores estará disponible próximamente.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                  <Button size="lg" disabled>
+                    Controla tu Seguimiento
+                  </Button>
+                  <Button size="lg" variant="secondary" disabled>
+                    Registrate
+                  </Button>
+                </div>
+                 <p className="text-xs text-muted-foreground">La funcionalidad para padres y jugadores es parte de la Fase 2 y estará disponible pronto.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main>
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
         <p className="text-xs text-muted-foreground">
