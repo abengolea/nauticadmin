@@ -28,22 +28,22 @@ service cloud.firestore {
 
     match /players/{playerId} {
       // Admins can read any player.
-      // Coaches can only read players from their own club.
+      // Coaches can only read players from their own school.
       allow read: if request.auth != null &&
                   (isUserAdmin(request.auth.uid) ||
-                   (isUserCoach(request.auth.uid) && resource.data.clubId == getUserData(request.auth.uid).clubId));
+                   (isUserCoach(request.auth.uid) && resource.data.escuelaId == getUserData(request.auth.uid).escuelaId));
                    
-      // Admins can create players for any club.
-      // Coaches can only create players for their own club.
+      // Admins can create players for any school.
+      // Coaches can only create players for their own school.
       allow create: if request.auth != null &&
                     (isUserAdmin(request.auth.uid) ||
-                     (isUserCoach(request.auth.uid) && request.resource.data.clubId == getUserData(request.auth.uid).clubId));
+                     (isUserCoach(request.auth.uid) && request.resource.data.escuelaId == getUserData(request.auth.uid).escuelaId));
 
       // Admins can update any player.
-      // Coaches can only update players from their own club.
+      // Coaches can only update players from their own school.
       allow update: if request.auth != null &&
                     (isUserAdmin(request.auth.uid) ||
-                     (isUserCoach(request.auth.uid) && request.resource.data.clubId == getUserData(request.auth.uid).clubId));
+                     (isUserCoach(request.auth.uid) && request.resource.data.escuelaId == getUserData(request.auth.uid).escuelaId));
 
       // Only admins can delete players.
       allow delete: if request.auth != null && isUserAdmin(request.auth.uid);

@@ -27,14 +27,14 @@ export function PlayerTable() {
     if (isAdmin) {
       return { orderBy: ['createdAt', 'desc'] as const };
     }
-    if (isCoach && profile?.clubId) {
+    if (isCoach && profile?.escuelaId) {
       return {
-        where: ['clubId', '==', profile.clubId] as const,
+        where: ['escuelaId', '==', profile.escuelaId] as const,
         orderBy: ['createdAt', 'desc'] as const,
       };
     }
     return null; // Don't fetch if not ready or no permission
-  }, [isReady, isAdmin, isCoach, profile?.clubId]);
+  }, [isReady, isAdmin, isCoach, profile?.escuelaId]);
 
   const { data: players, loading, error } = useCollection<Player>(
     collectionOptions ? 'players' : '',

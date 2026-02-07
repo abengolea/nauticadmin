@@ -72,18 +72,18 @@ export function AddPlayerForm() {
     });
 
     function onSubmit(values: z.infer<typeof playerSchema>) {
-        if (!profile?.clubId) {
+        if (!profile?.escuelaId) {
             toast({
                 variant: "destructive",
                 title: "Error de Perfil",
-                description: "Tu perfil de usuario no está asociado a un club. No puedes añadir jugadores.",
+                description: "Tu perfil de usuario no está asociado a una escuela. No puedes añadir jugadores.",
             });
             return;
         }
 
         const playerData = {
             ...values,
-            clubId: profile.clubId,
+            escuelaId: profile.escuelaId,
             birthDate: Timestamp.fromDate(values.birthDate),
             createdAt: Timestamp.now(),
         };

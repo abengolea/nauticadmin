@@ -56,9 +56,9 @@
             "type": "string",
             "description": "La ciudad de residencia del jugador."
           },
-          "clubId": {
+          "escuelaId": {
             "type": "string",
-            "description": "El ID del club al que pertenece el jugador."
+            "description": "El ID de la escuela a la que pertenece el jugador."
           }
         },
         "required": [
@@ -68,7 +68,7 @@
           "category",
           "primaryPosition",
           "status",
-          "clubId"
+          "escuelaId"
         ]
       },
       "UserProfile": {
@@ -95,9 +95,9 @@
             "description": "El rol del usuario en la aplicación.",
             "enum": ["admin", "entrenador"]
           },
-          "clubId": {
+          "escuelaId": {
             "type": "string",
-            "description": "El ID del club al que pertenece el usuario."
+            "description": "El ID de la escuela a la que pertenece el usuario."
           }
         }
       }

@@ -27,7 +27,7 @@ export default function PlayersPage() {
       <Card>
         <CardHeader>
           <CardTitle>Plantel de Jugadores</CardTitle>
-          <CardDescription>Gestiona los jugadores de tu club y mira sus perfiles.</CardDescription>
+          <CardDescription>Gestiona los jugadores de tu escuela y mira sus perfiles.</CardDescription>
         </CardHeader>
         <CardContent>
           <PlayerTable />

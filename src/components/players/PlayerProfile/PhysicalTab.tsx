@@ -67,7 +67,7 @@ export function PhysicalTab({ player }: { player: Player }) {
           </CardContent>
         </Card>
 
-        <ComparativeAnalytics playerId={player.id} />
+        <ComparativeAnalytics playerId={player.id} escuelaId={player.escuelaId} />
       </div>
     </div>
   );

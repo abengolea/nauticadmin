@@ -27,14 +27,14 @@ export default function DashboardPage() {
     if (isAdmin) {
       return { orderBy: ['createdAt', 'desc'] as const };
     }
-    if (isCoach && profile?.clubId) {
+    if (isCoach && profile?.escuelaId) {
       return {
-        where: ['clubId', '==', profile.clubId] as const,
+        where: ['escuelaId', '==', profile.escuelaId] as const,
         orderBy: ['createdAt', 'desc'] as const,
       };
     }
     return null;
-  }, [isReady, isAdmin, isCoach, profile?.clubId]);
+  }, [isReady, isAdmin, isCoach, profile?.escuelaId]);
   
   const { data: players, loading } = useCollection<Player>(
       collectionOptions ? 'players' : '',
@@ -153,7 +153,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{injuredPlayers}</div>
             <p className="text-xs text-muted-foreground">
-              {isAdmin ? 'En todos los clubes' : 'En tu club'}
+              {isAdmin ? 'En todas las escuelas' : 'En tu escuela'}
             </p>
           </CardContent>
         </Card>

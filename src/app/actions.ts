@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 const ActionInputSchema = z.object({
   playerId: z.string(),
-  clubId: z.string(),
+  escuelaId: z.string(),
   testType: z.string(),
 });
 
@@ -14,7 +14,7 @@ export async function getPlayerAnalysis(formData: FormData) {
   try {
     const input = ActionInputSchema.parse({
       playerId: formData.get('playerId'),
-      clubId: formData.get('clubId'),
+      escuelaId: formData.get('escuelaId'),
       testType: formData.get('testType'),
     });
     

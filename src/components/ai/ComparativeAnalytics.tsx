@@ -40,7 +40,7 @@ function SubmitButton() {
   );
 }
 
-export function ComparativeAnalytics({ playerId }: { playerId: string }) {
+export function ComparativeAnalytics({ playerId, escuelaId }: { playerId: string, escuelaId: string }) {
   const [state, formAction] = useFormState(getPlayerAnalysis, initialState);
 
   return (
@@ -51,13 +51,13 @@ export function ComparativeAnalytics({ playerId }: { playerId: string }) {
           Análisis de Rendimiento (IA)
         </CardTitle>
         <CardDescription>
-          Compara tendencias de jugadores contra las medianas del club para identificar áreas de mejora.
+          Compara tendencias de jugadores contra las medianas de la escuela para identificar áreas de mejora.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="playerId" value={playerId} />
-          <input type="hidden" name="clubId" value="club-123" />
+          <input type="hidden" name="escuelaId" value={escuelaId} />
           
           <div className="space-y-2">
             <Label htmlFor="testType">Seleccionar Tipo de Prueba</Label>

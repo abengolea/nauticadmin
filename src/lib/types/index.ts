@@ -10,7 +10,7 @@ export type Player = {
   height: number;
   weight: number;
   city: string;
-  clubId: string;
+  escuelaId: string;
 };
 
 export type PhysicalTest = {
@@ -67,5 +67,5 @@ export type UserProfile = {
   email: string;
   photoURL: string;
   role: 'admin' | 'entrenador';
-  clubId: string;
+  escuelaId: string;
 }

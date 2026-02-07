@@ -30,16 +30,16 @@ export default function LoginPage() {
     const userDocRef = doc(firestore, 'users', user.uid);
     const docSnap = await getDoc(userDocRef);
     if (!docSnap.exists()) {
-      // New user, create profile with default role and a placeholder club ID
+      // New user, create profile with default role and a placeholder school ID
       await setDoc(userDocRef, {
         displayName: user.displayName || user.email?.split('@')[0],
         email: user.email,
         photoURL: user.photoURL,
         role: 'entrenador',
-        clubId: 'club-123', // NOTE: All new coaches are assigned to a default club
+        escuelaId: 'escuela-123', // NOTE: All new coaches are assigned to a default school
       });
     } else {
-      // Existing user, just update some fields, but crucially, not the role or clubId
+      // Existing user, just update some fields, but crucially, not the role or escuelaId
       await setDoc(userDocRef, {
         displayName: user.displayName,
         photoURL: user.photoURL,
