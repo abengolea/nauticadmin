@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,13 +15,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PlusCircle, Building } from "lucide-react";
+import { Building } from "lucide-react";
 import { useCollection } from "@/firebase";
 import type { School } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
 import { Badge } from "../ui/badge";
+import { CreateSchoolDialog } from "./CreateSchoolDialog";
 
 export function SuperAdminDashboard() {
     const { data: schools, loading: schoolsLoading } = useCollection<School>('schools', { orderBy: ['createdAt', 'desc']});
@@ -35,10 +35,7 @@ export function SuperAdminDashboard() {
                     <p className="text-muted-foreground">Gestiona todas las escuelas de la plataforma.</p>
                 </div>
                 <div className="flex items-center space-x-2">
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Crear Nueva Escuela
-                </Button>
+                    <CreateSchoolDialog />
                 </div>
             </div>
 
@@ -60,6 +57,7 @@ export function SuperAdminDashboard() {
                                 <TableHead>Ubicación</TableHead>
                                 <TableHead>Estado</TableHead>
                                 <TableHead>Fecha de Creación</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -69,6 +67,7 @@ export function SuperAdminDashboard() {
                                     <TableCell><Skeleton className="h-6 w-32" /></TableCell>
                                     <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                                     <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-16 ml-auto" /></TableCell>
                                 </TableRow>
                             ))}
                             {schools?.map((school) => (
@@ -84,6 +83,9 @@ export function SuperAdminDashboard() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell>{format(school.createdAt.toDate(), 'dd/MM/yyyy', { locale: es })}</TableCell>
+                                    <TableCell className="text-right">
+                                        {/* Acciones futuras como "Gestionar" irán aquí */}
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
