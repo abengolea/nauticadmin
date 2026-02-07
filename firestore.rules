@@ -12,13 +12,14 @@ service cloud.firestore {
     }
 
     function isSchoolAdmin(schoolId) {
-      let userData = getSchoolUserData(schoolId, request.auth.uid);
-      return userData.role == 'school_admin';
+      // Se asegura de que el usuario exista en la escuela antes de leer su rol.
+      return exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid))
+          && getSchoolUserData(schoolId, request.auth.uid).role == 'school_admin';
     }
 
     function isCoach(schoolId) {
-      let userData = getSchoolUserData(schoolId, request.auth.uid);
-      return userData.role == 'coach';
+      return exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid))
+          && getSchoolUserData(schoolId, request.auth.uid).role == 'coach';
     }
 
     function isMemberOfSchool(schoolId) {
@@ -43,13 +44,11 @@ service cloud.firestore {
     }
     
     // --- School Sub-collections ---
-    match /schools/{schoolId}/{document=**} {
-        // Regla general: solo miembros de la escuela o super admins pueden acceder a sus datos
-        allow read, write: if isSuperAdmin() || isMemberOfSchool(schoolId);
-    }
     
     match /schools/{schoolId}/users/{userId} {
-        allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+        // Un usuario puede leer su propio documento de perfil.
+        // Un admin de escuela o super admin puede leer cualquier perfil en la escuela.
+        allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || request.auth.uid == userId;
         allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
     
@@ -59,11 +58,10 @@ service cloud.firestore {
     }
 
     match /schools/{schoolId}/players/{playerId} {
+      // Un miembro de la escuela puede ver los jugadores de su escuela.
       allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+      // Solo admins pueden crear/modificar jugadores.
       allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
-      
-      // Un coach puede ver jugadores pero no crearlos/borrarlos directamente
-      allow read: if isCoach(schoolId);
     }
 
     match /schools/{schoolId}/trainings/{trainingId} {
