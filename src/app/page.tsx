@@ -20,7 +20,7 @@ export default function LandingPage() {
             </Link>
           </Button>
           <Button asChild>
-            <Link href="/auth/login">Empezar Ahora</Link>
+            <Link href="/auth/signup">Regístrate</Link>
           </Button>
         </nav>
       </header>
@@ -70,20 +70,20 @@ export default function LandingPage() {
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-2">
                   <div className="inline-block rounded-lg bg-primary/10 text-primary px-3 py-1 text-sm font-medium">Para Jugadores y Familias</div>
-                  <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl font-headline">¿Sos Jugador de la Escuela?</h2>
+                  <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl font-headline">¿Sos parte de la Escuela?</h2>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                    Controla tu seguimiento, mira tus evaluaciones y comunicate con tus entrenadores. El registro de jugadores estará disponible próximamente.
+                    Crea tu cuenta para unirte a la plataforma. Un administrador te asignará a tu escuela y rol correspondiente para que puedas comenzar.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Button size="lg" disabled>
                     Controla tu Seguimiento
                   </Button>
-                  <Button size="lg" variant="secondary" disabled>
-                    Registrate
+                  <Button size="lg" variant="secondary" asChild>
+                    <Link href="/auth/signup">Regístrate</Link>
                   </Button>
                 </div>
-                 <p className="text-xs text-muted-foreground">La funcionalidad para padres y jugadores es parte de la Fase 2 y estará disponible pronto.</p>
+                 <p className="text-xs text-muted-foreground">El portal para control de seguimiento de padres y jugadores estará disponible próximamente.</p>
               </div>
             </div>
           </div>
