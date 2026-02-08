@@ -1,5 +1,11 @@
-# Firebase Studio
+# Escuela River App
 
-This is a NextJS starter in Firebase Studio.
+Aplicación web para gestión y seguimiento de jugadores de escuelas de fútbol.
 
-To get started, take a look at src/app/page.tsx.
+Desarrollada con Next.js y Firebase (Firestore, Auth, App Hosting).
+
+## Desarrollo
+El código vive en Firebase Studio y se trabaja localmente con Node.js.
+
+Punto de entrada:
+- src/app/page.tsx
