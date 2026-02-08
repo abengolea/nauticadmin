@@ -75,7 +75,7 @@ export function PlayerTable() {
             <TableRow
               key={player.id}
               className="cursor-pointer"
-              onClick={() => router.push(`/dashboard/players/${player.id}`)}
+              onClick={() => router.push(`/dashboard/players/${player.id}?schoolId=${activeSchoolId}`)}
             >
               <TableCell className="font-medium">
                 <div className="flex items-center gap-3">

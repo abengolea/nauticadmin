@@ -153,7 +153,7 @@ export function SchoolAdminDashboard() {
                     <p className="text-sm font-medium leading-none">{player.firstName} {player.lastName}</p>
                     <p className="text-sm text-muted-foreground">{player.categoryId}</p>
                   </div>
-                  <Link href={`/dashboard/players/${player.id}`} className="ml-auto">
+                  <Link href={`/dashboard/players/${player.id}?schoolId=${activeSchoolId}`} className="ml-auto">
                     <Button variant="ghost" size="sm">
                        Ver <ArrowUpRight className="h-4 w-4 ml-2" />
                     </Button>

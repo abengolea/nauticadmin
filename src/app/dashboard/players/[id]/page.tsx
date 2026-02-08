@@ -1,6 +1,6 @@
 "use client";
 
-import { notFound, useParams } from "next/navigation";
+import { notFound, useParams, useSearchParams } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,16 +22,20 @@ import { EvaluationDetailDisplay } from "@/components/evaluations/EvaluationDeta
 
 export default function PlayerProfilePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
   const { activeSchoolId, isReady: profileReady } = useUserProfile();
   const [isEvalSheetOpen, setEvalSheetOpen] = useState(false);
+
+  const schoolIdFromQuery = searchParams.get('schoolId');
+  const schoolId = schoolIdFromQuery || activeSchoolId;
   
   const { data: player, loading: playerLoading } = useDoc<Player>(
-      profileReady && activeSchoolId ? `schools/${activeSchoolId}/players/${id}` : ''
+      profileReady && schoolId ? `schools/${schoolId}/players/${id}` : ''
   );
 
   const { data: evaluations, loading: evalsLoading } = useCollection<Evaluation>(
-    profileReady && activeSchoolId ? `schools/${activeSchoolId}/evaluations` : '',
+    profileReady && schoolId ? `schools/${schoolId}/evaluations` : '',
     { where: ['playerId', '==', id], orderBy: ['date', 'desc'], limit: 20 }
   );
 
@@ -63,13 +67,13 @@ export default function PlayerProfilePage() {
     notFound();
   }
   
-  const playerWithSchool = { ...player, escuelaId: activeSchoolId! };
+  const playerWithSchool = { ...player, escuelaId: schoolId! };
 
   return (
     <>
     <AddEvaluationSheet
       playerId={id}
-      schoolId={activeSchoolId!}
+      schoolId={schoolId!}
       isOpen={isEvalSheetOpen}
       onOpenChange={setEvalSheetOpen}
     />
