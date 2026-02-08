@@ -81,7 +81,6 @@ export function AddSchoolUserDialog({ schoolId }: { schoolId: string }) {
             displayName: values.displayName,
             email: values.email,
             role: values.role,
-            assignedCategories: [],
         };
         batch.set(schoolUserRef, schoolUserData);
         

@@ -33,19 +33,9 @@
       "properties": {
         "displayName": { "type": "string" },
         "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["school_admin", "coach"] },
-        "assignedCategories": { "type": "array", "items": { "type": "string" }, "description": "IDs de categorías asignadas al coach."}
+        "role": { "type": "string", "enum": ["school_admin", "coach"] }
       },
       "required": ["displayName", "email", "role"]
-    },
-    "Category": {
-      "title": "Categoría",
-      "description": "Una categoría de edad (ej. U10).",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" }
-      },
-      "required": ["name"]
     },
     "Player": {
       "title": "Jugador",
@@ -55,7 +45,8 @@
         "firstName": { "type": "string" },
         "lastName": { "type": "string" },
         "birthDate": { "type": "string", "format": "date-time" },
-        "categoryId": { "type": "string" },
+        "dni": { "type": "string", "description": "Documento Nacional de Identidad del jugador." },
+        "healthInsurance": { "type": "string", "description": "Obra social o seguro médico del jugador." },
         "tutorContact": { "type": "object", "properties": { "name": { "type": "string" }, "phone": { "type": "string" } }, "required": ["name", "phone"]},
         "status": { "type": "string", "enum": ["active", "inactive"] },
         "photoUrl": { "type": "string", "format": "uri" },
@@ -63,7 +54,7 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "createdBy": { "type": "string" }
       },
-      "required": ["firstName", "lastName", "birthDate", "categoryId", "tutorContact", "status", "createdAt", "createdBy"]
+      "required": ["firstName", "lastName", "birthDate", "tutorContact", "status", "createdAt", "createdBy"]
     },
     "Evaluation": {
       "title": "Evaluación",
@@ -71,11 +62,10 @@
       "type": "object",
       "properties": {
         "playerId": { "type": "string" },
-        "categoryId": { "type": "string" },
         "date": { "type": "string", "format": "date-time" },
         "coachComments": { "type": "string" }
       },
-      "required": ["playerId", "categoryId", "date"]
+      "required": ["playerId", "date"]
     }
   },
   "auth": {
@@ -93,10 +83,6 @@
     "/schools/{schoolId}/users/{userId}": {
       "schema": { "$ref": "#/entities/SchoolUser" },
       "description": "Usuarios y sus roles para esta escuela."
-    },
-    "/schools/{schoolId}/categories/{categoryId}": {
-      "schema": { "$ref": "#/entities/Category" },
-      "description": "Categorías dentro de una escuela."
     },
     "/schools/{schoolId}/players/{playerId}": {
       "schema": { "$ref": "#/entities/Player" },

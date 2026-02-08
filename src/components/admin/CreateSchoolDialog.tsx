@@ -94,7 +94,6 @@ export function CreateSchoolDialog() {
           displayName: values.adminDisplayName,
           email: values.adminEmail,
           role: 'school_admin' as const,
-          assignedCategories: [],
       };
       batch.set(schoolUserRef, schoolUserData);
 

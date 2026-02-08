@@ -17,10 +17,18 @@ export function SummaryTab({ player }: { player: Player }) {
                                 <TableCell className="font-medium text-muted-foreground">Nombre Completo</TableCell>
                                 <TableCell className="text-right">{player.firstName} {player.lastName}</TableCell>
                             </TableRow>
-                            <TableRow>
-                                <TableCell className="font-medium text-muted-foreground">Categoría</TableCell>
-                                <TableCell className="text-right">{player.categoryId}</TableCell>
-                            </TableRow>
+                            {player.dni && (
+                                <TableRow>
+                                    <TableCell className="font-medium text-muted-foreground">DNI</TableCell>
+                                    <TableCell className="text-right">{player.dni}</TableCell>
+                                </TableRow>
+                            )}
+                            {player.healthInsurance && (
+                                <TableRow>
+                                    <TableCell className="font-medium text-muted-foreground">Obra Social</TableCell>
+                                    <TableCell className="text-right">{player.healthInsurance}</TableCell>
+                                </TableRow>
+                            )}
                              <TableRow>
                                 <TableCell className="font-medium text-muted-foreground">Estado</TableCell>
                                 <TableCell className="text-right capitalize">{player.status === 'active' ? 'Activo' : 'Inactivo'}</TableCell>

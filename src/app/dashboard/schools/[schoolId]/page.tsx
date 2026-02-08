@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChevronLeft } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SchoolUsersList } from "@/components/admin/SchoolUsersList";
-import { SchoolCategoriesManager } from "@/components/admin/SchoolCategoriesManager";
 import { useEffect } from "react";
 
 export default function SchoolAdminPage() {
@@ -78,7 +77,6 @@ export default function SchoolAdminPage() {
       ) : (
         <div className="space-y-4">
             <SchoolUsersList schoolId={schoolId} />
-            <SchoolCategoriesManager schoolId={schoolId} />
         </div>
       )}
     </div>

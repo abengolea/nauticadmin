@@ -76,7 +76,6 @@ export default function PlayerProfilePage() {
             {player.status === 'active' ? 'Activo' : 'Inactivo'}
           </Badge>
           <h1 className="text-4xl font-bold font-headline">{player.firstName} {player.lastName}</h1>
-          <p className="text-xl text-muted-foreground">{player.categoryId}</p>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
              <div className="flex items-center gap-1"><Cake className="h-4 w-4" /> {calculateAge(player.birthDate)} años</div>
              <div className="flex items-center gap-1"><User className="h-4 w-4" /> Tutor: {player.tutorContact.name}</div>

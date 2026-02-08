@@ -74,7 +74,6 @@ export function useUserProfile() {
             role: schoolUserData.role,
             displayName: schoolUserData.displayName,
             email: schoolUserData.email,
-            assignedCategories: schoolUserData.assignedCategories,
           };
         });
         setMemberships(userMemberships);
@@ -102,7 +101,6 @@ export function useUserProfile() {
         displayName: user.displayName || user.email || 'Super Admin',
         email: user.email!,
         role: 'school_admin', // Super admin has effectively the highest school role
-        assignedCategories: [],
         isSuperAdmin: true,
         activeSchoolId: undefined, // Super admin is not tied to one school
         memberships: [],

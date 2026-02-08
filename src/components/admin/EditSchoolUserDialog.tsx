@@ -32,16 +32,14 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
-import { useFirestore, useCollection, useUserProfile } from "@/firebase";
+import { useFirestore, useUserProfile } from "@/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import type { SchoolUser, Category } from "@/lib/types";
-import { Checkbox } from "../ui/checkbox";
+import type { SchoolUser } from "@/lib/types";
 
 const editUserSchema = z.object({
   displayName: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
   role: z.enum(["school_admin", "coach"], { required_error: "El rol es requerido."}),
-  assignedCategories: z.array(z.string()).optional(),
 });
 
 interface EditSchoolUserDialogProps {
@@ -54,7 +52,6 @@ export function EditSchoolUserDialog({ schoolId, user, children }: EditSchoolUse
   const [open, setOpen] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { data: categories, loading: categoriesLoading } = useCollection<Category>(`schools/${schoolId}/categories`, { orderBy: ['name', 'asc'] });
   const { user: currentUser } = useUserProfile();
 
   const form = useForm<z.infer<typeof editUserSchema>>({
@@ -62,7 +59,6 @@ export function EditSchoolUserDialog({ schoolId, user, children }: EditSchoolUse
     defaultValues: {
       displayName: user.displayName,
       role: user.role,
-      assignedCategories: user.assignedCategories || [],
     },
   });
 
@@ -75,7 +71,6 @@ export function EditSchoolUserDialog({ schoolId, user, children }: EditSchoolUse
       await updateDoc(userRef, {
         displayName: values.displayName,
         role: values.role,
-        assignedCategories: values.role === 'coach' ? values.assignedCategories : [],
       });
 
       toast({
@@ -102,7 +97,6 @@ export function EditSchoolUserDialog({ schoolId, user, children }: EditSchoolUse
             form.reset({
                 displayName: user.displayName,
                 role: user.role,
-                assignedCategories: user.assignedCategories || [],
             });
         }
     }}>
@@ -113,7 +107,7 @@ export function EditSchoolUserDialog({ schoolId, user, children }: EditSchoolUse
         <DialogHeader>
           <DialogTitle>Editar Usuario de Escuela</DialogTitle>
           <DialogDescription>
-            Modifica el rol y las categorías asignadas para este usuario.
+            Modifica el rol para este usuario.
           </DialogDescription>
         </DialogHeader>
         
@@ -154,52 +148,6 @@ export function EditSchoolUserDialog({ schoolId, user, children }: EditSchoolUse
                 </FormItem>
               )}
             />
-            
-            {form.watch('role') === 'coach' && (
-              <FormField
-                control={form.control}
-                name="assignedCategories"
-                render={() => (
-                  <FormItem>
-                    <FormLabel>Categorías Asignadas</FormLabel>
-                    <div className="rounded-md border p-4 max-h-36 overflow-y-auto space-y-2">
-                        {categoriesLoading ? <p className="text-sm text-center text-muted-foreground">Cargando categorías...</p> : 
-                        categories && categories.length > 0 ? categories.map((category) => (
-                            <FormField
-                                key={category.id}
-                                control={form.control}
-                                name="assignedCategories"
-                                render={({ field }) => {
-                                return (
-                                    <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                                        <FormControl>
-                                            <Checkbox
-                                            checked={field.value?.includes(category.id)}
-                                            onCheckedChange={(checked) => {
-                                                return checked
-                                                ? field.onChange([...(field.value || []), category.id])
-                                                : field.onChange(
-                                                    (field.value || []).filter(
-                                                        (value) => value !== category.id
-                                                    )
-                                                    );
-                                            }}
-                                            />
-                                        </FormControl>
-                                        <FormLabel className="font-normal text-sm">
-                                            {category.name}
-                                        </FormLabel>
-                                    </FormItem>
-                                );
-                                }}
-                            />
-                        )) : <p className="text-sm text-center text-muted-foreground">No hay categorías creadas.</p>}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
             
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>

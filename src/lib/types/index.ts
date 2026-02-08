@@ -22,15 +22,6 @@ export interface SchoolUser {
   displayName: string;
   email: string;
   role: 'school_admin' | 'coach';
-  // Los IDs de las categorías que un 'coach' tiene asignadas.
-  // Para 'school_admin' puede estar vacío o no aplicar.
-  assignedCategories: string[]; 
-}
-
-export interface Category {
-  id: string;
-  name: string; // "U6", "U8"
-  schoolId: string;
 }
 
 export interface Player {
@@ -38,7 +29,8 @@ export interface Player {
   firstName: string;
   lastName: string;
   birthDate: Date;
-  categoryId: string; // ID de la categoría actual
+  dni?: string;
+  healthInsurance?: string;
   tutorContact: {
     name: string;
     phone: string;
@@ -54,7 +46,6 @@ export interface Player {
 
 export interface Training {
     id: string;
-    categoryId: string;
     date: Date;
     createdAt: Date;
     createdBy: string; // uid
@@ -70,7 +61,6 @@ export interface Attendance {
 export interface Evaluation {
   id:string;
   playerId: string;
-  categoryId: string;
   date: Date;
   coachComments: string;
   physical?: {

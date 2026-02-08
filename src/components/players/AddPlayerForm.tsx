@@ -43,7 +43,8 @@ const playerSchema = z.object({
   firstName: z.string().min(1, "El nombre es requerido."),
   lastName: z.string().min(1, "El apellido es requerido."),
   birthDate: z.date({ required_error: "La fecha de nacimiento es requerida."}),
-  categoryId: z.string().min(1, "La categoría es requerida."),
+  dni: z.string().optional(),
+  healthInsurance: z.string().optional(),
   tutorName: z.string().min(1, "El nombre del tutor es requerido."),
   tutorPhone: z.string().min(1, "El teléfono del tutor es requerido."),
   status: z.enum(["active", "inactive"]),
@@ -65,6 +66,8 @@ export function AddPlayerForm() {
             status: "active",
             photoUrl: "",
             observations: "",
+            dni: "",
+            healthInsurance: "",
         },
     });
 
@@ -82,7 +85,8 @@ export function AddPlayerForm() {
             firstName: values.firstName,
             lastName: values.lastName,
             birthDate: Timestamp.fromDate(values.birthDate),
-            categoryId: values.categoryId,
+            dni: values.dni,
+            healthInsurance: values.healthInsurance,
             tutorContact: {
                 name: values.tutorName,
                 phone: values.tutorPhone,
@@ -191,27 +195,17 @@ export function AddPlayerForm() {
                         </FormItem>
                     )}
                 />
-                 <FormField
+                <FormField
                     control={form.control}
-                    name="categoryId"
+                    name="dni"
                     render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Categoría</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecciona una categoría" />
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {/* In a real app, these would be fetched from /schools/{schoolId}/categories */}
-                                <SelectItem value="U14">Sub-14</SelectItem>
-                                <SelectItem value="U16">Sub-16</SelectItem>
-                                <SelectItem value="U18">Sub-18</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    <FormItem>
+                        <FormLabel>DNI (Opcional)</FormLabel>
+                        <FormControl>
+                        <Input placeholder="40.123.456" {...field} />
+                        </FormControl>
                         <FormMessage />
-                        </FormItem>
+                    </FormItem>
                     )}
                 />
                  <FormField
@@ -235,6 +229,19 @@ export function AddPlayerForm() {
                         <FormLabel>Teléfono del Tutor</FormLabel>
                         <FormControl>
                         <Input placeholder="+54 9 ..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="healthInsurance"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Obra Social (Opcional)</FormLabel>
+                        <FormControl>
+                        <Input placeholder="Nombre de la obra social" {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
