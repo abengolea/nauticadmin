@@ -4,6 +4,7 @@ import {
   Home,
   Users,
   Settings,
+  Building,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,17 +14,27 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarFooter
+  SidebarFooter,
+  SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { RiverPlateLogo } from "../icons/RiverPlateLogo";
+import { useUserProfile } from "@/firebase";
 
-const menuItems = [
+const schoolUserMenuItems = [
   { href: "/dashboard", label: "Panel Principal", icon: Home },
   { href: "/dashboard/players", label: "Jugadores", icon: Users },
 ];
 
+const superAdminMenuItems = [
+    { href: "/dashboard", label: "Escuelas", icon: Building },
+];
+
+
 export function SidebarNav() {
   const pathname = usePathname();
+  const { isSuperAdmin, isReady } = useUserProfile();
+
+  const menuItems = isSuperAdmin ? superAdminMenuItems : schoolUserMenuItems;
 
   return (
     <>
@@ -34,22 +45,29 @@ export function SidebarNav() {
         </Link>
       </SidebarHeader>
       <SidebarContent className="p-2">
-        <SidebarMenu>
-          {menuItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <Link href={item.href}>
-                <SidebarMenuButton
-                  isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
-                  tooltip={item.label}
-                  className="font-headline"
-                >
-                  <item.icon />
-                  <span>{item.label}</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
+        {!isReady ? (
+            <div className="flex flex-col gap-2 pt-2">
+                <SidebarMenuSkeleton showIcon />
+                <SidebarMenuSkeleton showIcon />
+            </div>
+        ) : (
+            <SidebarMenu>
+            {menuItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                <Link href={item.href}>
+                    <SidebarMenuButton
+                    isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
+                    tooltip={item.label}
+                    className="font-headline"
+                    >
+                    <item.icon />
+                    <span>{item.label}</span>
+                    </SidebarMenuButton>
+                </Link>
+                </SidebarMenuItem>
+            ))}
+            </SidebarMenu>
+        )}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
