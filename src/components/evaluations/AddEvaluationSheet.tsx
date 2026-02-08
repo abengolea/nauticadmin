@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -23,11 +24,14 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mic, MicOff, Sparkles } from "lucide-react";
 import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError } from "@/firebase";
 import { collection, addDoc, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "../ui/scroll-area";
+import { improveCoachCommentsWithAI } from "@/ai/flows/improve-coach-comments";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 const evaluationSchema = z.object({
   coachComments: z.string().min(1, "Los comentarios son requeridos."),
@@ -69,17 +73,27 @@ const socioEmotionalSkills: { name: keyof EvaluationFormValues, label: string }[
     { name: "resilience", label: "Resiliencia / Tolerancia a la Frustración" },
 ]
 
+/** Evaluación mínima para contexto de IA (fecha + comentarios). */
+export type EvaluationSummaryForAI = { date: Date; coachComments: string };
+
 interface AddEvaluationSheetProps {
     playerId: string;
     schoolId: string;
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
+    /** Nombre del jugador (para "Mejorar con IA"). */
+    playerName?: string;
+    /** Evaluaciones anteriores del jugador (para que la IA mejore el texto con contexto). */
+    evaluationsSummary?: EvaluationSummaryForAI[];
 }
 
-export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange }: AddEvaluationSheetProps) {
+export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, playerName, evaluationsSummary = [] }: AddEvaluationSheetProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
     const { profile } = useUserProfile();
+    const [isRecording, setRecording] = useState(false);
+    const [isImproving, setImproving] = useState(false);
+    const recognitionRef = useRef<SpeechRecognition | null>(null);
 
     const form = useForm<EvaluationFormValues>({
         resolver: zodResolver(evaluationSchema),
@@ -161,6 +175,71 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange }:
                 });
             });
     }
+
+    const canUseVoice = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+
+    const toggleVoice = (currentValue: string, onChange: (v: string) => void) => {
+        const SpeechRecognitionAPI = (window as unknown as { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition
+            ?? (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+        if (!SpeechRecognitionAPI) return;
+
+        if (isRecording) {
+            recognitionRef.current?.stop();
+            recognitionRef.current = null;
+            setRecording(false);
+            return;
+        }
+
+        const recognition = new SpeechRecognitionAPI();
+        recognition.lang = "es-AR";
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+            const transcript = Array.from(event.results)
+                .map((r) => r[0].transcript)
+                .join("");
+            if (transcript) onChange(currentValue ? `${currentValue} ${transcript}` : transcript);
+        };
+        recognition.onend = () => {
+            setRecording(false);
+            recognitionRef.current = null;
+        };
+        recognition.onerror = () => {
+            setRecording(false);
+            recognitionRef.current = null;
+            toast({ variant: "destructive", title: "Error de voz", description: "No se pudo grabar. Prueba de nuevo." });
+        };
+        recognitionRef.current = recognition;
+        recognition.start();
+        setRecording(true);
+    };
+
+    const handleImproveWithAI = async (currentDraft: string) => {
+        const name = playerName ?? "el jugador";
+        setImproving(true);
+        try {
+            const previousSummary = evaluationsSummary.length > 0
+                ? evaluationsSummary
+                    .map((e) => `Evaluación del ${format(e.date, "PPP", { locale: es })}: ${e.coachComments || "(sin comentarios)"}`)
+                    .join("\n\n")
+                : "Sin evaluaciones anteriores.";
+            const result = await improveCoachCommentsWithAI({
+                playerName: name,
+                previousEvaluationsSummary: previousSummary,
+                currentDraft: currentDraft || "(El entrenador no escribió nada aún; genera un comentario breve y alentador basado en el historial si hay datos.)",
+            });
+            form.setValue("coachComments", result.improvedText);
+            toast({ title: "Texto mejorado", description: "Los comentarios se han redactado con IA." });
+        } catch (err) {
+            toast({
+                variant: "destructive",
+                title: "Error al mejorar con IA",
+                description: err instanceof Error ? err.message : "No se pudo generar el texto.",
+            });
+        } finally {
+            setImproving(false);
+        }
+    };
 
     return (
         <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -259,9 +338,32 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange }:
                                 render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Comentarios Generales del Entrenador</FormLabel>
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {canUseVoice && (
+                                            <Button
+                                                type="button"
+                                                variant={isRecording ? "destructive" : "outline"}
+                                                size="sm"
+                                                onClick={() => toggleVoice(field.value, field.onChange)}
+                                            >
+                                                {isRecording ? <MicOff className="h-4 w-4 mr-1" /> : <Mic className="h-4 w-4 mr-1" />}
+                                                {isRecording ? "Detener grabación" : "Hablar (transcribir)"}
+                                            </Button>
+                                        )}
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={isImproving}
+                                            onClick={() => handleImproveWithAI(field.value)}
+                                        >
+                                            {isImproving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                                            Mejorar con IA
+                                        </Button>
+                                    </div>
                                     <FormControl>
                                     <Textarea
-                                        placeholder="Describe el rendimiento general, actitud, y áreas de mejora..."
+                                        placeholder="Escribe o graba con voz. Luego puedes usar «Mejorar con IA» para que quede un texto coherente usando todas las evaluaciones."
                                         className="min-h-[120px]"
                                         {...field}
                                     />

@@ -1,11 +1,12 @@
 "use client";
 
-import { notFound, useParams, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useParams, useSearchParams } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cake, User, Contact, Bot, FilePlus } from "lucide-react";
+import { Cake, User, Contact, Bot, FilePlus, ArrowLeft, UserX, ClipboardCheck } from "lucide-react";
 import { calculateAge } from "@/lib/utils";
 import { useDoc, useUserProfile, useCollection } from "@/firebase";
 import type { Player, Evaluation } from "@/lib/types";
@@ -64,9 +65,29 @@ export default function PlayerProfilePage() {
   }
 
   if (!player) {
-    notFound();
+    return (
+      <div className="flex flex-col items-center justify-center gap-6 py-16">
+        <div className="rounded-full bg-muted p-4">
+          <UserX className="h-12 w-12 text-muted-foreground" />
+        </div>
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-semibold">Jugador no encontrado</h2>
+          <p className="text-muted-foreground max-w-sm">
+            {schoolId
+              ? "No existe un jugador con este ID en la escuela seleccionada, o no tienes permiso para verlo."
+              : "Falta el identificador de escuela. Entra desde la lista de jugadores de tu escuela."}
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href={schoolId ? `/dashboard/players?schoolId=${schoolId}` : "/dashboard/players"}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver a jugadores
+          </Link>
+        </Button>
+      </div>
+    );
   }
-  
+
   const playerWithSchool = { ...player, escuelaId: schoolId! };
 
   return (
@@ -76,6 +97,8 @@ export default function PlayerProfilePage() {
       schoolId={schoolId!}
       isOpen={isEvalSheetOpen}
       onOpenChange={setEvalSheetOpen}
+      playerName={`${player.firstName ?? ""} ${player.lastName ?? ""}`.trim()}
+      evaluationsSummary={evaluations?.map((e) => ({ date: e.date, coachComments: e.coachComments ?? "" })) ?? []}
     />
     <div className="flex flex-col gap-8">
       <header className="flex flex-col md:flex-row gap-6">
@@ -113,9 +136,12 @@ export default function PlayerProfilePage() {
       </header>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-card">
+        <TabsList className="grid w-full grid-cols-4 bg-card">
           <TabsTrigger value="summary">Resumen</TabsTrigger>
           <TabsTrigger value="evaluations">Evaluaciones</TabsTrigger>
+          <TabsTrigger value="attendance" className="gap-2">
+            Asistencia <ClipboardCheck className="h-4 w-4" />
+          </TabsTrigger>
           <TabsTrigger value="analytics" className="gap-2">
             Análisis IA <Bot className="h-4 w-4" />
           </TabsTrigger>
@@ -155,6 +181,17 @@ export default function PlayerProfilePage() {
                 ))}
               </Accordion>
             )}
+        </TabsContent>
+        <TabsContent value="attendance">
+          <Card>
+            <CardContent className="p-10 text-center text-muted-foreground">
+              <ClipboardCheck className="mx-auto h-12 w-12 mb-4 opacity-50" />
+              <h3 className="font-semibold text-foreground">Control de asistencia</h3>
+              <p className="mt-2">
+                El profesor podrá registrar y consultar la asistencia de este jugador aquí. (Próximamente.)
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
         <TabsContent value="analytics">
           <AnalyticsTab player={playerWithSchool} evaluations={evaluations || []} />

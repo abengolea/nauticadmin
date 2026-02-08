@@ -9,7 +9,11 @@ export default function LandingPage() {
       <header className="px-4 lg:px-6 h-14 flex items-center">
         <Link href="/" className="flex items-center justify-center">
           <RiverPlateLogo className="h-8 w-8" />
-          <span className="ml-2 text-lg font-bold font-headline text-primary">Escuela River San Nicolás</span>
+          <span className="ml-2 text-lg font-bold font-headline uppercase">
+            <span className="text-red-600">ESCUELAS</span>{" "}
+            <span className="text-black dark:text-white">RIVER</span>{" "}
+            <span className="text-red-600">SN</span>
+          </span>
         </Link>
         <nav className="ml-auto flex items-center gap-4 sm:gap-6">
           <Button variant="ghost" asChild>
@@ -92,7 +96,7 @@ export default function LandingPage() {
       </main>
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
         <p className="text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} Escuela River San Nicolás. Todos los derechos reservados.
+          &copy; {new Date().getFullYear()} ESCUELAS RIVER SN. Todos los derechos reservados.
         </p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link href="#" className="text-xs hover:underline underline-offset-4">

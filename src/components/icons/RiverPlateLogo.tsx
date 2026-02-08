@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 // This key should be consistent with the settings page
 const LOGO_STORAGE_KEY = "app-logo-data-url";
-const FALLBACK_LOGO_SRC = "/river-plate-logo.png"; // A default that will 404 if not in /public, but provides a path
+const FALLBACK_LOGO_SRC = "/LogoRiverNuevo_1_2.png"; // Logo en public/LogoRiverNuevo_1_2.png
 
 export function RiverPlateLogo({ className }: { className?: string }) {
   const [logoSrc, setLogoSrc] = useState<string | null>(null);
@@ -53,7 +53,7 @@ export function RiverPlateLogo({ className }: { className?: string }) {
       // Using a key helps React re-render the image when the src changes
       key={logoSrc}
       src={logoSrc}
-      alt="Escuela River San Nicolás Logo"
+      alt="Escuelas River Logo"
       width={40}
       height={40}
       className={cn("h-10 w-10", className)}

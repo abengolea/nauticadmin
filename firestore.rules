@@ -19,8 +19,14 @@ service cloud.firestore {
           );
     }
 
+    function userExistsInSchool(schoolId) {
+      return exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid));
+    }
+
     function getSchoolUserData(schoolId) {
-      return get(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid)).data;
+      return userExistsInSchool(schoolId)
+          ? get(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid)).data
+          : null;
     }
 
     function isSchoolAdmin(schoolId) {
@@ -83,7 +89,10 @@ service cloud.firestore {
     }
 
     match /schools/{schoolId} {
-      allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+      allow read: if isSuperAdmin()
+          || isMemberOfSchool(schoolId)
+          || isSchoolAdmin(schoolId)
+          || isCoach(schoolId);
       allow create, update: if isSuperAdmin();
       allow delete: if false; // Soft delete
     }
@@ -97,20 +106,31 @@ service cloud.firestore {
     }
     
     match /schools/{schoolId}/players/{playerId} {
-      allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+      allow read: if isSuperAdmin()
+          || isMemberOfSchool(schoolId)
+          || isSchoolAdmin(schoolId)
+          || isCoach(schoolId);
       // Coaches can create/update, but only admins can delete.
       allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
       allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
 
     match /schools/{schoolId}/pendingPlayers/{pendingId} {
-        allow read, delete: if isSuperAdmin() || isMemberOfSchool(schoolId);
+        // Super admin, miembros de la escuela, o admins/entrenadores pueden leer y eliminar.
+        allow read, delete: if isSuperAdmin()
+            || isMemberOfSchool(schoolId)
+            || isSchoolAdmin(schoolId)
+            || isCoach(schoolId);
         // Allow any signed-in user to create a request. This can be tightened later if needed.
         allow create: if isSignedIn();
     }
 
     match /schools/{schoolId}/evaluations/{evalId} {
-      allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+      // get = documento individual; list = listar la colección (queries).
+      allow get, list: if isSuperAdmin()
+          || isMemberOfSchool(schoolId)
+          || isSchoolAdmin(schoolId)
+          || isCoach(schoolId);
       // A coach can create an evaluation only for an assigned category.
       allow create: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
       // On update, a coach cannot change the categoryId and must be assigned to the original category.
@@ -121,7 +141,10 @@ service cloud.firestore {
     // --- Other collections ---
 
     match /schools/{schoolId}/trainings/{trainingId} {
-      allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+      allow read: if isSuperAdmin()
+          || isMemberOfSchool(schoolId)
+          || isSchoolAdmin(schoolId)
+          || isCoach(schoolId);
       allow create: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
       allow update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
       allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
@@ -137,7 +160,10 @@ service cloud.firestore {
     }
     
      match /schools/{schoolId}/testTemplates/{templateId} {
-        allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+        allow read: if isSuperAdmin()
+            || isMemberOfSchool(schoolId)
+            || isSchoolAdmin(schoolId)
+            || isCoach(schoolId);
         allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
     
@@ -146,7 +172,10 @@ service cloud.firestore {
     }
 
     match /schools/{schoolId}/reports/{reportId} {
-        allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
+        allow read: if isSuperAdmin()
+            || isMemberOfSchool(schoolId)
+            || isSchoolAdmin(schoolId)
+            || isCoach(schoolId);
         allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
   }
