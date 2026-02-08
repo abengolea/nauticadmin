@@ -25,7 +25,7 @@ export function useUserProfile() {
   const [membershipsLoading, setMembershipsLoading] = useState(true);
   
   // Fetch global platform roles (e.g., isSuperAdmin)
-  const { data: platformUser, loading: platformUserLoading } = useDoc<PlatformUser>(
+  const { data: platformUser, loading: platformUserLoading, error: platformUserError } = useDoc<PlatformUser>(
     user ? `platformUsers/${user.uid}` : ''
   );
   
@@ -75,8 +75,6 @@ export function useUserProfile() {
       }
       setMembershipsLoading(false);
     }).catch((error: FirestoreError) => {
-        // This error is expected if the index is not created yet.
-        // The console will show a link to create it.
         console.error("Error fetching user memberships:", error);
         setMemberships([]);
         setMembershipsLoading(false);
@@ -134,8 +132,8 @@ export function useUserProfile() {
     loading,
     isReady,
     activeSchoolId: profile?.activeSchoolId,
-    isAdmin: profile?.isSuperAdmin || profile?.role === 'school_admin',
+    isAdmin: isSuperAdmin || profile?.role === 'school_admin',
     isCoach: profile?.role === 'coach',
-    isSuperAdmin: profile?.isSuperAdmin ?? false,
+    isSuperAdmin: isSuperAdmin,
   };
 }
