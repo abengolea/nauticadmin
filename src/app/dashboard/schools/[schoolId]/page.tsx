@@ -6,10 +6,12 @@ import { useDoc, useUserProfile } from "@/firebase";
 import type { School } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Shield, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SchoolUsersList } from "@/components/admin/SchoolUsersList";
 import { useEffect } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PlayerTable } from "@/components/players/PlayerTable";
 
 export default function SchoolAdminPage() {
   const params = useParams();
@@ -75,9 +77,32 @@ export default function SchoolAdminPage() {
             </CardHeader>
         </Card>
       ) : (
-        <div className="space-y-4">
-            <SchoolUsersList schoolId={schoolId} />
-        </div>
+        <Tabs defaultValue="users" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="users">
+                    <Shield className="mr-2 h-4 w-4" />
+                    Responsables
+                </TabsTrigger>
+                <TabsTrigger value="players">
+                    <Users className="mr-2 h-4 w-4" />
+                    Jugadores
+                </TabsTrigger>
+            </TabsList>
+            <TabsContent value="users">
+                <SchoolUsersList schoolId={schoolId} />
+            </TabsContent>
+            <TabsContent value="players">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Plantel de Jugadores</CardTitle>
+                        <CardDescription>Gestiona los jugadores de esta escuela.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <PlayerTable schoolId={schoolId} />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
       )}
     </div>
   );

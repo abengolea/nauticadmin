@@ -17,12 +17,14 @@ import { useCollection, useUserProfile } from "@/firebase";
 import { Skeleton } from "../ui/skeleton";
 import React from "react";
 
-export function PlayerTable() {
+export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   const router = useRouter();
-  const { isReady, activeSchoolId } = useUserProfile();
+  const { isReady, activeSchoolId: userActiveSchoolId } = useUserProfile();
+
+  const schoolId = propSchoolId || userActiveSchoolId;
 
   const { data: players, loading, error } = useCollection<Player>(
-    isReady && activeSchoolId ? `schools/${activeSchoolId}/players` : '',
+    isReady && schoolId ? `schools/${schoolId}/players` : '',
     { orderBy: ['lastName', 'asc'] }
   );
 
@@ -75,18 +77,18 @@ export function PlayerTable() {
             <TableRow
               key={player.id}
               className="cursor-pointer"
-              onClick={() => router.push(`/dashboard/players/${player.id}?schoolId=${activeSchoolId}`)}
+              onClick={() => router.push(`/dashboard/players/${player.id}?schoolId=${schoolId}`)}
             >
               <TableCell className="font-medium">
                 <div className="flex items-center gap-3">
                   <Avatar>
                     <AvatarImage src={player.photoUrl} alt={player.firstName} data-ai-hint="person portrait" />
-                    <AvatarFallback>{player.firstName[0]}{player.lastName[0]}</AvatarFallback>
+                    <AvatarFallback>{(player.firstName?.[0] || '')}{(player.lastName?.[0] || '')}</AvatarFallback>
                   </Avatar>
                   <span>{player.firstName} {player.lastName}</span>
                 </div>
               </TableCell>
-              <TableCell>{calculateAge(player.birthDate)}</TableCell>
+              <TableCell>{player.birthDate ? calculateAge(player.birthDate) : '-'}</TableCell>
               <TableCell>
                 <Badge
                   variant={
