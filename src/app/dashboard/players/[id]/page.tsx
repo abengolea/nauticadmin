@@ -76,8 +76,10 @@ export default function PlayerProfilePage() {
     <div className="flex flex-col gap-8">
       <header className="flex flex-col md:flex-row gap-6">
         <Avatar className="h-32 w-32 border-4 border-card">
-          <AvatarImage src={player.photoUrl} data-ai-hint="person portrait" />
-          <AvatarFallback className="text-4xl">{player.firstName[0]}{player.lastName[0]}</AvatarFallback>
+          <AvatarImage src={player.photoUrl || undefined} data-ai-hint="person portrait" />
+          <AvatarFallback className="text-4xl">
+            {(player.firstName?.[0] || '')}{(player.lastName?.[0] || '')}
+          </AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <Badge 
@@ -90,11 +92,11 @@ export default function PlayerProfilePage() {
           >
             {player.status === 'active' ? 'Activo' : 'Inactivo'}
           </Badge>
-          <h1 className="text-4xl font-bold font-headline">{player.firstName} {player.lastName}</h1>
+          <h1 className="text-4xl font-bold font-headline">{player.firstName || ''} {player.lastName || ''}</h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-             <div className="flex items-center gap-1"><Cake className="h-4 w-4" /> {calculateAge(player.birthDate)} años</div>
-             <div className="flex items-center gap-1"><User className="h-4 w-4" /> Tutor: {player.tutorContact.name}</div>
-             <div className="flex items-center gap-1"><Contact className="h-4 w-4" /> {player.tutorContact.phone}</div>
+             {player.birthDate && <div className="flex items-center gap-1"><Cake className="h-4 w-4" /> {calculateAge(player.birthDate)} años</div>}
+             {player.tutorContact?.name && <div className="flex items-center gap-1"><User className="h-4 w-4" /> Tutor: {player.tutorContact.name}</div>}
+             {player.tutorContact?.phone && <div className="flex items-center gap-1"><Contact className="h-4 w-4" /> {player.tutorContact.phone}</div>}
           </div>
         </div>
         <div className="flex items-start gap-2">
@@ -138,7 +140,7 @@ export default function PlayerProfilePage() {
                   <AccordionItem value={evaluation.id} key={evaluation.id}>
                     <AccordionTrigger>
                       <div className="flex justify-between w-full pr-4">
-                        <span className="font-semibold">Evaluación del {format(evaluation.date, "PPP", { locale: es })}</span>
+                        <span className="font-semibold">Evaluación del {evaluation.date ? format(evaluation.date, "PPP", { locale: es }) : 'Fecha desconocida'}</span>
                         <span className="text-sm text-muted-foreground">Ver detalles</span>
                       </div>
                     </AccordionTrigger>

@@ -22,6 +22,7 @@ const skillLabels: Record<string, string> = {
     responsibility: "Responsabilidad",
     teamwork: "Compañerismo",
     resilience: "Resiliencia",
+    learningAttitude: "Actitud de aprendizaje",
 };
 
 export function EvaluationDetailDisplay({ evaluation }: EvaluationDetailDisplayProps) {
@@ -38,7 +39,7 @@ export function EvaluationDetailDisplay({ evaluation }: EvaluationDetailDisplayP
             <Card>
                  <CardHeader>
                     <CardTitle className="font-headline text-xl">
-                        Evaluación del {format(evaluation.date, "d 'de' MMMM 'de' yyyy", { locale: es })}
+                        Evaluación del {evaluation.date ? format(evaluation.date, "d 'de' MMMM 'de' yyyy", { locale: es }) : "Fecha desconocida"}
                     </CardTitle>
                     <CardDescription>
                         Comentarios y calificaciones de la sesión.
@@ -55,7 +56,7 @@ export function EvaluationDetailDisplay({ evaluation }: EvaluationDetailDisplayP
             </Card>
 
             <div className="grid md:grid-cols-3 gap-4">
-                {evaluation.technical && (
+                {evaluation.technical && Object.keys(evaluation.technical).length > 0 && (
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Técnica</CardTitle>
@@ -65,7 +66,7 @@ export function EvaluationDetailDisplay({ evaluation }: EvaluationDetailDisplayP
                         </CardContent>
                     </Card>
                 )}
-                {evaluation.tactical && (
+                {evaluation.tactical && Object.keys(evaluation.tactical).length > 0 && (
                      <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Táctica</CardTitle>
@@ -75,7 +76,7 @@ export function EvaluationDetailDisplay({ evaluation }: EvaluationDetailDisplayP
                         </CardContent>
                     </Card>
                 )}
-                {evaluation.socioEmotional && (
+                {evaluation.socioEmotional && Object.keys(evaluation.socioEmotional).length > 0 && (
                      <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Socio-emocional</CardTitle>
