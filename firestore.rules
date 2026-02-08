@@ -103,6 +103,12 @@ service cloud.firestore {
       allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
 
+    match /schools/{schoolId}/pendingPlayers/{pendingId} {
+        allow read, delete: if isSuperAdmin() || isMemberOfSchool(schoolId);
+        // Allow any signed-in user to create a request. This can be tightened later if needed.
+        allow create: if isSignedIn();
+    }
+
     match /schools/{schoolId}/evaluations/{evalId} {
       allow read: if isSuperAdmin() || isMemberOfSchool(schoolId);
       // A coach can create an evaluation only for an assigned category.

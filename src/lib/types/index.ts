@@ -52,6 +52,20 @@ export interface Player {
   escuelaId?: string; 
 }
 
+export interface PendingPlayer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  birthDate: Date;
+  dni?: string;
+  tutorContact: {
+    name: string;
+    phone: string;
+  };
+  submittedAt: Date;
+}
+
+
 export interface Training {
     id: string;
     date: Date;

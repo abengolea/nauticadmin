@@ -6,6 +6,7 @@ import {
   Settings,
   Building,
   Shield,
+  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -24,6 +25,7 @@ import { useUserProfile } from "@/firebase";
 const schoolUserMenuItems = [
   { href: "/dashboard", label: "Panel Principal", icon: Home },
   { href: "/dashboard/players", label: "Jugadores", icon: Users },
+  { href: "/dashboard/registrations", label: "Solicitudes", icon: UserCheck },
 ];
 
 const superAdminMenuItems = [
