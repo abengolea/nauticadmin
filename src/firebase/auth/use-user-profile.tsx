@@ -5,7 +5,7 @@ import { useFirestore } from '../provider';
 import type { PlatformUser, SchoolUser, UserProfile, SchoolMembership } from '@/lib/types';
 import { useDoc } from '../firestore/use-doc';
 import { useEffect, useMemo, useState } from 'react';
-import { collectionGroup, query, where, getDocs } from 'firebase/firestore';
+import { collectionGroup, query, where, getDocs, type FirestoreError } from 'firebase/firestore';
 
 
 // This type extends SchoolMembership to include the full user data found in the subcollection,
@@ -74,7 +74,7 @@ export function useUserProfile() {
         setMemberships(userMemberships);
       }
       setMembershipsLoading(false);
-    }).catch(error => {
+    }).catch((error: FirestoreError) => {
         console.error("Error fetching user memberships:", error);
         setMemberships([]);
         setMembershipsLoading(false);
