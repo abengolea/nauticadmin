@@ -10,14 +10,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirestore } from "@/firebase";
-import type { SchoolUser } from "@/lib/types";
+import type { SchoolUser, Category } from "@/lib/types";
 import { Skeleton } from "../ui/skeleton";
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
-import { Users, MoreHorizontal, Loader2 } from "lucide-react";
+import { Users, MoreHorizontal, Loader2, Edit } from "lucide-react";
 import { AddSchoolUserDialog } from "./AddSchoolUserDialog";
 import { Button } from "../ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "../ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "../ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,15 +31,19 @@ import {
 import { doc, deleteDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useUserProfile } from "@/firebase";
+import { EditSchoolUserDialog } from "./EditSchoolUserDialog";
 
 export function SchoolUsersList({ schoolId }: { schoolId: string }) {
-  const { data: users, loading, error } = useCollection<SchoolUser>(`schools/${schoolId}/users`);
+  const { data: users, loading: usersLoading } = useCollection<SchoolUser>(`schools/${schoolId}/users`, { orderBy: ['displayName', 'asc'] });
+  const { data: categories, loading: categoriesLoading } = useCollection<Category>(`schools/${schoolId}/categories`);
   const firestore = useFirestore();
   const { toast } = useToast();
   const { user } = useUserProfile();
 
   const [userToDelete, setUserToDelete] = useState<SchoolUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  const loading = usersLoading || categoriesLoading;
 
   const roleDisplay: { [key in SchoolUser['role']]: string } = {
     school_admin: 'Admin. de Escuela',
@@ -92,7 +96,8 @@ export function SchoolUsersList({ schoolId }: { schoolId: string }) {
                 <TableHead>Nombre</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Rol</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead>Categorías Asignadas</TableHead>
+                <TableHead className="text-right w-[80px]">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -101,22 +106,28 @@ export function SchoolUsersList({ schoolId }: { schoolId: string }) {
                   <TableCell><Skeleton className="h-6 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-48" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-36" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                 </TableRow>
               ))}
-              {error && (
-                  <TableRow>
-                      <TableCell colSpan={4} className="text-center text-destructive">
-                          Error al cargar los usuarios.
-                      </TableCell>
-                  </TableRow>
-              )}
               {!loading && users?.map((userRow) => (
                 <TableRow key={userRow.id}>
                   <TableCell className="font-medium">{userRow.displayName}</TableCell>
                   <TableCell>{userRow.email}</TableCell>
                   <TableCell>
-                      <Badge variant="secondary">{roleDisplay[userRow.role] || userRow.role}</Badge>
+                      <Badge variant={userRow.role === 'school_admin' ? 'default' : 'secondary'}>{roleDisplay[userRow.role] || userRow.role}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {userRow.role === 'coach' && (
+                        <div className="flex flex-wrap gap-1">
+                            {(userRow.assignedCategories || []).length > 0 ? (
+                                userRow.assignedCategories.map(catId => {
+                                    const category = categories?.find(c => c.id === catId);
+                                    return category ? <Badge key={catId} variant="outline">{category.name}</Badge> : null;
+                                })
+                            ) : <span className="text-xs text-muted-foreground">Ninguna</span>}
+                        </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -128,7 +139,13 @@ export function SchoolUsersList({ schoolId }: { schoolId: string }) {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                              <DropdownMenuItem disabled>Editar Rol</DropdownMenuItem>
+                                <EditSchoolUserDialog schoolId={schoolId} user={userRow}>
+                                    <DropdownMenuItem onSelect={e => e.preventDefault()}>
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        <span>Editar Usuario</span>
+                                    </DropdownMenuItem>
+                                </EditSchoolUserDialog>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                                 onSelect={() => setUserToDelete(userRow)}
@@ -143,7 +160,7 @@ export function SchoolUsersList({ schoolId }: { schoolId: string }) {
               ))}
               {!loading && (!users || users.length === 0) && (
                   <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">No hay usuarios asignados a esta escuela.</TableCell>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No hay usuarios asignados a esta escuela.</TableCell>
                   </TableRow>
               )}
             </TableBody>
