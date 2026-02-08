@@ -10,6 +10,7 @@ import { ChevronLeft } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SchoolUsersList } from "@/components/admin/SchoolUsersList";
 import { SchoolCategoriesManager } from "@/components/admin/SchoolCategoriesManager";
+import { useEffect } from "react";
 
 export default function SchoolAdminPage() {
   const params = useParams();
@@ -17,14 +18,21 @@ export default function SchoolAdminPage() {
   const schoolId = params.schoolId as string;
   const { isSuperAdmin, profile, isReady: profileReady } = useUserProfile();
 
-  // This hook fetches the school's data, which is independent of user profile.
   const { data: school, loading: schoolLoading } = useDoc<School>(`schools/${schoolId}`);
 
-  // Combine loading states: we need both profile and school data to be ready.
   const isLoading = schoolLoading || !profileReady;
+  const canManageSchool = isSuperAdmin || (profile?.role === 'school_admin' && profile?.activeSchoolId === schoolId);
 
-  // Wait until all data is loaded before making an authorization decision.
-  if (isLoading) {
+  useEffect(() => {
+    // Only perform redirect logic after loading is complete and if the user is not authorized.
+    if (!isLoading && !canManageSchool) {
+      router.replace('/dashboard');
+    }
+  }, [isLoading, canManageSchool, router]);
+  
+  // While loading, or if the user is not authorized (and is about to be redirected), show a loading skeleton.
+  // This prevents a flash of unauthorized content.
+  if (isLoading || !canManageSchool) {
     return (
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-4">
@@ -45,16 +53,6 @@ export default function SchoolAdminPage() {
     );
   }
 
-  // Now that loading is complete, we can safely check for authorization.
-  const canManageSchool = isSuperAdmin || (profile?.role === 'school_admin' && profile?.activeSchoolId === schoolId);
-
-  if (!canManageSchool) {
-    // If not authorized, redirect to the main dashboard.
-    // We use router.replace to avoid adding a bad entry to the browser's history.
-    router.replace('/dashboard');
-    return null; // Render nothing while the redirect is happening.
-  }
-  
   // User is authorized and data is loaded, so render the page.
   return (
     <div className="flex flex-col gap-4">
