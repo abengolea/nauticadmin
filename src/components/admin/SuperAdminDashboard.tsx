@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -40,6 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 export function SuperAdminDashboard() {
     const { data: schools, loading: schoolsLoading } = useCollection<School>('schools', { orderBy: ['createdAt', 'desc']});
     const firestore = useFirestore();
+    const router = useRouter();
     const { toast } = useToast();
     const [updatingSchoolId, setUpdatingSchoolId] = useState<string | null>(null);
 
@@ -109,11 +109,9 @@ export function SuperAdminDashboard() {
                                 </TableRow>
                             ))}
                             {schools?.map((school) => (
-                                <TableRow key={school.id}>
+                                <TableRow key={school.id} className="cursor-pointer" onClick={() => router.push(`/dashboard/schools/${school.id}`)}>
                                     <TableCell className="font-medium">
-                                        <Link href={`/dashboard/schools/${school.id}`} className="hover:underline">
-                                            {school.name}
-                                        </Link>
+                                        {school.name}
                                     </TableCell>
                                     <TableCell>{school.city}, {school.province}</TableCell>
                                     <TableCell>
@@ -128,7 +126,7 @@ export function SuperAdminDashboard() {
                                     <TableCell className="text-right">
                                        <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0" disabled={updatingSchoolId === school.id}>
+                                                <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()} disabled={updatingSchoolId === school.id}>
                                                     <span className="sr-only">Abrir menú</span>
                                                     <MoreHorizontal className="h-4 w-4" />
                                                 </Button>
@@ -136,7 +134,10 @@ export function SuperAdminDashboard() {
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                                 <DropdownMenuItem
-                                                    onClick={() => handleStatusChange(school.id, school.status)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleStatusChange(school.id, school.status);
+                                                    }}
                                                     disabled={updatingSchoolId === school.id}
                                                 >
                                                     {updatingSchoolId === school.id ? (
