@@ -5,6 +5,7 @@ import {
   Users,
   Settings,
   Building,
+  Shield,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -32,9 +33,24 @@ const superAdminMenuItems = [
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const { isSuperAdmin, isReady } = useUserProfile();
+  const { isSuperAdmin, isReady, profile } = useUserProfile();
 
-  const menuItems = isSuperAdmin ? superAdminMenuItems : schoolUserMenuItems;
+  let menuItems;
+
+  if (isSuperAdmin) {
+    menuItems = superAdminMenuItems;
+  } else {
+    // Start with the base items for any school user
+    menuItems = [...schoolUserMenuItems]; 
+    // Add the management link ONLY for school admins
+    if (profile?.role === 'school_admin' && profile.activeSchoolId) {
+      menuItems.push({
+        href: `/dashboard/schools/${profile.activeSchoolId}`,
+        label: "Gestionar Escuela",
+        icon: Shield
+      });
+    }
+  }
 
   return (
     <>
