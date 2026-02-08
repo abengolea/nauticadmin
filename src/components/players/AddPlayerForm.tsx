@@ -184,8 +184,11 @@ export function AddPlayerForm() {
                                 mode="single"
                                 selected={field.value}
                                 onSelect={field.onChange}
+                                captionLayout="dropdown-buttons"
+                                fromYear={2000}
+                                toYear={new Date().getFullYear()}
                                 disabled={(date) =>
-                                date > new Date() || date < new Date("2005-01-01")
+                                date > new Date() || date < new Date("2000-01-01")
                                 }
                                 initialFocus
                             />
