@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   Home,
   Users,
@@ -10,6 +11,10 @@ import {
   Video,
   ClipboardCheck,
   Activity,
+  Mail,
+  MessageCircle,
+  Headphones,
+  Banknote,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -21,6 +26,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
   SidebarMenuSkeleton,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { RiverPlateLogo } from "../icons/RiverPlateLogo";
@@ -35,16 +41,23 @@ const schoolUserMenuItems = [
   { href: "/dashboard/record-video", label: "Grabar video", icon: Video },
   { href: "/dashboard/registrations", label: "Solicitudes", icon: UserCheck },
   { href: "/dashboard/physical-assessments-config", label: "Evaluaciones Físicas", icon: Activity },
+  { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
 ];
 
 const superAdminMenuItems = [
     { href: "/dashboard", label: "Escuelas", icon: Building },
+    { href: "/dashboard/support/operator", label: "Tickets de Soporte", icon: Headphones },
 ];
 
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
   const { isSuperAdmin, isReady, profile, activeSchoolId, isPlayer } = useUserProfile();
+
+  const closeMobileSidebar = React.useCallback(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [isMobile, setOpenMobile]);
   // Solo staff (admin/coach) puede listar pendingPlayers; un jugador no tiene permiso.
   const canListSchoolCollections = isReady && activeSchoolId && !isPlayer;
 
@@ -63,28 +76,34 @@ export function SidebarNav() {
   if (isSuperAdmin) {
     menuItems = superAdminMenuItems;
   } else if (profile?.role === 'player' && profile.activeSchoolId && profile.playerId) {
-    // Jugador: solo ve su perfil
+    // Jugador: panel, perfil y soporte
     menuItems = [
       { href: "/dashboard", label: "Panel Principal", icon: Home },
       { href: `/dashboard/players/${profile.playerId}?schoolId=${profile.activeSchoolId}`, label: "Mi perfil", icon: Users },
+      { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
     ];
   } else {
     // Start with the base items for any school user (coach / school_admin)
     menuItems = [...schoolUserMenuItems]; 
-    // Add the management link ONLY for school admins
+    // Add management and messages ONLY for school admins
     if (profile?.role === 'school_admin' && profile.activeSchoolId) {
-      menuItems.push({
-        href: `/dashboard/schools/${profile.activeSchoolId}`,
-        label: "Gestionar Escuela",
-        icon: Shield
-      });
+      menuItems.push(
+        { href: "/dashboard/payments", label: "Pagos", icon: Banknote },
+        { href: "/dashboard/messages", label: "Mensajes", icon: Mail },
+        {
+          href: `/dashboard/schools/${profile.activeSchoolId}`,
+          label: "Gestionar Escuela",
+          icon: Shield
+        },
+        { href: "/dashboard/support/operator", label: "Tickets de Soporte", icon: Headphones }
+      );
     }
   }
 
   return (
     <>
       <SidebarHeader>
-        <Link href="/dashboard" className="flex items-center gap-2 p-2">
+        <Link href="/dashboard" className="flex items-center gap-2 p-2" onClick={closeMobileSidebar}>
           <RiverPlateLogo className="h-8 w-8" />
           <span className="text-xl font-bold font-headline uppercase">
             <span className="text-red-600">ESCUELAS</span>{" "}
@@ -103,7 +122,7 @@ export function SidebarNav() {
             <SidebarMenu>
             {menuItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                <Link href={item.href} className="relative flex items-center">
+                <Link href={item.href} className="relative flex items-center" onClick={closeMobileSidebar}>
                     <SidebarMenuButton
                     isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
                     tooltip={item.label}
@@ -126,7 +145,7 @@ export function SidebarNav() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <Link href="/dashboard/settings">
+            <Link href="/dashboard/settings" onClick={closeMobileSidebar}>
               <SidebarMenuButton
                 isActive={pathname.startsWith("/dashboard/settings")}
                 tooltip="Ajustes"
