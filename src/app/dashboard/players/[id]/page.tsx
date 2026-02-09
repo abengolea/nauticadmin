@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cake, User, Contact, Bot, FilePlus, ArrowLeft, UserX, ClipboardCheck } from "lucide-react";
+import { Cake, User, Contact, Bot, FilePlus, ArrowLeft, UserX, ClipboardCheck, Video } from "lucide-react";
 import { calculateAge } from "@/lib/utils";
 import { useDoc, useUserProfile, useCollection } from "@/firebase";
 import type { Player, Evaluation } from "@/lib/types";
@@ -15,18 +15,24 @@ import { SummaryTab } from "@/components/players/PlayerProfile/SummaryTab";
 import { AnalyticsTab } from "@/components/players/PlayerProfile/AnalyticsTab";
 import { useState } from "react";
 import { AddEvaluationSheet } from "@/components/evaluations/AddEvaluationSheet";
-import { Card, CardContent } from "@/components/ui/card";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { EvaluationDetailDisplay } from "@/components/evaluations/EvaluationDetailDisplay";
+import { EvaluationsTab } from "@/components/evaluations/EvaluationsTab";
+import { PlayerVideoteca } from "@/components/videos/PlayerVideoteca";
+import { AttendanceHistory } from "@/components/attendance/AttendanceHistory";
+import { PhysicalAssessmentsTab } from "@/components/physical-assessments/PhysicalAssessmentsTab";
+import { Activity } from "lucide-react";
+import { EditPlayerDialog } from "@/components/players/EditPlayerDialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function PlayerProfilePage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const id = params.id as string;
-  const { activeSchoolId, isReady: profileReady } = useUserProfile();
+  const { activeSchoolId, isReady: profileReady, profile } = useUserProfile();
+  const isViewingAsPlayer = profile?.role === "player" && profile?.playerId === id;
   const [isEvalSheetOpen, setEvalSheetOpen] = useState(false);
+  const [editingEvaluation, setEditingEvaluation] = useState<Evaluation | null>(null);
+  const [isEditPlayerOpen, setEditPlayerOpen] = useState(false);
 
   const schoolIdFromQuery = searchParams.get('schoolId');
   const schoolId = schoolIdFromQuery || activeSchoolId;
@@ -35,7 +41,7 @@ export default function PlayerProfilePage() {
       profileReady && schoolId ? `schools/${schoolId}/players/${id}` : ''
   );
 
-  const { data: evaluations, loading: evalsLoading } = useCollection<Evaluation>(
+  const { data: evaluations, loading: evalsLoading, error: evalsError } = useCollection<Evaluation>(
     profileReady && schoolId ? `schools/${schoolId}/evaluations` : '',
     { where: ['playerId', '==', id], orderBy: ['date', 'desc'], limit: 20 }
   );
@@ -96,9 +102,19 @@ export default function PlayerProfilePage() {
       playerId={id}
       schoolId={schoolId!}
       isOpen={isEvalSheetOpen}
-      onOpenChange={setEvalSheetOpen}
+      onOpenChange={(open) => {
+        setEvalSheetOpen(open);
+        if (!open) setEditingEvaluation(null);
+      }}
       playerName={`${player.firstName ?? ""} ${player.lastName ?? ""}`.trim()}
       evaluationsSummary={evaluations?.map((e) => ({ date: e.date, coachComments: e.coachComments ?? "" })) ?? []}
+      editingEvaluation={editingEvaluation}
+    />
+    <EditPlayerDialog
+      player={player}
+      schoolId={schoolId!}
+      isOpen={isEditPlayerOpen}
+      onOpenChange={setEditPlayerOpen}
     />
     <div className="flex flex-col gap-8">
       <header className="flex flex-col md:flex-row gap-6">
@@ -126,76 +142,87 @@ export default function PlayerProfilePage() {
              {player.tutorContact?.phone && <div className="flex items-center gap-1"><Contact className="h-4 w-4" /> {player.tutorContact.phone}</div>}
           </div>
         </div>
+        {!isViewingAsPlayer && (
         <div className="flex items-start gap-2">
-            <Button variant="outline">Editar Perfil</Button>
+            <Button variant="outline" onClick={() => setEditPlayerOpen(true)}>
+              Editar Perfil
+            </Button>
             <Button onClick={() => setEvalSheetOpen(true)}>
               <FilePlus className="mr-2 h-4 w-4" />
               Nueva Evaluación
             </Button>
         </div>
+        )}
       </header>
 
+      {!isViewingAsPlayer && !player.email && (
+        <Alert variant="destructive" className="border-amber-500 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-600">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Este jugador no puede iniciar sesión</AlertTitle>
+          <AlertDescription>
+            Falta completar el <strong>Email (acceso al panel)</strong> en Editar perfil. Sin ese email, al iniciar sesión verá &quot;Acceso Pendiente&quot;. Agregá el mismo email con el que el jugador se registra y guardá.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-card">
+        <TabsList className={`grid w-full bg-card ${isViewingAsPlayer ? "grid-cols-5" : "grid-cols-6"}`}>
           <TabsTrigger value="summary">Resumen</TabsTrigger>
           <TabsTrigger value="evaluations">Evaluaciones</TabsTrigger>
+          <TabsTrigger value="physical" className="gap-2">
+            Físicas <Activity className="h-4 w-4" />
+          </TabsTrigger>
+          <TabsTrigger value="videoteca" className="gap-2">
+            Videoteca <Video className="h-4 w-4" />
+          </TabsTrigger>
           <TabsTrigger value="attendance" className="gap-2">
             Asistencia <ClipboardCheck className="h-4 w-4" />
           </TabsTrigger>
+          {!isViewingAsPlayer && (
           <TabsTrigger value="analytics" className="gap-2">
             Análisis IA <Bot className="h-4 w-4" />
+            <Badge variant="secondary" className="text-[10px] font-normal">En desarrollo</Badge>
           </TabsTrigger>
+          )}
         </TabsList>
         <TabsContent value="summary">
           <SummaryTab player={playerWithSchool} />
         </TabsContent>
         <TabsContent value="evaluations">
-            {evalsLoading && <Skeleton className="h-40 w-full" />}
-            {!evalsLoading && (!evaluations || evaluations.length === 0) ? (
-              <Card>
-                <CardContent className="p-10 text-center">
-                  <h3 className="font-semibold">Sin Evaluaciones</h3>
-                  <p className="text-muted-foreground mt-2">
-                    Aún no se han registrado evaluaciones para este jugador.
-                  </p>
-                  <Button className="mt-4" onClick={() => setEvalSheetOpen(true)}>
-                    <FilePlus className="mr-2 h-4 w-4" />
-                    Crear primera evaluación
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Accordion type="single" collapsible className="w-full">
-                {evaluations?.map((evaluation) => (
-                  <AccordionItem value={evaluation.id} key={evaluation.id}>
-                    <AccordionTrigger>
-                      <div className="flex justify-between w-full pr-4">
-                        <span className="font-semibold">Evaluación del {evaluation.date ? format(evaluation.date, "PPP", { locale: es }) : 'Fecha desconocida'}</span>
-                        <span className="text-sm text-muted-foreground">Ver detalles</span>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <EvaluationDetailDisplay evaluation={evaluation} />
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            )}
+          <EvaluationsTab
+            playerId={id}
+            schoolId={schoolId!}
+            evaluations={evaluations}
+            loading={evalsLoading}
+            error={evalsError}
+            onOpenCreate={() => setEvalSheetOpen(true)}
+            onEditClick={(evalData) => {
+              setEditingEvaluation(evalData);
+              setEvalSheetOpen(true);
+            }}
+            isViewingAsPlayer={isViewingAsPlayer}
+          />
+        </TabsContent>
+        <TabsContent value="physical">
+          <PhysicalAssessmentsTab player={playerWithSchool} schoolId={schoolId!} isViewingAsPlayer={isViewingAsPlayer} />
+        </TabsContent>
+        <TabsContent value="videoteca">
+          <PlayerVideoteca
+            schoolId={schoolId!}
+            playerId={id}
+            playerName={`${player.firstName ?? ""} ${player.lastName ?? ""}`.trim()}
+            embedded
+            isViewingAsPlayer={isViewingAsPlayer}
+          />
         </TabsContent>
         <TabsContent value="attendance">
-          <Card>
-            <CardContent className="p-10 text-center text-muted-foreground">
-              <ClipboardCheck className="mx-auto h-12 w-12 mb-4 opacity-50" />
-              <h3 className="font-semibold text-foreground">Control de asistencia</h3>
-              <p className="mt-2">
-                El profesor podrá registrar y consultar la asistencia de este jugador aquí. (Próximamente.)
-              </p>
-            </CardContent>
-          </Card>
+          <AttendanceHistory schoolId={schoolId!} playerId={id} />
         </TabsContent>
+        {!isViewingAsPlayer && (
         <TabsContent value="analytics">
           <AnalyticsTab player={playerWithSchool} evaluations={evaluations || []} />
         </TabsContent>
+        )}
       </Tabs>
     </div>
     </>

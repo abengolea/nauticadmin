@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowUpRight, PlusCircle, Users, School } from "lucide-react";
+import { ArrowUpRight, PlusCircle, Users, School, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCollection, useUserProfile, useDoc } from "@/firebase";
@@ -87,8 +87,14 @@ export function SchoolAdminDashboard() {
             <h1 className="text-3xl font-bold tracking-tight font-headline">Panel de {profile?.role === 'school_admin' ? 'Administración' : 'Entrenador'}</h1>
             <p className="text-muted-foreground">Bienvenido, {profile?.displayName}.</p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button asChild>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant={profile?.role === 'coach' ? 'default' : 'outline'}>
+            <Link href="/dashboard/attendance">
+                <ClipboardCheck className="mr-2 h-4 w-4" />
+                Tomar asistencia
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link href="/dashboard/players/new">
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Añadir Jugador
@@ -97,6 +103,19 @@ export function SchoolAdminDashboard() {
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Link href="/dashboard/attendance">
+          <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tomar asistencia</CardTitle>
+              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                Planilla de control por entrenamiento
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Jugadores Activos</CardTitle>

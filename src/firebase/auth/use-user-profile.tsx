@@ -5,12 +5,12 @@ import { useFirestore } from '../provider';
 import type { PlatformUser, SchoolUser, UserProfile, SchoolMembership } from '@/lib/types';
 import { useDoc } from '../firestore/use-doc';
 import { useEffect, useMemo, useState } from 'react';
-import { collectionGroup, query, where, getDocs, type FirestoreError } from 'firebase/firestore';
+import { collectionGroup, query, where, getDocs, getDoc, doc, type FirestoreError } from 'firebase/firestore';
 
 
 // This type extends SchoolMembership to include the full user data found in the subcollection,
 // as the collection group query returns the whole document.
-type FullSchoolMembership = SchoolMembership & Omit<SchoolUser, 'id'>;
+type FullSchoolMembership = SchoolMembership & Omit<SchoolUser, 'id'> & { playerId?: string };
 
 /**
  * A hook to get the complete profile for the current user, including global
@@ -54,7 +54,7 @@ export function useUserProfile() {
         return; // Exit early, no need to fetch memberships
     }
     
-    // 4. If not super admin, it must be a regular user. Fetch their school roles.
+    // 4. If not super admin, it must be a regular user. Fetch their school roles (coach/admin).
     setIsSuperAdmin(false);
     
     const userRolesQuery = query(
@@ -63,9 +63,7 @@ export function useUserProfile() {
     );
 
     getDocs(userRolesQuery).then(snapshot => {
-      if (snapshot.empty) {
-        setMemberships([]);
-      } else {
+      if (!snapshot.empty) {
         const userMemberships: FullSchoolMembership[] = snapshot.docs.map(doc => {
           const schoolId = doc.ref.parent.parent!.id;
           const schoolUserData = doc.data() as SchoolUser;
@@ -77,8 +75,49 @@ export function useUserProfile() {
           };
         });
         setMemberships(userMemberships);
+        setProfileLoading(false);
+        return;
       }
-      setProfileLoading(false);
+      // 5. No membership in users: check playerLogins (email -> schoolId + playerId) para que el jugador inicie sesión.
+      const emailNorm = (user.email ?? '').trim().toLowerCase();
+      if (!emailNorm) {
+        setMemberships([]);
+        setProfileLoading(false);
+        return;
+      }
+      const loginRef = doc(firestore, 'playerLogins', emailNorm);
+      getDoc(loginRef).then(loginSnap => {
+        if (!loginSnap.exists()) {
+          setMemberships([]);
+          setProfileLoading(false);
+          return;
+        }
+        const { schoolId, playerId } = loginSnap.data() as { schoolId: string; playerId: string };
+        const playerRef = doc(firestore, `schools/${schoolId}/players/${playerId}`);
+        getDoc(playerRef).then(playerSnap => {
+          if (!playerSnap.exists()) {
+            setMemberships([]);
+          } else {
+            const playerData = playerSnap.data() as { firstName?: string; lastName?: string };
+            const displayName = [playerData.firstName, playerData.lastName].filter(Boolean).join(' ') || user.email ?? 'Jugador';
+            setMemberships([{
+              schoolId,
+              role: 'player',
+              displayName,
+              email: user.email!,
+              playerId,
+            }]);
+          }
+          setProfileLoading(false);
+        }).catch(() => {
+          setMemberships([]);
+          setProfileLoading(false);
+        });
+      }).catch((err: FirestoreError) => {
+        console.error("Error fetching playerLogin by email:", err);
+        setMemberships([]);
+        setProfileLoading(false);
+      });
     }).catch((error: FirestoreError) => {
         console.error("Error fetching user memberships:", error);
         setMemberships([]); // Set empty on error
@@ -114,7 +153,7 @@ export function useUserProfile() {
 
     // If they have memberships, build their profile from the first one.
     const activeMembership = memberships[0];
-    const { schoolId, ...schoolUserData } = activeMembership;
+    const { schoolId, playerId, ...schoolUserData } = activeMembership;
 
     return {
       ...schoolUserData,
@@ -122,6 +161,7 @@ export function useUserProfile() {
       isSuperAdmin: false,
       activeSchoolId: schoolId,
       memberships: memberships,
+      ...(playerId && { playerId }),
     };
   }, [loading, user, isSuperAdmin, memberships]);
 
@@ -136,6 +176,7 @@ export function useUserProfile() {
     activeSchoolId: profile?.activeSchoolId,
     isAdmin: isSuperAdmin || profile?.role === 'school_admin',
     isCoach: profile?.role === 'coach',
+    isPlayer: profile?.role === 'player',
     isSuperAdmin: isSuperAdmin,
   };
 }

@@ -1,13 +1,23 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useUserProfile } from "@/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SuperAdminDashboard } from "@/components/admin/SuperAdminDashboard";
 import { SchoolAdminDashboard } from "@/components/admin/SchoolAdminDashboard";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
-  const { isReady, isSuperAdmin } = useUserProfile();
+  const { isReady, isSuperAdmin, profile } = useUserProfile();
+  const router = useRouter();
+
+  const isPlayer = profile?.role === "player" && profile.activeSchoolId && profile.playerId;
+
+  useEffect(() => {
+    if (isReady && isPlayer) {
+      router.replace(`/dashboard/players/${profile!.playerId!}?schoolId=${profile!.activeSchoolId!}`);
+    }
+  }, [isReady, isPlayer, profile?.playerId, profile?.activeSchoolId, router]);
 
   if (!isReady) {
     return (
@@ -24,6 +34,14 @@ export default function DashboardPage() {
             <Skeleton className="col-span-3 h-64 w-full" />
           </div>
        </div>
+    );
+  }
+
+  if (isPlayer) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <Skeleton className="h-10 w-1/3" />
+      </div>
     );
   }
   

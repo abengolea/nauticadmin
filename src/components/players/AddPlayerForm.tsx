@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
 import { useFirestore, useUserProfile } from "@/firebase";
-import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, doc, setDoc, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { errorEmitter } from "@/firebase/error-emitter";
@@ -45,6 +45,7 @@ const playerSchema = z.object({
   birthDate: z.date({ required_error: "La fecha de nacimiento es requerida."}),
   dni: z.string().optional(),
   healthInsurance: z.string().optional(),
+  email: z.string().email("Debe ser un email válido.").optional().or(z.literal('')),
   tutorName: z.string().min(1, "El nombre del tutor es requerido."),
   tutorPhone: z.string().min(1, "El teléfono del tutor es requerido."),
   status: z.enum(["active", "inactive"]),
@@ -63,6 +64,7 @@ export function AddPlayerForm() {
         defaultValues: {
             firstName: "",
             lastName: "",
+            email: "",
             tutorName: "",
             tutorPhone: "",
             status: "active",
@@ -89,6 +91,7 @@ export function AddPlayerForm() {
             birthDate: Timestamp.fromDate(values.birthDate),
             dni: values.dni,
             healthInsurance: values.healthInsurance,
+            ...(values.email?.trim() && { email: values.email.trim().toLowerCase() }),
             tutorContact: {
                 name: values.tutorName,
                 phone: values.tutorPhone,
@@ -103,7 +106,12 @@ export function AddPlayerForm() {
         const playersCollectionRef = collection(firestore, `schools/${activeSchoolId}/players`);
 
         addDoc(playersCollectionRef, playerData)
-            .then(() => {
+            .then(async (newPlayerRef) => {
+                const emailNorm = values.email?.trim().toLowerCase();
+                if (emailNorm) {
+                    const loginRef = doc(firestore, "playerLogins", emailNorm);
+                    await setDoc(loginRef, { schoolId: activeSchoolId, playerId: newPlayerRef.id });
+                }
                 toast({
                     title: "Jugador añadido",
                     description: `${values.firstName} ${values.lastName} ha sido añadido a la base de datos.`,
@@ -152,6 +160,20 @@ export function AddPlayerForm() {
                         <FormControl>
                         <Input placeholder="Messi" {...field} />
                         </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Email (acceso al panel)</FormLabel>
+                        <FormControl>
+                        <Input type="email" placeholder="jugador@ejemplo.com" {...field} />
+                        </FormControl>
+                        <FormDescription>Opcional. Si lo completas, el jugador podrá iniciar sesión y ver su perfil.</FormDescription>
                         <FormMessage />
                     </FormItem>
                     )}

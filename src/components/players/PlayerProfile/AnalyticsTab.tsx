@@ -2,12 +2,12 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Sparkles, Loader2, Construction } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useToast } from '@/hooks/use-toast';
 import type { Player, Evaluation } from '@/lib/types';
 import { generateComparativeAnalysis, type GenerateComparativeAnalysisInput } from '@/ai/flows/physical-assessment-comparative-analytics';
-import ReactMarkdown from 'react-markdown';
 
 
 interface AnalyticsTabProps {
@@ -81,17 +81,25 @@ export function AnalyticsTab({ player, evaluations }: AnalyticsTabProps) {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 font-headline">
-          <Sparkles className="text-primary" />
-          Análisis Comparativo con IA
-        </CardTitle>
-        <CardDescription>
-          Genera un borrador de análisis comparando la última evaluación del jugador con el promedio de su categoría.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
+      <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+        <Construction className="h-4 w-4" />
+        <AlertTitle>Función en desarrollo</AlertTitle>
+        <AlertDescription>
+          El análisis comparativo con IA está en fase de pruebas. Puedes generar borradores, pero los resultados son experimentales y la comparación usa datos de ejemplo (promedio de categoría simulado).
+        </AlertDescription>
+      </Alert>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 font-headline">
+            <Sparkles className="text-primary" />
+            Análisis Comparativo con IA
+          </CardTitle>
+          <CardDescription>
+            Genera un borrador de análisis comparando la última evaluación del jugador con el promedio de su categoría.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
         <div className="flex justify-start">
           <Button onClick={handleGenerateAnalysis} disabled={loading || evaluations.length === 0}>
             {loading ? (
@@ -119,12 +127,14 @@ export function AnalyticsTab({ player, evaluations }: AnalyticsTabProps) {
           </div>
           {analysisResult && (
               <div className='mt-4 flex gap-2'>
-                  <Button>Aprobar y Guardar Informe</Button>
-                  <Button variant="outline">Editar</Button>
+                  <Button disabled>Aprobar y Guardar Informe</Button>
+                  <Button variant="outline" disabled>Editar</Button>
+                  <span className="text-xs text-muted-foreground self-center">(En desarrollo)</span>
               </div>
           )}
        
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

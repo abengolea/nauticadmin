@@ -7,6 +7,9 @@ import {
   Building,
   Shield,
   UserCheck,
+  Video,
+  ClipboardCheck,
+  Activity,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -25,7 +28,10 @@ import { useUserProfile } from "@/firebase";
 const schoolUserMenuItems = [
   { href: "/dashboard", label: "Panel Principal", icon: Home },
   { href: "/dashboard/players", label: "Jugadores", icon: Users },
+  { href: "/dashboard/attendance", label: "Asistencia", icon: ClipboardCheck },
+  { href: "/dashboard/record-video", label: "Grabar video", icon: Video },
   { href: "/dashboard/registrations", label: "Solicitudes", icon: UserCheck },
+  { href: "/dashboard/physical-assessments-config", label: "Evaluaciones Físicas", icon: Activity },
 ];
 
 const superAdminMenuItems = [
@@ -41,8 +47,14 @@ export function SidebarNav() {
 
   if (isSuperAdmin) {
     menuItems = superAdminMenuItems;
+  } else if (profile?.role === 'player' && profile.activeSchoolId && profile.playerId) {
+    // Jugador: solo ve su perfil
+    menuItems = [
+      { href: "/dashboard", label: "Panel Principal", icon: Home },
+      { href: `/dashboard/players/${profile.playerId}?schoolId=${profile.activeSchoolId}`, label: "Mi perfil", icon: Users },
+    ];
   } else {
-    // Start with the base items for any school user
+    // Start with the base items for any school user (coach / school_admin)
     menuItems = [...schoolUserMenuItems]; 
     // Add the management link ONLY for school admins
     if (profile?.role === 'school_admin' && profile.activeSchoolId) {

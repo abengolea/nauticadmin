@@ -10,11 +10,12 @@ service cloud.firestore {
 
     function isSuperAdmin() {
       // Check for the DB flag OR the specific bootstrap email.
-      // This makes the rule resilient if the DB flag is missing for the bootstrap user.
-      let platformUserData = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
+      // Si no existe platformUsers/{uid}, no acceder a .data para evitar fallo.
+      let path = /databases/$(database)/documents/platformUsers/$(request.auth.uid);
+      let platformUserData = exists(path) ? get(path).data : null;
       return isSignedIn()
           && (
-            (platformUserData != null && platformUserData.super_admin == true)
+            (platformUserData != null && platformUserData.get('super_admin', false) == true)
             || request.auth.token.email == 'abengolea1@gmail.com'
           );
     }
@@ -47,6 +48,14 @@ service cloud.firestore {
       return isSignedIn()
         && exists(/databases/$(database)/documents/schools/$(schoolId)/users/$(request.auth.uid));
     }
+
+    // True si el usuario es el jugador (el doc de jugador tiene su email). Comparación case-insensitive.
+    function isOwnPlayer(schoolId, playerId) {
+      return isSignedIn()
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/schools/$(schoolId)/players/$(playerId))
+        && get(/databases/$(database)/documents/schools/$(schoolId)/players/$(playerId)).data.get('email', '').lower() == request.auth.token.email.lower();
+    }
     
     // --- Schema Validation Helpers ---
 
@@ -60,6 +69,23 @@ service cloud.firestore {
     // Necesario para la collectionGroup query que se ejecuta al iniciar sesión.
     match /{path=**}/users/{userId} {
       allow read: if isSignedIn() && resource.data.email == request.auth.token.email;
+    }
+
+    // Solicitudes de acceso: usuario logueado sin perfil pide ser dado de alta como jugador.
+    match /accessRequests/{requestId} {
+      allow create: if isSignedIn();
+      allow read, update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Jugadores: mapa email (doc id) -> schoolId + playerId para que el jugador pueda iniciar sesión sin collection group.
+    match /playerLogins/{emailKey} {
+      allow read: if isSignedIn() && request.auth.token.email != null && emailKey == request.auth.token.email.lower();
+      allow create, update: if isSuperAdmin()
+        || (request.resource.data.schoolId != null && request.resource.data.playerId != null
+            && (isCoach(request.resource.data.schoolId) || isSchoolAdmin(request.resource.data.schoolId)));
+      allow delete: if isSuperAdmin()
+        || (resource.data.schoolId != null && (isCoach(resource.data.schoolId) || isSchoolAdmin(resource.data.schoolId)));
     }
 
     match /platformUsers/{userId} {
@@ -106,10 +132,12 @@ service cloud.firestore {
     }
     
     match /schools/{schoolId}/players/{playerId} {
+      // Jugador puede leer su propio documento si el email coincide (case-insensitive).
       allow read: if isSuperAdmin()
           || isMemberOfSchool(schoolId)
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId);
+          || isCoach(schoolId)
+          || (isSignedIn() && request.auth.token.email != null && resource.data.get('email', '').lower() == request.auth.token.email.lower());
       // Coaches can create/update, but only admins can delete.
       allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
       allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
@@ -126,33 +154,32 @@ service cloud.firestore {
     }
 
     match /schools/{schoolId}/evaluations/{evalId} {
-      // get = documento individual; list = listar la colección (queries).
       allow get, list: if isSuperAdmin()
           || isMemberOfSchool(schoolId)
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId);
-      // A coach can create an evaluation only for an assigned category.
-      allow create: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
-      // On update, a coach cannot change the categoryId and must be assigned to the original category.
-      allow update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
-      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+          || isCoach(schoolId)
+          || isOwnPlayer(schoolId, resource.data.playerId);
+      // Cualquier miembro de la escuela (admin o coach) puede crear/editar/borrar evaluaciones.
+      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId) || isMemberOfSchool(schoolId);
+      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
     }
 
     // --- Other collections ---
 
     match /schools/{schoolId}/trainings/{trainingId} {
+      // Jugadores necesitan listar entrenamientos para ver su asistencia; permitir lectura a cualquier usuario autenticado.
       allow read: if isSuperAdmin()
           || isMemberOfSchool(schoolId)
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId);
-      allow create: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
-      allow update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
-      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+          || isCoach(schoolId)
+          || isSignedIn();
+      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
     }
 
     match /schools/{schoolId}/trainings/{trainingId}/attendance/{playerId} {
-      // The coach must be assigned to the training's category.
-      allow read, write: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId)
+          || isOwnPlayer(schoolId, playerId);
+      allow write: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
     }
     
     match /schools/{schoolId}/invites/{inviteId} {
@@ -177,6 +204,36 @@ service cloud.firestore {
             || isSchoolAdmin(schoolId)
             || isCoach(schoolId);
         allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+    }
+
+    // Configuración de evaluaciones físicas (tests habilitados por edad)
+    match /schools/{schoolId}/physicalAssessmentConfig/{configId} {
+      allow read: if isSuperAdmin()
+          || isMemberOfSchool(schoolId)
+          || isSchoolAdmin(schoolId)
+          || isCoach(schoolId);
+      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+    }
+
+    // Evaluaciones físicas por jugador
+    match /schools/{schoolId}/physicalAssessments/{assessmentId} {
+      allow read: if isSuperAdmin()
+          || isMemberOfSchool(schoolId)
+          || isSchoolAdmin(schoolId)
+          || isCoach(schoolId)
+          || isOwnPlayer(schoolId, resource.data.playerId);
+      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+    }
+
+    // Videoteca: videos por jugador (grabados/subidos por el entrenador)
+    match /schools/{schoolId}/playerVideos/{videoId} {
+      allow read: if isSuperAdmin()
+          || isMemberOfSchool(schoolId)
+          || isSchoolAdmin(schoolId)
+          || isCoach(schoolId)
+          || isOwnPlayer(schoolId, resource.data.playerId);
+      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
     }
   }
 }

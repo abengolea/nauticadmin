@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -23,27 +23,55 @@ import {
     SheetClose
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
+import { StarRating } from "@/components/ui/star-rating";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, Mic, MicOff, Sparkles } from "lucide-react";
 import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError } from "@/firebase";
-import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, Timestamp } from "firebase/firestore";
+import type { Evaluation, PlayerPosition } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "../ui/scroll-area";
 import { improveCoachCommentsWithAI } from "@/ai/flows/improve-coach-comments";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
+/** Valor usado en el Select para "sin posición"; no puede ser "" porque Radix lo reserva para el placeholder. */
+const POSITION_NONE = "__none__";
+
+const positionOptions: { value: PlayerPosition; label: string }[] = [
+  { value: "delantero", label: "Delantero" },
+  { value: "mediocampo", label: "Mediocampo" },
+  { value: "defensor", label: "Defensor" },
+  { value: "arquero", label: "Arquero" },
+];
+
 const evaluationSchema = z.object({
+  position: z.enum(["delantero", "mediocampo", "defensor", "arquero"]).optional(),
   coachComments: z.string().min(1, "Los comentarios son requeridos."),
-  // Technical skills
+  // Technical skills (jugador de campo)
   control: z.number().min(1).max(5).default(3),
   pase: z.number().min(1).max(5).default(3),
   definicion: z.number().min(1).max(5).default(3),
   dribbling: z.number().min(1).max(5).default(3),
-  // Tactical skills
+  // Tactical skills (jugador de campo)
   posicionamiento: z.number().min(1).max(5).default(3),
   tomaDeDecision: z.number().min(1).max(5).default(3),
   presion: z.number().min(1).max(5).default(3),
+  // Technical skills (arquero)
+  reflejos: z.number().min(1).max(5).default(3),
+  salida: z.number().min(1).max(5).default(3),
+  juegoConLosPies: z.number().min(1).max(5).default(3),
+  atajadaColocacion: z.number().min(1).max(5).default(3),
+  despeje: z.number().min(1).max(5).default(3),
+  // Tactical skills (arquero)
+  posicionamientoArco: z.number().min(1).max(5).default(3),
+  comunicacionDefensa: z.number().min(1).max(5).default(3),
   // Socio-emotional skills
   respect: z.number().min(1).max(4).default(2),
   responsibility: z.number().min(1).max(4).default(2),
@@ -71,7 +99,20 @@ const socioEmotionalSkills: { name: keyof EvaluationFormValues, label: string }[
     { name: "responsibility", label: "Responsabilidad" },
     { name: "teamwork", label: "Compañerismo" },
     { name: "resilience", label: "Resiliencia / Tolerancia a la Frustración" },
-]
+];
+
+const arqueroTechnicalSkills: { name: keyof EvaluationFormValues; label: string }[] = [
+    { name: "reflejos", label: "Reflejos y reacción" },
+    { name: "salida", label: "Salida del arco" },
+    { name: "juegoConLosPies", label: "Juego con los pies" },
+    { name: "atajadaColocacion", label: "Atajada y colocación" },
+    { name: "despeje", label: "Despeje y centro" },
+];
+
+const arqueroTacticalSkills: { name: keyof EvaluationFormValues; label: string }[] = [
+    { name: "posicionamientoArco", label: "Posicionamiento en el arco" },
+    { name: "comunicacionDefensa", label: "Comunicación con la defensa" },
+];
 
 /** Evaluación mínima para contexto de IA (fecha + comentarios). */
 export type EvaluationSummaryForAI = { date: Date; coachComments: string };
@@ -85,9 +126,59 @@ interface AddEvaluationSheetProps {
     playerName?: string;
     /** Evaluaciones anteriores del jugador (para que la IA mejore el texto con contexto). */
     evaluationsSummary?: EvaluationSummaryForAI[];
+    /** Si se pasa, el sheet abre en modo edición con estos datos. */
+    editingEvaluation?: Evaluation | null;
 }
 
-export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, playerName, evaluationsSummary = [] }: AddEvaluationSheetProps) {
+const defaultFormValues: EvaluationFormValues = {
+    position: undefined,
+    coachComments: "",
+    control: 3,
+    pase: 3,
+    definicion: 3,
+    dribbling: 3,
+    posicionamiento: 3,
+    tomaDeDecision: 3,
+    presion: 3,
+    reflejos: 3,
+    salida: 3,
+    juegoConLosPies: 3,
+    atajadaColocacion: 3,
+    despeje: 3,
+    posicionamientoArco: 3,
+    comunicacionDefensa: 3,
+    respect: 2,
+    responsibility: 2,
+    teamwork: 2,
+    resilience: 2,
+};
+
+function getDefaultValuesFromEvaluation(e: Evaluation): EvaluationFormValues {
+    return {
+        position: e.position ?? undefined,
+        coachComments: e.coachComments ?? "",
+        control: e.technical?.control ?? 3,
+        pase: e.technical?.pase ?? 3,
+        definicion: e.technical?.definicion ?? 3,
+        dribbling: e.technical?.dribbling ?? 3,
+        posicionamiento: e.tactical?.posicionamiento ?? 3,
+        tomaDeDecision: e.tactical?.tomaDeDecision ?? 3,
+        presion: e.tactical?.presion ?? 3,
+        reflejos: e.technical?.reflejos ?? 3,
+        salida: e.technical?.salida ?? 3,
+        juegoConLosPies: e.technical?.juegoConLosPies ?? 3,
+        atajadaColocacion: e.technical?.atajadaColocacion ?? 3,
+        despeje: e.technical?.despeje ?? 3,
+        posicionamientoArco: e.tactical?.posicionamientoArco ?? 3,
+        comunicacionDefensa: e.tactical?.comunicacionDefensa ?? 3,
+        respect: e.socioEmotional?.respect ?? 2,
+        responsibility: e.socioEmotional?.responsibility ?? 2,
+        teamwork: e.socioEmotional?.teamwork ?? 2,
+        resilience: e.socioEmotional?.resilience ?? 2,
+    };
+}
+
+export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, playerName, evaluationsSummary = [], editingEvaluation = null }: AddEvaluationSheetProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
     const { profile } = useUserProfile();
@@ -95,23 +186,21 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
     const [isImproving, setImproving] = useState(false);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
 
+    const isEditMode = Boolean(editingEvaluation?.id);
+
     const form = useForm<EvaluationFormValues>({
         resolver: zodResolver(evaluationSchema),
-        defaultValues: {
-            coachComments: "",
-            control: 3,
-            pase: 3,
-            definicion: 3,
-            dribbling: 3,
-            posicionamiento: 3,
-            tomaDeDecision: 3,
-            presion: 3,
-            respect: 2,
-            responsibility: 2,
-            teamwork: 2,
-            resilience: 2,
-        },
+        defaultValues: defaultFormValues,
     });
+
+    // Al abrir en modo edición, rellenar el formulario con los datos de la evaluación.
+    React.useEffect(() => {
+        if (isOpen && editingEvaluation) {
+            form.reset(getDefaultValuesFromEvaluation(editingEvaluation));
+        } else if (isOpen && !editingEvaluation) {
+            form.reset(defaultFormValues);
+        }
+    }, [isOpen, editingEvaluation?.id]);
 
     function onSubmit(values: EvaluationFormValues) {
         if (!profile) {
@@ -123,34 +212,75 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
             return;
         }
 
-        const { coachComments, ...ratings } = values;
-        const evaluationData = {
-            playerId: playerId,
-            date: Timestamp.now(),
-            coachComments: coachComments,
-            technical: {
-                control: ratings.control,
-                pase: ratings.pase,
-                definicion: ratings.definicion,
-                dribbling: ratings.dribbling,
-            },
-            tactical: {
-                posicionamiento: ratings.posicionamiento,
-                tomaDeDecision: ratings.tomaDeDecision,
-                presion: ratings.presion,
-            },
+        const { coachComments, position, ...ratings } = values;
+        const isArquero = position === "arquero";
+        const payload = {
+            ...(position && { position }),
+            coachComments,
+            technical: isArquero
+                ? {
+                    reflejos: ratings.reflejos,
+                    salida: ratings.salida,
+                    juegoConLosPies: ratings.juegoConLosPies,
+                    atajadaColocacion: ratings.atajadaColocacion,
+                    despeje: ratings.despeje,
+                }
+                : {
+                    control: ratings.control,
+                    pase: ratings.pase,
+                    definicion: ratings.definicion,
+                    dribbling: ratings.dribbling,
+                },
+            tactical: isArquero
+                ? {
+                    posicionamientoArco: ratings.posicionamientoArco,
+                    comunicacionDefensa: ratings.comunicacionDefensa,
+                }
+                : {
+                    posicionamiento: ratings.posicionamiento,
+                    tomaDeDecision: ratings.tomaDeDecision,
+                    presion: ratings.presion,
+                },
             socioEmotional: {
                 respect: ratings.respect,
                 responsibility: ratings.responsibility,
                 teamwork: ratings.teamwork,
                 resilience: ratings.resilience,
             },
+        };
+
+        if (isEditMode && editingEvaluation) {
+            const docRef = doc(firestore, `schools/${schoolId}/evaluations/${editingEvaluation.id}`);
+            updateDoc(docRef, payload)
+                .then(() => {
+                    toast({ title: "Evaluación actualizada", description: "Los cambios se han guardado correctamente." });
+                    form.reset();
+                    onOpenChange(false);
+                })
+                .catch(() => {
+                    errorEmitter.emit("permission-error", new FirestorePermissionError({
+                        path: `schools/${schoolId}/evaluations/${editingEvaluation.id}`,
+                        operation: "update",
+                        requestResourceData: payload,
+                    }));
+                    toast({
+                        variant: "destructive",
+                        title: "Error de permisos",
+                        description: "No tienes permiso para modificar esta evaluación.",
+                    });
+                });
+            return;
+        }
+
+        const evaluationData = {
+            playerId,
+            date: Timestamp.now(),
+            ...payload,
             createdAt: Timestamp.now(),
             createdBy: profile.uid,
         };
 
         const evaluationsCollectionRef = collection(firestore, `schools/${schoolId}/evaluations`);
-        
         addDoc(evaluationsCollectionRef, evaluationData)
             .then(() => {
                 toast({
@@ -160,14 +290,12 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
                 form.reset();
                 onOpenChange(false);
             })
-            .catch((serverError) => {
-                const permissionError = new FirestorePermissionError({
+            .catch(() => {
+                errorEmitter.emit("permission-error", new FirestorePermissionError({
                     path: `schools/${schoolId}/evaluations`,
-                    operation: 'create',
+                    operation: "create",
                     requestResourceData: evaluationData,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-
+                }));
                 toast({
                     variant: "destructive",
                     title: "Error de permisos",
@@ -241,70 +369,154 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
         }
     };
 
+    const position = form.watch("position");
+    const isArquero = position === "arquero";
+
     return (
         <Sheet open={isOpen} onOpenChange={onOpenChange}>
             <SheetContent className="sm:max-w-xl w-full flex flex-col">
                 <SheetHeader>
-                    <SheetTitle className="font-headline">Nueva Evaluación de Jugador</SheetTitle>
+                    <SheetTitle className="font-headline">
+                        {isEditMode ? "Editar Evaluación" : "Nueva Evaluación de Jugador"}
+                    </SheetTitle>
                     <SheetDescription>
-                        Califica las habilidades y el comportamiento del jugador. Los cambios se guardarán como una nueva entrada en su historial.
+                        {isEditMode
+                            ? "Modifica las calificaciones y comentarios. La fecha de la evaluación no cambia."
+                            : "Califica las habilidades y el comportamiento del jugador. Los cambios se guardarán como una nueva entrada en su historial."}
                     </SheetDescription>
                 </SheetHeader>
                 <ScrollArea className="flex-1 -mx-6 px-6">
                     <Form {...form}>
                         <form id="add-evaluation-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 py-4">
-                            
-                            {/* Technical Skills */}
+
+                            {/* Posición del jugador */}
                             <div className="space-y-4 p-4 border rounded-lg">
-                                <h3 className="font-semibold text-lg">Habilidades Técnicas</h3>
-                                {technicalSkills.map(skill => (
-                                     <FormField
-                                        key={skill.name}
-                                        control={form.control}
-                                        name={skill.name as keyof EvaluationFormValues}
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>{skill.label} - {field.value}</FormLabel>
+                                <h3 className="font-semibold text-lg">Posición del jugador</h3>
+                                <FormField
+                                    control={form.control}
+                                    name="position"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>¿En qué posición califica mejor al jugador?</FormLabel>
+                                            <Select
+                                                onValueChange={(v) => field.onChange(v === POSITION_NONE ? undefined : (v as PlayerPosition))}
+                                                value={field.value ?? POSITION_NONE}
+                                            >
                                                 <FormControl>
-                                                    <Slider
-                                                        min={1}
-                                                        max={5}
-                                                        step={1}
-                                                        defaultValue={[field.value]}
-                                                        onValueChange={(value) => field.onChange(value[0])}
-                                                    />
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Selecciona una posición (opcional)" />
+                                                    </SelectTrigger>
                                                 </FormControl>
-                                            </FormItem>
-                                        )}
-                                    />
-                                ))}
+                                                <SelectContent>
+                                                    <SelectItem value={POSITION_NONE}>Sin especificar</SelectItem>
+                                                    {positionOptions.map((opt) => (
+                                                        <SelectItem key={opt.value} value={opt.value}>
+                                                            {opt.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    )}
+                                />
                             </div>
 
-                             {/* Tactical Skills */}
-                             <div className="space-y-4 p-4 border rounded-lg">
-                                <h3 className="font-semibold text-lg">Habilidades Tácticas</h3>
-                                {tacticalSkills.map(skill => (
-                                     <FormField
-                                        key={skill.name}
-                                        control={form.control}
-                                        name={skill.name as keyof EvaluationFormValues}
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>{skill.label} - {field.value}</FormLabel>
-                                                <FormControl>
-                                                    <Slider
-                                                        min={1}
-                                                        max={5}
-                                                        step={1}
-                                                        defaultValue={[field.value]}
-                                                        onValueChange={(value) => field.onChange(value[0])}
-                                                    />
-                                                </FormControl>
-                                            </FormItem>
-                                        )}
-                                    />
-                                ))}
-                            </div>
+                            {/* Technical + Tactical: cambian según posición (arquero vs campo) */}
+                            {isArquero ? (
+                                <>
+                                    <div className="space-y-4 p-4 border rounded-lg">
+                                        <h3 className="font-semibold text-lg">Habilidades Técnicas (Arquero)</h3>
+                                        {arqueroTechnicalSkills.map(skill => (
+                                            <FormField
+                                                key={skill.name}
+                                                control={form.control}
+                                                name={skill.name as keyof EvaluationFormValues}
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>{skill.label}</FormLabel>
+                                                        <FormControl>
+                                                            <StarRating
+                                                                value={field.value}
+                                                                max={5}
+                                                                onValueChange={field.onChange}
+                                                            />
+                                                        </FormControl>
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="space-y-4 p-4 border rounded-lg">
+                                        <h3 className="font-semibold text-lg">Habilidades Tácticas (Arquero)</h3>
+                                        {arqueroTacticalSkills.map(skill => (
+                                            <FormField
+                                                key={skill.name}
+                                                control={form.control}
+                                                name={skill.name as keyof EvaluationFormValues}
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>{skill.label}</FormLabel>
+                                                        <FormControl>
+                                                            <StarRating
+                                                                value={field.value}
+                                                                max={5}
+                                                                onValueChange={field.onChange}
+                                                            />
+                                                        </FormControl>
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="space-y-4 p-4 border rounded-lg">
+                                        <h3 className="font-semibold text-lg">Habilidades Técnicas</h3>
+                                        {technicalSkills.map(skill => (
+                                            <FormField
+                                                key={skill.name}
+                                                control={form.control}
+                                                name={skill.name as keyof EvaluationFormValues}
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>{skill.label}</FormLabel>
+                                                        <FormControl>
+                                                            <StarRating
+                                                                value={field.value}
+                                                                max={5}
+                                                                onValueChange={field.onChange}
+                                                            />
+                                                        </FormControl>
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="space-y-4 p-4 border rounded-lg">
+                                        <h3 className="font-semibold text-lg">Habilidades Tácticas</h3>
+                                        {tacticalSkills.map(skill => (
+                                            <FormField
+                                                key={skill.name}
+                                                control={form.control}
+                                                name={skill.name as keyof EvaluationFormValues}
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>{skill.label}</FormLabel>
+                                                        <FormControl>
+                                                            <StarRating
+                                                                value={field.value}
+                                                                max={5}
+                                                                onValueChange={field.onChange}
+                                                            />
+                                                        </FormControl>
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        ))}
+                                    </div>
+                                </>
+                            )}
 
                              {/* Socio-emotional Skills */}
                              <div className="space-y-4 p-4 border rounded-lg">
@@ -316,14 +528,12 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
                                         name={skill.name as keyof EvaluationFormValues}
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>{skill.label} - {field.value}</FormLabel>
+                                                <FormLabel>{skill.label}</FormLabel>
                                                 <FormControl>
-                                                    <Slider
-                                                        min={1}
+                                                    <StarRating
+                                                        value={field.value}
                                                         max={4}
-                                                        step={1}
-                                                        defaultValue={[field.value]}
-                                                        onValueChange={(value) => field.onChange(value[0])}
+                                                        onValueChange={field.onChange}
                                                     />
                                                 </FormControl>
                                             </FormItem>
@@ -381,7 +591,7 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
                     </SheetClose>
                     <Button type="submit" form="add-evaluation-form" disabled={form.formState.isSubmitting}>
                         {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {form.formState.isSubmitting ? "Guardando..." : "Guardar Evaluación"}
+                        {form.formState.isSubmitting ? "Guardando..." : isEditMode ? "Guardar cambios" : "Guardar Evaluación"}
                     </Button>
                 </SheetFooter>
             </SheetContent>

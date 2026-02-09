@@ -19,12 +19,13 @@ import React from "react";
 
 export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   const router = useRouter();
-  const { isReady, activeSchoolId: userActiveSchoolId } = useUserProfile();
+  const { isReady, activeSchoolId: userActiveSchoolId, profile } = useUserProfile();
 
   const schoolId = propSchoolId || userActiveSchoolId;
+  const canListPlayers = profile?.role !== "player";
 
   const { data: players, loading, error } = useCollection<Player>(
-    isReady && schoolId ? `schools/${schoolId}/players` : '',
+    isReady && schoolId && canListPlayers ? `schools/${schoolId}/players` : '',
     { orderBy: ['lastName', 'asc'] }
   );
 

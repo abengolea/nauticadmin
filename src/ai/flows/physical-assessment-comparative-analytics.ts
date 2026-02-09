@@ -37,6 +37,16 @@ const GenerateComparativeAnalysisInputSchema = z.object({
 });
 export type GenerateComparativeAnalysisInput = z.infer<typeof GenerateComparativeAnalysisInputSchema>;
 
+// Schema extendido para el prompt: incluye versiones JSON stringificadas (Genkit no ejecuta JS en la plantilla).
+const AnalysisPromptInputSchema = GenerateComparativeAnalysisInputSchema.extend({
+  playerDataPhysicalJson: z.string(),
+  playerDataTechnicalJson: z.string(),
+  playerDataTacticalJson: z.string(),
+  comparisonDataPhysicalJson: z.string(),
+  comparisonDataTechnicalJson: z.string(),
+  comparisonDataTacticalJson: z.string(),
+});
+
 
 const GenerateComparativeAnalysisOutputSchema = z.object({
   analysis: z.string().describe('Análisis de texto detallado, constructivo y en español, con formato Markdown. Debe incluir fortalezas, áreas de mejora y un resumen general.'),
@@ -49,10 +59,10 @@ export async function generateComparativeAnalysis(input: GenerateComparativeAnal
 }
 
 
-// Definición del Prompt de Genkit
+// Definición del Prompt de Genkit (usa variables pre-serializadas; Genkit no ejecuta JS en la plantilla).
 const analysisPrompt = ai.definePrompt({
   name: 'playerAnalysisPrompt',
-  input: { schema: GenerateComparativeAnalysisInputSchema },
+  input: { schema: AnalysisPromptInputSchema },
   output: { schema: GenerateComparativeAnalysisOutputSchema },
   prompt: `
     Actúa como un director deportivo y entrenador experto en fútbol juvenil de la "Escuela de River Plate".
@@ -67,11 +77,11 @@ const analysisPrompt = ai.definePrompt({
 
     **2. Fortalezas Destacadas:**
     Una lista (usando viñetas) de 2-3 puntos donde el jugador destaca en comparación con la referencia. Sé específico y usa los datos.
-    Por ejemplo: "Su velocidad en 20 metros ({{playerData.physical.speed20m.value}}s) es notablemente superior al promedio ({{comparisonData.physical.speed20m.value}}s), lo que le da una ventaja en ataques rápidos."
+    Por ejemplo: "Su velocidad en 20 metros (valor en physical.speed20m) es notablemente superior al promedio, lo que le da una ventaja en ataques rápidos."
 
     **3. Áreas de Enfoque para el Desarrollo:**
     Una lista (usando viñetas) de 2-3 áreas donde hay oportunidad de mejora. El lenguaje debe ser de apoyo y orientado a la acción, no negativo.
-    Por ejemplo: "Existe una buena oportunidad para mejorar la consistencia en el pase (evaluado en {{playerData.technical.passing}} sobre 5), lo que potenciará su capacidad para construir juego."
+    Por ejemplo: "Existe una buena oportunidad para mejorar la consistencia en el pase (revisar datos técnicos), lo que potenciará su capacidad para construir juego."
 
     **4. Conclusión y Próximos Pasos:**
     Un párrafo final que ofrezca ánimo y sugiera un enfoque para los próximos entrenamientos.
@@ -80,14 +90,14 @@ const analysisPrompt = ai.definePrompt({
     NO uses jerga excesivamente técnica. El informe puede ser leído por entrenadores y, eventualmente, por los padres.
 
     **Datos del Jugador ({{playerName}}):**
-    - Físico: {{{JSON.stringify(playerData.physical)}}}
-    - Técnico: {{{JSON.stringify(playerData.technical)}}}
-    - Táctico: {{{JSON.stringify(playerData.tactical)}}}
+    - Físico: {{{playerDataPhysicalJson}}}
+    - Técnico: {{{playerDataTechnicalJson}}}
+    - Táctico: {{{playerDataTacticalJson}}}
 
     **Datos de Comparación ({{comparisonContext}}):**
-    - Físico: {{{JSON.stringify(comparisonData.physical)}}}
-    - Técnico: {{{JSON.stringify(comparisonData.technical)}}}
-    - Táctico: {{{JSON.stringify(comparisonData.tactical)}}}
+    - Físico: {{{comparisonDataPhysicalJson}}}
+    - Técnico: {{{comparisonDataTechnicalJson}}}
+    - Táctico: {{{comparisonDataTacticalJson}}}
   `,
 });
 
@@ -100,7 +110,16 @@ const analysisFlow = ai.defineFlow(
     outputSchema: GenerateComparativeAnalysisOutputSchema,
   },
   async (input) => {
-    const { output } = await analysisPrompt(input);
+    const promptInput = {
+      ...input,
+      playerDataPhysicalJson: JSON.stringify(input.playerData?.physical ?? {}),
+      playerDataTechnicalJson: JSON.stringify(input.playerData?.technical ?? {}),
+      playerDataTacticalJson: JSON.stringify(input.playerData?.tactical ?? {}),
+      comparisonDataPhysicalJson: JSON.stringify(input.comparisonData?.physical ?? {}),
+      comparisonDataTechnicalJson: JSON.stringify(input.comparisonData?.technical ?? {}),
+      comparisonDataTacticalJson: JSON.stringify(input.comparisonData?.tactical ?? {}),
+    };
+    const { output } = await analysisPrompt(promptInput);
     if (!output) {
       throw new Error("La IA no generó una respuesta válida.");
     }

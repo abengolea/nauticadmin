@@ -8,6 +8,7 @@ import {
   getFirestore,
   Firestore,
 } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 import { initializeFirebase, firebaseConfig } from './config';
 import { FirebaseApp } from 'firebase/app';
@@ -24,6 +25,7 @@ export * from './errors';
 let app: FirebaseApp;
 let auth: Auth;
 let firestore: Firestore;
+let storage: FirebaseStorage;
 
 function getFirebase() {
   if (!app) {
@@ -33,8 +35,9 @@ function getFirebase() {
     app = initializeFirebase();
     auth = getAuth(app);
     firestore = getFirestore(app);
+    storage = getStorage(app);
   }
-  return { app, auth, firestore };
+  return { app, auth, firestore, storage };
 }
 
 function useFirebase() {
