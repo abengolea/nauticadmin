@@ -268,11 +268,12 @@ export function RecordOrUploadVideoDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg flex max-h-[90vh] flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="font-headline">Grabar o subir video</DialogTitle>
         </DialogHeader>
 
+        <ScrollArea className="flex-1 min-h-0 -mx-1 px-1">
         {!embedded && (
           <div className="space-y-2">
             <Label>Jugador</Label>
@@ -391,7 +392,7 @@ export function RecordOrUploadVideoDialog({
                 </>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {!recording && !recordedBlob && (
                 <Button type="button" onClick={startRecording} disabled={uploading}>
                   <Circle className="mr-2 h-4 w-4 fill-red-500 text-red-500" />
@@ -405,16 +406,33 @@ export function RecordOrUploadVideoDialog({
                 </Button>
               )}
               {recordedBlob && !recording && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setRecordedBlob(null);
-                    chunksRef.current = [];
-                  }}
-                >
-                  Volver a grabar
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={!canSubmit}
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Subiendo...
+                      </>
+                    ) : (
+                      "Guardar en videoteca"
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setRecordedBlob(null);
+                      chunksRef.current = [];
+                    }}
+                    disabled={uploading}
+                  >
+                    Volver a grabar
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -492,8 +510,9 @@ export function RecordOrUploadVideoDialog({
             <Progress value={uploadProgress} />
           </div>
         )}
+        </ScrollArea>
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0 border-t pt-4 mt-2">
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={uploading}>
             Cancelar
           </Button>
