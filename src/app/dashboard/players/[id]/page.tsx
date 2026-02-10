@@ -1,17 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Cake, User, Contact, Bot, FilePlus, ArrowLeft, UserX, ClipboardCheck, Video } from "lucide-react";
 import { calculateAge, isPlayerProfileComplete } from "@/lib/utils";
-import { useDoc, useUserProfile, useCollection } from "@/firebase";
+import { useDoc, useUserProfile, useCollection, useUser } from "@/firebase";
 import type { Player, Evaluation } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SummaryTab } from "@/components/players/PlayerProfile/SummaryTab";
+import { MedicalRecordField } from "@/components/players/MedicalRecordField";
+import { isMedicalRecordApproved, isMedicalRecordRejected } from "@/lib/utils";
 import { AnalyticsTab } from "@/components/players/PlayerProfile/AnalyticsTab";
 import { useState } from "react";
 import { AddEvaluationSheet } from "@/components/evaluations/AddEvaluationSheet";
@@ -22,18 +24,36 @@ import { PhysicalAssessmentsTab } from "@/components/physical-assessments/Physic
 import { Activity } from "lucide-react";
 import { EditPlayerDialog } from "@/components/players/EditPlayerDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle, Lock } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { AlertCircle, Archive, Lock, FileHeart } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PlayerProfilePage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const id = params.id as string;
-  const { activeSchoolId, isReady: profileReady, profile } = useUserProfile();
+  const { activeSchoolId, isReady: profileReady, profile, isSuperAdmin } = useUserProfile();
+  const { user } = useUser();
+  const { toast } = useToast();
+  const router = useRouter();
   const isViewingAsPlayer = profile?.role === "player" && String(profile?.playerId ?? "") === String(id);
   const [isEvalSheetOpen, setEvalSheetOpen] = useState(false);
   const [editingEvaluation, setEditingEvaluation] = useState<Evaluation | null>(null);
   const [isEditPlayerOpen, setEditPlayerOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
 
   const schoolIdFromQuery = searchParams.get('schoolId');
   const schoolId = schoolIdFromQuery || activeSchoolId;
@@ -98,6 +118,82 @@ export default function PlayerProfilePage() {
   const playerWithSchool = { ...player, escuelaId: schoolId! };
   const profileComplete = isPlayerProfileComplete(player);
   const showLockedContent = isViewingAsPlayer && !profileComplete;
+  const canArchive =
+    !!schoolId &&
+    !player.archived &&
+    (profile?.role === "school_admin" || isSuperAdmin);
+
+  const canToggleStatus =
+    !!schoolId &&
+    !player.archived &&
+    !isViewingAsPlayer &&
+    (profile?.role === "school_admin" || profile?.role === "coach" || isSuperAdmin);
+
+  const handleToggleStatus = async () => {
+    if (!user || !schoolId || statusUpdating) return;
+    const newStatus = player.status === "active" ? "inactive" : "active";
+    setStatusUpdating(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/players/status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ schoolId, playerId: id, status: newStatus }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Error al cambiar estado");
+      toast({
+        title: newStatus === "active" ? "Jugador activado" : "Jugador desactivado",
+        description:
+          newStatus === "active"
+            ? "El jugador ya puede ingresar al panel."
+            : "El jugador ya no puede ingresar al panel.",
+      });
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo cambiar el estado",
+      });
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    if (!user || !schoolId) return;
+    setArchiving(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/players/archive", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ schoolId, playerId: id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Error al archivar");
+      setArchiveDialogOpen(false);
+      toast({
+        title: "Jugador archivado",
+        description: "El jugador ya no aparecerá en listados ni en totales.",
+      });
+      router.push(`/dashboard/players?schoolId=${schoolId}`);
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo archivar el jugador",
+      });
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   return (
     <>
@@ -129,16 +225,35 @@ export default function PlayerProfilePage() {
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <Badge 
-            variant={
-              player.status === "active"
-                ? "secondary"
-                : "destructive"
-            }
-            className={`mb-2 capitalize ${player.status === "active" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""}`}
-          >
-            {player.status === 'active' ? 'Activo' : 'Inactivo'}
-          </Badge>
+          {canToggleStatus ? (
+            <button
+              type="button"
+              onClick={handleToggleStatus}
+              disabled={statusUpdating}
+              className={`mb-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 cursor-pointer ${
+                player.status === "active"
+                  ? "border-green-600/50 bg-green-500/10 text-green-700 hover:bg-green-500/20 dark:text-green-400 dark:hover:bg-green-500/20"
+                  : player.status === "suspended"
+                    ? "border-amber-600/50 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400 dark:hover:bg-amber-500/20"
+                    : "border-red-600/50 bg-red-500/10 text-red-700 hover:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/20"
+              }`}
+            >
+              {statusUpdating
+                ? "…"
+                : player.status === "active"
+                  ? "Activo"
+                  : player.status === "suspended"
+                    ? "Mora"
+                    : "Desactivado"}
+            </button>
+          ) : (
+            <Badge
+              variant={player.status === "active" ? "secondary" : "destructive"}
+              className={`mb-2 capitalize ${player.status === "active" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""} ${player.status === "suspended" ? "border-amber-600/50 bg-amber-500/10 text-amber-800 dark:text-amber-400" : ""}`}
+            >
+              {player.status === "active" ? "Activo" : player.status === "suspended" ? "Mora" : "Desactivado"}
+            </Badge>
+          )}
           <h1 className="text-4xl font-bold font-headline">{player.firstName || ''} {player.lastName || ''}</h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
              {player.birthDate && <div className="flex items-center gap-1"><Cake className="h-4 w-4" /> {calculateAge(player.birthDate)} años</div>}
@@ -146,7 +261,7 @@ export default function PlayerProfilePage() {
              {player.tutorContact?.phone && <div className="flex items-center gap-1"><Contact className="h-4 w-4" /> {player.tutorContact.phone}</div>}
           </div>
         </div>
-        <div className="flex items-start gap-2">
+        <div className="flex flex-wrap items-start gap-2">
           <Button variant="outline" onClick={() => setEditPlayerOpen(true)}>
             Editar Perfil
           </Button>
@@ -158,6 +273,21 @@ export default function PlayerProfilePage() {
           )}
         </div>
       </header>
+
+      {player.archived && (
+        <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500">
+          <Archive className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertTitle>Jugador archivado</AlertTitle>
+          <AlertDescription>
+            Este jugador está archivado. No aparece en listados ni en totales de la escuela.
+          </AlertDescription>
+          <Button variant="outline" size="sm" className="mt-2" asChild>
+            <Link href={schoolId ? `/dashboard/players?schoolId=${schoolId}` : "/dashboard/players"}>
+              Volver a jugadores
+            </Link>
+          </Button>
+        </Alert>
+      )}
 
       {/* Cartel obligatorio para el jugador con perfil incompleto: no puede ver evaluaciones, videos, etc. */}
       {showLockedContent && (
@@ -230,7 +360,47 @@ export default function PlayerProfilePage() {
           )}
         </TabsList>
         <TabsContent value="summary">
-          <SummaryTab player={playerWithSchool} />
+          {isViewingAsPlayer && !isMedicalRecordApproved(player) && (
+            <Alert className={`mb-4 ${isMedicalRecordRejected(player) ? "border-red-500 bg-red-50 dark:bg-red-950/40 dark:border-red-500" : "border-amber-500 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500"}`}>
+              <FileHeart className={`h-4 w-4 ${isMedicalRecordRejected(player) ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`} />
+              <AlertTitle>{isMedicalRecordRejected(player) ? "Ficha médica rechazada" : "Ficha médica obligatoria"}</AlertTitle>
+              <AlertDescription>
+                {isMedicalRecordRejected(player) && player.medicalRecord?.rejectionReason ? (
+                  <>
+                    Tu ficha médica no fue aprobada. Motivo: <strong>{player.medicalRecord.rejectionReason}</strong>.
+                    Por favor subí una nueva ficha corregida en la sección de abajo.
+                  </>
+                ) : (
+                  <>
+                    Debes cargar tu ficha médica en PDF. Podés subirla en la sección &quot;Ficha médica&quot; más abajo. Una vez revisada por el entrenador o administrador, quedará marcada como cumplida.
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+          <SummaryTab player={playerWithSchool} lastCoachComment={evaluations?.[0]?.coachComments} />
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="font-headline">Ficha médica</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                PDF obligatorio. El jugador puede subirla aquí; el entrenador o administrador la revisa y marca como cumplida.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <MedicalRecordField
+                value={player.medicalRecord}
+                onChange={() => {}}
+                onApprove={() => {}}
+                onReject={() => {}}
+                schoolId={schoolId!}
+                playerId={id}
+                playerName={`${player.firstName ?? ""} ${player.lastName ?? ""}`.trim()}
+                playerEmail={player.email}
+                canApprove={!isViewingAsPlayer && (profile?.role === "school_admin" || profile?.role === "coach")}
+                disabled={false}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
         <TabsContent value="evaluations">
           {showLockedContent ? (
@@ -307,6 +477,38 @@ export default function PlayerProfilePage() {
         </TabsContent>
         )}
       </Tabs>
+
+      {canArchive && (
+        <div className="flex justify-end">
+          <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-600 dark:hover:bg-amber-950/50">
+                <Archive className="mr-2 h-4 w-4" />
+                Archivar jugador
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogTitle>¿Archivar este jugador?</AlertDialogTitle>
+              <AlertDialogDescription>
+                El jugador dejará de aparecer en listados, no se contará en cantidad de jugadores ni sus pagos en los totales. Es útil para jugadores de prueba. Los datos se conservan pero quedan ocultos.
+              </AlertDialogDescription>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleArchive();
+                  }}
+                  disabled={archiving}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  {archiving ? "Archivando…" : "Sí, archivar"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
     </div>
     </>
   );

@@ -62,6 +62,12 @@ const SheetContent = React.forwardRef<
     <SheetPrimitive.Content
       ref={ref}
       className={cn(sheetVariants({ side }), className)}
+      onInteractOutside={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest("[data-toast-viewport]")) {
+          e.preventDefault();
+        }
+      }}
       {...props}
     >
       {children}

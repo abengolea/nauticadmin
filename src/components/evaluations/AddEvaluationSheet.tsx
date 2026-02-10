@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, type Control } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,7 @@ import {
     SheetFooter,
     SheetClose
 } from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { StarRating } from "@/components/ui/star-rating";
 import {
@@ -56,9 +57,10 @@ const MAX_STARS = 10;
 
 const evaluationSchema = z.object({
   position: z.enum(["delantero", "mediocampo", "defensor", "arquero"]).optional(),
-  coachComments: z.string().min(1, "Los comentarios son requeridos."),
-  /** Comentarios opcionales por rubro (key = nombre del campo, ej. control, pase). */
-  rubricComments: z.record(z.string()).optional().default({}),
+  // Validación de coachComments se hace manualmente en onSubmit (evita desincronía estado/DOM)
+  coachComments: z.string().optional().default(""),
+  /** Comentarios opcionales por rubro (key = nombre del campo, ej. control, pase). Valores pueden venir undefined si no se tocó el campo. */
+  rubricComments: z.record(z.union([z.string(), z.undefined()]).transform((s) => (typeof s === "string" ? s : ""))).optional().default({}),
   // Technical skills (jugador de campo) — 1 a 10 estrellas
   control: z.number().min(1).max(MAX_STARS).default(5),
   pase: z.number().min(1).max(MAX_STARS).default(5),
@@ -185,6 +187,71 @@ function getDefaultValuesFromEvaluation(e: Evaluation): EvaluationFormValues {
     };
 }
 
+/** Comentario por rubro usando FormField para evitar re-renders que quitan el foco del textarea. */
+function RubricCommentField({
+    control,
+    skillName,
+    skillLabel,
+    canUseVoice,
+    isRecording,
+    onToggleVoice,
+    onImproveWithAI,
+    improvingKey,
+}: {
+    control: Control<EvaluationFormValues>;
+    skillName: string;
+    skillLabel: string;
+    canUseVoice: boolean;
+    isRecording: boolean;
+    onToggleVoice: (value: string, onChange: (v: string) => void) => void;
+    onImproveWithAI: (rubricKey: string, rubricLabel: string, currentDraft: string) => void;
+    improvingKey: string | null;
+}) {
+    return (
+        <FormField
+            control={control}
+            name={`rubricComments.${skillName}` as keyof EvaluationFormValues}
+            render={({ field }) => (
+                <div className="mt-2 space-y-1.5">
+                    <Textarea
+                        placeholder={`Comentario opcional para ${skillLabel}… Escribí o usá "Hablar" y después "Mejorar con IA".`}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value)}
+                        className="min-h-[56px] text-sm resize-none"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                        {canUseVoice && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onToggleVoice(field.value ?? "", field.onChange)}
+                            >
+                                {isRecording ? <MicOff className="h-3 w-3 mr-1" /> : <Mic className="h-3 w-3 mr-1" />}
+                                {isRecording ? "Detener" : "Hablar"}
+                            </Button>
+                        )}
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={improvingKey !== null}
+                            onClick={() => onImproveWithAI(skillName, skillLabel, field.value ?? "")}
+                        >
+                            {improvingKey === skillName ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                                <Sparkles className="h-3 w-3 mr-1" />
+                            )}
+                            Mejorar con IA
+                        </Button>
+                    </div>
+                </div>
+            )}
+        />
+    );
+}
+
 export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, playerName, evaluationsSummary = [], editingEvaluation = null }: AddEvaluationSheetProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -193,6 +260,7 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
     const [isImproving, setImproving] = useState(false);
     const [improvingRubricKey, setImprovingRubricKey] = useState<string | null>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const coachCommentsRef = useRef<HTMLTextAreaElement | null>(null);
 
     const isEditMode = Boolean(editingEvaluation?.id);
 
@@ -201,16 +269,20 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
         defaultValues: defaultFormValues,
     });
 
-    // Al abrir en modo edición, rellenar el formulario con los datos de la evaluación.
+    // Solo resetear al abrir el sheet (no mientras está abierto), para no borrar lo que escribe el usuario.
+    const prevOpenRef = React.useRef(false);
     React.useEffect(() => {
-        if (isOpen && editingEvaluation) {
+        const justOpened = isOpen && !prevOpenRef.current;
+        prevOpenRef.current = isOpen;
+        if (!justOpened) return;
+        if (editingEvaluation) {
             form.reset(getDefaultValuesFromEvaluation(editingEvaluation));
-        } else if (isOpen && !editingEvaluation) {
+        } else {
             form.reset(defaultFormValues);
         }
     }, [isOpen, editingEvaluation?.id]);
 
-    function onSubmit(values: EvaluationFormValues) {
+    async function onSubmit(values: EvaluationFormValues) {
         if (!profile) {
             toast({
                 variant: "destructive",
@@ -220,7 +292,22 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
             return;
         }
 
-        const { coachComments, position, rubricComments, ...ratings } = values;
+        // Validación manual de comentarios: usar estado y, si viene vacío, valor del DOM (evita desincronía)
+        let coachComments = (values.coachComments ?? "").trim();
+        if (!coachComments && coachCommentsRef.current?.value) {
+            coachComments = (coachCommentsRef.current.value ?? "").trim();
+            if (coachComments) form.setValue("coachComments", coachCommentsRef.current.value);
+        }
+        if (!coachComments) {
+            toast({
+                variant: "destructive",
+                title: "Completa los datos",
+                description: "Los Comentarios Generales del Entrenador son obligatorios. Escribí al menos un carácter (no solo espacios).",
+            });
+            return;
+        }
+
+        const { position, rubricComments, ...ratings } = values;
         const isArquero = position === "arquero";
         const payload = {
             ...(position && { position }),
@@ -260,24 +347,23 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
 
         if (isEditMode && editingEvaluation) {
             const docRef = doc(firestore, `schools/${schoolId}/evaluations/${editingEvaluation.id}`);
-            updateDoc(docRef, payload)
-                .then(() => {
-                    toast({ title: "Evaluación actualizada", description: "Los cambios se han guardado correctamente." });
-                    form.reset();
-                    onOpenChange(false);
-                })
-                .catch(() => {
-                    errorEmitter.emit("permission-error", new FirestorePermissionError({
-                        path: `schools/${schoolId}/evaluations/${editingEvaluation.id}`,
-                        operation: "update",
-                        requestResourceData: payload,
-                    }));
-                    toast({
-                        variant: "destructive",
-                        title: "Error de permisos",
-                        description: "No tienes permiso para modificar esta evaluación.",
-                    });
+            try {
+                await updateDoc(docRef, payload);
+                toast({ title: "Evaluación actualizada", description: "Los cambios se han guardado correctamente." });
+                form.reset();
+                onOpenChange(false);
+            } catch {
+                errorEmitter.emit("permission-error", new FirestorePermissionError({
+                    path: `schools/${schoolId}/evaluations/${editingEvaluation.id}`,
+                    operation: "update",
+                    requestResourceData: payload,
+                }));
+                toast({
+                    variant: "destructive",
+                    title: "Error de permisos",
+                    description: "No tienes permiso para modificar esta evaluación.",
                 });
+            }
             return;
         }
 
@@ -290,15 +376,16 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
         };
 
         const evaluationsCollectionRef = collection(firestore, `schools/${schoolId}/evaluations`);
-        addDoc(evaluationsCollectionRef, evaluationData)
-            .then(async () => {
-                toast({
-                    title: "Evaluación guardada",
-                    description: "La nueva evaluación ha sido guardada exitosamente.",
-                });
-                form.reset();
-                onOpenChange(false);
-                // Notificar por mail al jugador si tiene email
+        try {
+            await addDoc(evaluationsCollectionRef, evaluationData);
+            toast({
+                title: "Evaluación guardada",
+                description: "La nueva evaluación ha sido guardada exitosamente.",
+            });
+            form.reset();
+            onOpenChange(false);
+            // Enviar mail en segundo plano para no bloquear la UI
+            (async () => {
                 try {
                     const playerRef = doc(firestore, `schools/${schoolId}/players/${playerId}`);
                     const playerSnap = await getDoc(playerRef);
@@ -309,28 +396,28 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
                         const subject = "Nueva evaluación - Escuelas River SN";
                         const contentHtml = `<p>Hola <strong>${escapeHtml(firstName)}</strong>,</p><p>Tu entrenador cargó una nueva evaluación. Entrá al panel para verla.</p><p><a href="${typeof window !== "undefined" ? window.location.origin : ""}/dashboard" style="color: #d4002a; font-weight: bold;">Ver mi perfil</a></p>`;
                         const html = buildEmailHtml(contentHtml, {
-                          title: "Escuelas River SN",
-                          greeting: "Tenés una novedad en tu perfil.",
-                          baseUrl: typeof window !== "undefined" ? window.location.origin : "",
+                            title: "Escuelas River SN",
+                            greeting: "Tenés una novedad en tu perfil.",
+                            baseUrl: typeof window !== "undefined" ? window.location.origin : "",
                         });
                         await sendMailDoc(firestore, { to: playerEmail, subject, html, text: htmlToPlainText(contentHtml) });
                     }
                 } catch {
                     // No bloquear si falla el envío del mail
                 }
-            })
-            .catch(() => {
-                errorEmitter.emit("permission-error", new FirestorePermissionError({
-                    path: `schools/${schoolId}/evaluations`,
-                    operation: "create",
-                    requestResourceData: evaluationData,
-                }));
-                toast({
-                    variant: "destructive",
-                    title: "Error de permisos",
-                    description: "No tienes permiso para crear evaluaciones. Contacta a un administrador.",
-                });
+            })();
+        } catch {
+            errorEmitter.emit("permission-error", new FirestorePermissionError({
+                path: `schools/${schoolId}/evaluations`,
+                operation: "create",
+                requestResourceData: evaluationData,
+            }));
+            toast({
+                variant: "destructive",
+                title: "Error de permisos",
+                description: "No tienes permiso para crear evaluaciones. Contacta a un administrador.",
             });
+        }
     }
 
     const canUseVoice = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
@@ -421,56 +508,6 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
         }
     };
 
-    /** Bloque opcional: comentario por rubro (escribir, dictar o mejorar con IA). */
-    function RubricCommentBlock({ skillName, skillLabel }: { skillName: string; skillLabel: string }) {
-        const value = form.watch("rubricComments")?.[skillName] ?? "";
-        return (
-            <div className="mt-2 space-y-1.5">
-                <Textarea
-                    placeholder={`Comentario opcional para ${skillLabel}… Escribí o usá "Hablar" y después "Mejorar con IA".`}
-                    value={value}
-                    onChange={(e) => {
-                        const current = form.getValues("rubricComments") ?? {};
-                        form.setValue("rubricComments", { ...current, [skillName]: e.target.value });
-                    }}
-                    className="min-h-[56px] text-sm resize-none"
-                />
-                <div className="flex flex-wrap gap-2">
-                    {canUseVoice && (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                                toggleVoice(value, (v) => {
-                                    const current = form.getValues("rubricComments") ?? {};
-                                    form.setValue("rubricComments", { ...current, [skillName]: v });
-                                })
-                            }
-                        >
-                            {isRecording ? <MicOff className="h-3 w-3 mr-1" /> : <Mic className="h-3 w-3 mr-1" />}
-                            {isRecording ? "Detener" : "Hablar"}
-                        </Button>
-                    )}
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={improvingRubricKey !== null}
-                        onClick={() => handleImproveRubricComment(skillName, skillLabel, value)}
-                    >
-                        {improvingRubricKey === skillName ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                            <Sparkles className="h-3 w-3 mr-1" />
-                        )}
-                        Mejorar con IA
-                    </Button>
-                </div>
-            </div>
-        );
-    }
-
     const position = form.watch("position");
     const isArquero = position === "arquero";
 
@@ -544,7 +581,16 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
                                                                 onValueChange={field.onChange}
                                                             />
                                                         </FormControl>
-                                                        <RubricCommentBlock skillName={skill.name} skillLabel={skill.label} />
+                                                        <RubricCommentField
+                                                        control={form.control}
+                                                        skillName={skill.name}
+                                                        skillLabel={skill.label}
+                                                        canUseVoice={canUseVoice}
+                                                        isRecording={isRecording}
+                                                        onToggleVoice={toggleVoice}
+                                                        onImproveWithAI={handleImproveRubricComment}
+                                                        improvingKey={improvingRubricKey}
+                                                    />
                                                     </FormItem>
                                                 )}
                                             />
@@ -568,7 +614,16 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
                                                                 onValueChange={field.onChange}
                                                             />
                                                         </FormControl>
-                                                        <RubricCommentBlock skillName={skill.name} skillLabel={skill.label} />
+                                                        <RubricCommentField
+                                                        control={form.control}
+                                                        skillName={skill.name}
+                                                        skillLabel={skill.label}
+                                                        canUseVoice={canUseVoice}
+                                                        isRecording={isRecording}
+                                                        onToggleVoice={toggleVoice}
+                                                        onImproveWithAI={handleImproveRubricComment}
+                                                        improvingKey={improvingRubricKey}
+                                                    />
                                                     </FormItem>
                                                 )}
                                             />
@@ -595,7 +650,16 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
                                                                 onValueChange={field.onChange}
                                                             />
                                                         </FormControl>
-                                                        <RubricCommentBlock skillName={skill.name} skillLabel={skill.label} />
+                                                        <RubricCommentField
+                                                        control={form.control}
+                                                        skillName={skill.name}
+                                                        skillLabel={skill.label}
+                                                        canUseVoice={canUseVoice}
+                                                        isRecording={isRecording}
+                                                        onToggleVoice={toggleVoice}
+                                                        onImproveWithAI={handleImproveRubricComment}
+                                                        improvingKey={improvingRubricKey}
+                                                    />
                                                     </FormItem>
                                                 )}
                                             />
@@ -619,7 +683,16 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
                                                                 onValueChange={field.onChange}
                                                             />
                                                         </FormControl>
-                                                        <RubricCommentBlock skillName={skill.name} skillLabel={skill.label} />
+                                                        <RubricCommentField
+                                                            control={form.control}
+                                                            skillName={skill.name}
+                                                            skillLabel={skill.label}
+                                                            canUseVoice={canUseVoice}
+                                                            isRecording={isRecording}
+                                                            onToggleVoice={toggleVoice}
+                                                            onImproveWithAI={handleImproveRubricComment}
+                                                            improvingKey={improvingRubricKey}
+                                                        />
                                                     </FormItem>
                                                 )}
                                             />
@@ -647,53 +720,68 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
                                                         onValueChange={field.onChange}
                                                     />
                                                 </FormControl>
-                                                <RubricCommentBlock skillName={skill.name} skillLabel={skill.label} />
+                                                <RubricCommentField
+                                                control={form.control}
+                                                skillName={skill.name}
+                                                skillLabel={skill.label}
+                                                canUseVoice={canUseVoice}
+                                                isRecording={isRecording}
+                                                onToggleVoice={toggleVoice}
+                                                onImproveWithAI={handleImproveRubricComment}
+                                                improvingKey={improvingRubricKey}
+                                            />
                                             </FormItem>
                                         )}
                                     />
                                 ))}
                             </div>
                            
-                            <FormField
-                                control={form.control}
-                                name="coachComments"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Comentarios Generales del Entrenador</FormLabel>
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {canUseVoice && (
-                                            <Button
-                                                type="button"
-                                                variant={isRecording ? "destructive" : "outline"}
-                                                size="sm"
-                                                onClick={() => toggleVoice(field.value, field.onChange)}
-                                            >
-                                                {isRecording ? <MicOff className="h-4 w-4 mr-1" /> : <Mic className="h-4 w-4 mr-1" />}
-                                                {isRecording ? "Detener grabación" : "Hablar (transcribir)"}
-                                            </Button>
-                                        )}
+                            {/* Comentarios Generales: register() para que el valor esté siempre sincronizado con el formulario */}
+                            <div className="space-y-2">
+                                <Label htmlFor="coachComments">Comentarios Generales del Entrenador <span className="text-destructive">*</span></Label>
+                                <p className="text-xs text-muted-foreground">Único campo obligatorio. Escribí al menos un carácter (no solo espacios).</p>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {canUseVoice && (
                                         <Button
                                             type="button"
-                                            variant="outline"
+                                            variant={isRecording ? "destructive" : "outline"}
                                             size="sm"
-                                            disabled={isImproving}
-                                            onClick={() => handleImproveWithAI(field.value)}
+                                            onClick={() => toggleVoice(form.getValues("coachComments") ?? "", (v) => form.setValue("coachComments", v))}
                                         >
-                                            {isImproving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
-                                            Mejorar con IA
+                                            {isRecording ? <MicOff className="h-4 w-4 mr-1" /> : <Mic className="h-4 w-4 mr-1" />}
+                                            {isRecording ? "Detener grabación" : "Hablar (transcribir)"}
                                         </Button>
-                                    </div>
-                                    <FormControl>
-                                    <Textarea
-                                        placeholder="Escribe o graba con voz. Luego puedes usar «Mejorar con IA» para que quede un texto coherente usando todas las evaluaciones."
-                                        className="min-h-[120px]"
-                                        {...field}
-                                    />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
+                                    )}
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isImproving}
+                                        onClick={() => handleImproveWithAI(form.getValues("coachComments") ?? "")}
+                                    >
+                                        {isImproving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                                        Mejorar con IA
+                                    </Button>
+                                </div>
+                                {(() => {
+                                    const { ref: regRef, ...regRest } = form.register("coachComments", {
+                                        setValueAs: (v) => (typeof v === "string" ? v : ""),
+                                    });
+                                    return (
+                                        <Textarea
+                                            id="coachComments"
+                                            placeholder="Escribe o graba con voz. Luego puedes usar «Mejorar con IA» para que quede un texto coherente usando todas las evaluaciones."
+                                            className="min-h-[120px]"
+                                            {...regRest}
+                                            ref={(el) => {
+                                                coachCommentsRef.current = el;
+                                                if (typeof regRef === "function") regRef(el);
+                                                else if (regRef) (regRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+                                            }}
+                                        />
+                                    );
+                                })()}
+                            </div>
                         </form>
                     </Form>
                 </ScrollArea>
@@ -701,7 +789,35 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
                     <SheetClose asChild>
                         <Button type="button" variant="outline">Cancelar</Button>
                     </SheetClose>
-                    <Button type="submit" form="add-evaluation-form" disabled={form.formState.isSubmitting}>
+                    <Button
+                        type="button"
+                        disabled={form.formState.isSubmitting}
+                        onClick={() => {
+                            // Forzar sincronía: leer valor del DOM y llevarlo al form antes de validar (evita race con RHF)
+                            const domValue = coachCommentsRef.current?.value ?? "";
+                            if (domValue !== form.getValues("coachComments")) {
+                                form.setValue("coachComments", domValue, { shouldValidate: false });
+                            }
+                            form.handleSubmit(onSubmit, (errors) => {
+                                // Mensaje según el campo que falló (no asumir siempre coachComments)
+                                const firstKey = Object.keys(errors)[0];
+                                const firstErr = firstKey ? errors[firstKey as keyof typeof errors] : null;
+                                const message = firstErr && typeof firstErr === "object" && "message" in firstErr
+                                    ? String((firstErr as { message?: string }).message)
+                                    : null;
+                                const description = firstKey === "coachComments"
+                                    ? (message ?? "Solo los Comentarios Generales del Entrenador son obligatorios.")
+                                    : firstKey === "rubricComments"
+                                        ? (message ?? "Revisá los comentarios opcionales por rubro (algún valor no es válido).")
+                                        : (message ?? "Revisá los campos marcados.");
+                                toast({
+                                    variant: "destructive",
+                                    title: "Error de validación",
+                                    description,
+                                });
+                            })();
+                        }}
+                    >
                         {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         {form.formState.isSubmitting ? "Guardando..." : isEditMode ? "Guardar cambios" : "Guardar Evaluación"}
                     </Button>
