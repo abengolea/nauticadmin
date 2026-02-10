@@ -24,27 +24,35 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Loader2, PlusCircle, UserPlus } from "lucide-react";
-import { useFirestore } from "@/firebase";
+import { useFirestore, useUserProfile } from "@/firebase";
 import { collection, doc, writeBatch, Timestamp } from "firebase/firestore";
+import { writeAuditLog } from "@/lib/audit";
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getFirebaseConfig } from "@/firebase/config";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "../ui/separator";
 
-const schoolSchema = z.object({
-  name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
-  city: z.string().min(2, "La ciudad es requerida."),
-  province: z.string().min(2, "La provincia es requerida."),
-  address: z.string().optional(),
-  adminDisplayName: z.string().min(3, "El nombre del administrador es requerido."),
-  adminEmail: z.string().email("El correo electrónico no es válido."),
-  adminPassword: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
-});
+const schoolSchema = z
+  .object({
+    name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
+    city: z.string().min(2, "La ciudad es requerida."),
+    province: z.string().min(2, "La provincia es requerida."),
+    address: z.string().optional(),
+    adminDisplayName: z.string().min(3, "El nombre del administrador es requerido."),
+    adminEmail: z.string().email("El correo electrónico no es válido."),
+    adminEmailConfirm: z.string().email("El correo electrónico no es válido."),
+    adminPassword: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
+  })
+  .refine((data) => data.adminEmail === data.adminEmailConfirm, {
+    message: "Los correos electrónicos no coinciden.",
+    path: ["adminEmailConfirm"],
+  });
 
 export function CreateSchoolDialog() {
   const [open, setOpen] = useState(false);
   const firestore = useFirestore();
+  const { user } = useUserProfile();
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof schoolSchema>>({
@@ -56,6 +64,7 @@ export function CreateSchoolDialog() {
       address: "",
       adminDisplayName: "",
       adminEmail: "",
+      adminEmailConfirm: "",
       adminPassword: "",
     },
   });
@@ -107,6 +116,15 @@ export function CreateSchoolDialog() {
       batch.set(platformUserRef, platformUserData);
 
       await batch.commit();
+
+      if (user?.uid && user?.email) {
+        await writeAuditLog(firestore, user.email, user.uid, {
+          action: "school.create",
+          resourceType: "school",
+          resourceId: newSchoolRef.id,
+          details: values.name,
+        });
+      }
 
       toast({
           title: "¡Éxito!",
@@ -237,6 +255,19 @@ export function CreateSchoolDialog() {
                     render={({ field }) => (
                         <FormItem>
                         <FormLabel>Email del Admin</FormLabel>
+                        <FormControl>
+                            <Input type="email" placeholder="mg@riverplate.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="adminEmailConfirm"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Confirmar Email del Admin</FormLabel>
                         <FormControl>
                             <Input type="email" placeholder="mg@riverplate.com" {...field} />
                         </FormControl>

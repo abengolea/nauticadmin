@@ -23,6 +23,7 @@ import {
 import {
   useCollection,
   useFirestore,
+  useAuth,
   useUserProfile,
   errorEmitter,
   FirestorePermissionError,
@@ -49,6 +50,7 @@ type ActionState = {
 } | null;
 
 export function PendingRegistrations() {
+  const auth = useAuth();
   const { profile, activeSchoolId, isReady } = useUserProfile();
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -127,9 +129,44 @@ export function PendingRegistrations() {
 
     try {
       await batch.commit();
+      const newPlayerId = newPlayerRef.id;
+      // Después de aprobar: encolar email "Fuiste aceptado" vía API → colección mail → Trigger Email
+      let emailSent = false;
+      if (emailNorm) {
+        try {
+          const token = await auth.currentUser?.getIdToken();
+          if (token) {
+            const res = await fetch("/api/registrations/on-approve", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                schoolId: activeSchoolId,
+                playerId: newPlayerId,
+                playerEmail: emailNorm,
+              }),
+            });
+            emailSent = res.ok;
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              console.warn("Email de aceptación no enviado:", res.status, errData);
+            }
+          } else {
+            console.warn("Email de aceptación no enviado: sin token de sesión");
+          }
+        } catch (emailErr) {
+          console.warn("Email de aceptación no enviado:", emailErr);
+        }
+      }
       toast({
         title: "¡Jugador Aprobado!",
-        description: `${pendingPlayer.firstName} ${pendingPlayer.lastName} ahora es parte de la escuela.`,
+        description: emailNorm
+          ? emailSent
+            ? `${pendingPlayer.firstName} ${pendingPlayer.lastName} ahora es parte de la escuela. Se envió un email al jugador.`
+            : `${pendingPlayer.firstName} ${pendingPlayer.lastName} ahora es parte de la escuela. No se pudo enviar el email de aviso (revisá la extensión Trigger Email o la consola).`
+          : `${pendingPlayer.firstName} ${pendingPlayer.lastName} ahora es parte de la escuela.`,
       });
     } catch (err) {
       errorEmitter.emit(
@@ -225,6 +262,28 @@ export function PendingRegistrations() {
         }
         batch.delete(doc(firestore, `schools/${activeSchoolId}/pendingPlayers`, player.id));
         await batch.commit();
+        if (emailNorm) {
+          try {
+            const token = await auth.currentUser?.getIdToken();
+            if (token) {
+              const res = await fetch("/api/registrations/on-approve", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  schoolId: activeSchoolId,
+                  playerId: newPlayerRef.id,
+                  playerEmail: emailNorm,
+                }),
+              });
+              if (!res.ok) console.warn("Email on-approve failed:", res.status);
+            }
+          } catch {
+            // ignore
+          }
+        }
         approved++;
       } catch (err) {
         errorEmitter.emit(

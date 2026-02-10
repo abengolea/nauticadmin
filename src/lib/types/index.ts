@@ -5,6 +5,39 @@ export interface PlatformUser {
   createdAt: Date;
 }
 
+/** Configuración global de la plataforma (solo super admin). */
+export interface PlatformConfig {
+  /** Mensaje mostrado cuando la plataforma está en mantenimiento. */
+  maintenanceMessage?: string;
+  /** Si true, se muestra el mensaje de mantenimiento y se limita el acceso. */
+  maintenanceMode?: boolean;
+  /** Si el registro web de nuevos jugadores está habilitado globalmente. */
+  registrationEnabled?: boolean;
+  updatedAt?: Date;
+  updatedBy?: string;
+}
+
+/** Plantilla básica global de evaluaciones físicas (super admin). Tests predefinidos + los aceptados desde propuestas de entrenadores. */
+export interface PhysicalAssessmentTemplate {
+  /** Tests aceptados por super admin por grupo etario; una vez aceptados forman parte de la plantilla para todas las escuelas. */
+  acceptedFieldsByAgeGroup?: Partial<Record<PhysicalAgeGroup, PhysicalFieldDef[]>>;
+  updatedAt?: Date;
+  updatedBy?: string;
+}
+
+/** Entrada del log de auditoría (acciones relevantes del super admin). */
+export interface AuditLogEntry {
+  id: string;
+  userId: string;
+  userEmail: string;
+  action: string;
+  resourceType: string;
+  resourceId?: string;
+  schoolId?: string;
+  details?: string;
+  createdAt: Date;
+}
+
 export interface School {
   id: string;
   name: string;
@@ -200,6 +233,8 @@ export interface Evaluation {
   };
   createdAt: Date;
   createdBy: string; // uid
+  /** Nombre del entrenador que realizó la evaluación (quien la hizo). */
+  evaluatedByName?: string;
 }
 
 

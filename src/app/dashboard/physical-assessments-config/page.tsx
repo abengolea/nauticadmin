@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useUserProfile, useDoc } from "@/firebase";
-import type { PhysicalAssessmentConfig } from "@/lib/types";
+import type { PhysicalAssessmentConfig, PhysicalAssessmentTemplate } from "@/lib/types";
 import {
   AGE_GROUPS,
   FIELDS_BY_AGE_GROUP,
@@ -53,11 +53,16 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
   flexibilidad: Target,
 };
 
+const TEMPLATE_DOC_ID = "physicalAssessmentTemplate";
+
 export default function PhysicalAssessmentsConfigPage() {
   const { profile, isReady: profileReady, activeSchoolId } = useUserProfile();
   const schoolId = activeSchoolId ?? "";
   const { data: config, loading: configLoading } = useDoc<PhysicalAssessmentConfig>(
     schoolId ? `schools/${schoolId}/physicalAssessmentConfig/default` : ""
+  );
+  const { data: globalTemplate } = useDoc<PhysicalAssessmentTemplate>(
+    `platformConfig/${TEMPLATE_DOC_ID}`
   );
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -241,7 +246,11 @@ export default function PhysicalAssessmentsConfigPage() {
           ) : (
             <div className="space-y-8">
               {AGE_GROUPS.map(({ group, label }) => {
-                const fields = getFieldsForAgeGroup(group, config ?? undefined);
+                const fields = getFieldsForAgeGroup(
+                  group,
+                  config ?? undefined,
+                  globalTemplate?.acceptedFieldsByAgeGroup ?? undefined
+                );
                 const enabledKeys = enabledByGroup[group];
                 const baseFields = FIELDS_BY_AGE_GROUP[group];
 

@@ -24,8 +24,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Loader2, Edit } from "lucide-react";
-import { useFirestore } from "@/firebase";
+import { useFirestore, useUserProfile } from "@/firebase";
 import { doc, updateDoc } from "firebase/firestore";
+import { writeAuditLog } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import type { School } from "@/lib/types";
 
@@ -44,6 +45,7 @@ interface EditSchoolDialogProps {
 export function EditSchoolDialog({ school, children }: EditSchoolDialogProps) {
   const [open, setOpen] = useState(false);
   const firestore = useFirestore();
+  const { user } = useUserProfile();
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof schoolSchema>>({
@@ -68,6 +70,16 @@ export function EditSchoolDialog({ school, children }: EditSchoolDialogProps) {
         province: values.province,
         address: values.address,
       });
+
+      if (user?.uid && user?.email) {
+        await writeAuditLog(firestore, user.email, user.uid, {
+          action: "school.update",
+          resourceType: "school",
+          resourceId: school.id,
+          schoolId: school.id,
+          details: values.name,
+        });
+      }
 
       toast({
         title: "¡Escuela actualizada!",

@@ -146,7 +146,8 @@ service cloud.firestore {
 
     // Mapa email -> schoolId para saber si un usuario tiene pendingPlayer (registro web).
     match /pendingPlayerByEmail/{emailKey} {
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.token.email != null
+          && emailKey == request.auth.token.email.lower();
       allow read: if isSignedIn() && request.auth.token.email != null
           && emailKey == request.auth.token.email.lower();
       allow delete: if isSuperAdmin() || (resource != null && resource.data.schoolId != null
@@ -358,6 +359,19 @@ service cloud.firestore {
       allow read: if isMemberOfSchool(schoolId)
           && (get(/databases/$(database)/documents/schools/$(schoolId)/supportTickets/$(ticketId)).data.userId == request.auth.uid
               || isSuperAdmin());
+      allow create: if isSuperAdmin();
+      allow update, delete: if false;
+    }
+
+    // --- Configuración global y auditoría (solo super admin) ---
+
+    match /platformConfig/{configId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /auditLog/{entryId} {
+      allow read: if isSuperAdmin();
       allow create: if isSuperAdmin();
       allow update, delete: if false;
     }

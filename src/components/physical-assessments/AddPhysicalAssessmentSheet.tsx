@@ -27,7 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { useFirestore, useUserProfile, errorEmitter, FirestorePermissionError } from "@/firebase";
 import { collection, addDoc, doc, updateDoc, Timestamp } from "firebase/firestore";
-import type { PhysicalAssessment, PhysicalAgeGroup } from "@/lib/types";
+import type { PhysicalAssessment, PhysicalAgeGroup, PhysicalAssessmentTemplate } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getAgeGroup, FIELDS_BY_AGE_GROUP, getFieldsForAgeGroup } from "@/lib/physical-assessments";
@@ -118,6 +118,9 @@ export function AddPhysicalAssessmentSheet({
   }>(
     schoolId ? `schools/${schoolId}/physicalAssessmentConfig/default` : ""
   );
+  const { data: globalTemplate } = useDoc<PhysicalAssessmentTemplate>(
+    "platformConfig/physicalAssessmentTemplate"
+  );
 
   const ageGroup = useMemo(() => {
     if (editingAssessment) return editingAssessment.ageGroup;
@@ -126,8 +129,12 @@ export function AddPhysicalAssessmentSheet({
 
   const fields = useMemo(() => {
     if (!ageGroup) return [];
-    return getFieldsForAgeGroup(ageGroup, config ?? undefined);
-  }, [ageGroup, config]);
+    return getFieldsForAgeGroup(
+      ageGroup,
+      config ?? undefined,
+      globalTemplate?.acceptedFieldsByAgeGroup ?? undefined
+    );
+  }, [ageGroup, config, globalTemplate?.acceptedFieldsByAgeGroup]);
 
   const isEditMode = Boolean(editingAssessment?.id);
   const schema = useMemo(() => buildSchema(fields), [fields]);

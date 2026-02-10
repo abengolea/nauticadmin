@@ -139,7 +139,11 @@ export function EvaluationDetailDisplay({ evaluation, schoolId, onDeleted, onEdi
                         Evaluación del {evaluation.date ? format(evaluation.date, "d 'de' MMMM 'de' yyyy", { locale: es }) : "Fecha desconocida"}
                     </CardTitle>
                     <CardDescription>
-                        Comentarios y calificaciones de la sesión.
+                        {evaluation.evaluatedByName ? (
+                            <>Comentarios y calificaciones de la sesión. Evaluada por <strong>{evaluation.evaluatedByName}</strong>.</>
+                        ) : (
+                            "Comentarios y calificaciones de la sesión."
+                        )}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

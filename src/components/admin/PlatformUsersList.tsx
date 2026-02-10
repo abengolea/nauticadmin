@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -11,11 +12,19 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Loader2, Shield, ShieldOff } from "lucide-react";
+import { MoreHorizontal, Loader2, Shield, ShieldOff, Building2 } from "lucide-react";
 import { useCollection, useFirestore, useUserProfile } from "@/firebase";
-import { doc, updateDoc } from "firebase/firestore";
-import type { PlatformUser } from "@/lib/types";
+import { doc, updateDoc, collectionGroup, getDocs, collection } from "firebase/firestore";
+import type { PlatformUser, School, SchoolUser } from "@/lib/types";
+import { writeAuditLog } from "@/lib/audit";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
@@ -37,7 +46,18 @@ type UserAction = {
     action: 'promote' | 'demote';
 }
 
-export function PlatformUsersList() {
+type UserRoleInfo = {
+    role: 'school_admin' | 'coach' | 'player';
+    displayName?: string;
+    schoolId: string;
+    playerId?: string;
+};
+
+type PlatformUsersListProps = {
+    schools?: School[] | null;
+};
+
+export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
     const { data: platformUsers, loading: usersLoading } = useCollection<PlatformUser>('platformUsers', { orderBy: ['createdAt', 'desc'] });
     const { user: currentUser } = useUserProfile();
     const firestore = useFirestore();
@@ -45,6 +65,73 @@ export function PlatformUsersList() {
     
     const [actionToConfirm, setActionToConfirm] = useState<UserAction | null>(null);
     const [isUpdating, setIsUpdating] = useState(false);
+    const [selectedSchoolId, setSelectedSchoolId] = useState<string>("all");
+
+    // Cuando hay un filtro por escuela, cargamos los usuarios de esa escuela (staff: admin, coach) con role y displayName
+    const schoolUsersPath = selectedSchoolId && selectedSchoolId !== "all" ? `schools/${selectedSchoolId}/users` : "";
+    const { data: schoolUsers } = useCollection<SchoolUser & { id: string }>(schoolUsersPath);
+
+    // Para vista "Todas las escuelas": cargar roles desde collectionGroup + playerLogins
+    const [allRolesMap, setAllRolesMap] = useState<Map<string, UserRoleInfo>>(new Map());
+    const [playerMap, setPlayerMap] = useState<Map<string, { schoolId: string; playerId: string }>>(new Map());
+
+    useEffect(() => {
+        if (selectedSchoolId !== "all") return;
+        const load = async () => {
+            const rolesMap = new Map<string, UserRoleInfo>();
+            const pMap = new Map<string, { schoolId: string; playerId: string }>();
+            try {
+                const [usersSnap, loginsSnap] = await Promise.all([
+                    getDocs(collectionGroup(firestore!, "users")),
+                    getDocs(collection(firestore!, "playerLogins")),
+                ]);
+                usersSnap.docs.forEach((d) => {
+                    const schoolId = d.ref.parent.parent?.id;
+                    if (!schoolId) return;
+                    const data = d.data() as SchoolUser;
+                    rolesMap.set(d.id, {
+                        role: data.role,
+                        displayName: data.displayName,
+                        schoolId,
+                        playerId: (data as { playerId?: string }).playerId,
+                    });
+                });
+                loginsSnap.docs.forEach((d) => {
+                    const data = d.data() as { schoolId: string; playerId: string };
+                    if (data.schoolId && data.playerId) pMap.set(d.id, { schoolId: data.schoolId, playerId: data.playerId });
+                });
+                setAllRolesMap(rolesMap);
+                setPlayerMap(pMap);
+            } catch {
+                setAllRolesMap(new Map());
+                setPlayerMap(new Map());
+            }
+        };
+        load();
+    }, [selectedSchoolId, firestore]);
+
+    const roleMap = useMemo(() => {
+        if (selectedSchoolId === "all") return allRolesMap;
+        const m = new Map<string, UserRoleInfo>();
+        schoolUsers?.forEach((u) => {
+            m.set(u.id, {
+                role: u.role,
+                displayName: u.displayName,
+                schoolId: selectedSchoolId,
+            });
+        });
+        return m;
+    }, [selectedSchoolId, schoolUsers, allRolesMap]);
+
+    const filteredUsers = useMemo(() => {
+        if (!platformUsers) return [];
+        if (selectedSchoolId === "all") return platformUsers;
+        if (!schoolUsers) return [];
+        const schoolUserIds = new Set(schoolUsers.map((u) => u.id));
+        return platformUsers.filter(
+            (u) => schoolUserIds.has(u.id) || u.super_admin
+        );
+    }, [platformUsers, selectedSchoolId, schoolUsers]);
 
     const handleUpdateRole = async () => {
         if (!actionToConfirm) return;
@@ -55,6 +142,14 @@ export function PlatformUsersList() {
 
         try {
             await updateDoc(userRef, { super_admin: newStatus });
+            if (currentUser?.uid && currentUser?.email) {
+              await writeAuditLog(firestore, currentUser.email, currentUser.uid, {
+                action: newStatus ? "platform_user.promote_super_admin" : "platform_user.demote_super_admin",
+                resourceType: "platformUser",
+                resourceId: user.id,
+                details: user.email,
+              });
+            }
             toast({
                 title: "Rol actualizado",
                 description: `${user.email} ha sido ${newStatus ? 'promovido a' : 'revocado como'} Super Admin.`,
@@ -75,10 +170,28 @@ export function PlatformUsersList() {
 
     return (
         <>
+        <div className="flex flex-col gap-4 pb-4">
+            <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedSchoolId} onValueChange={setSelectedSchoolId}>
+                    <SelectTrigger className="w-[280px]">
+                        <SelectValue placeholder="Filtrar por escuela" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todas las escuelas</SelectItem>
+                        {schools?.map((school) => (
+                            <SelectItem key={school.id} value={school.id}>
+                                {school.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+        </div>
         <Table className="min-w-[480px]">
             <TableHeader>
                 <TableRow>
-                    <TableHead className="text-xs sm:text-sm">Email</TableHead>
+                    <TableHead className="text-xs sm:text-sm">Nombre / Email</TableHead>
                     <TableHead className="text-xs sm:text-sm">Rol</TableHead>
                     <TableHead className="text-xs sm:text-sm whitespace-nowrap">Fecha de Registro</TableHead>
                     <TableHead className="text-right w-[80px]">Acciones</TableHead>
@@ -93,9 +206,39 @@ export function PlatformUsersList() {
                             <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                         </TableRow>
                     ))}
-                    {platformUsers?.map((user) => (
+                    {filteredUsers?.map((user) => {
+                        const info = roleMap.get(user.id);
+                        const href = info
+                          ? info.playerId
+                            ? `/dashboard/players/${info.playerId}?schoolId=${info.schoolId}`
+                            : `/dashboard/schools/${info.schoolId}`
+                          : null;
+                        const displayName = info?.displayName ?? user.email;
+                        const roleLabel =
+                          info?.role === "school_admin"
+                            ? "Admin"
+                            : info?.role === "coach"
+                              ? "Entrenador"
+                              : info?.role === "player"
+                                ? "Jugador"
+                                : "Usuario";
+                        return (
                         <TableRow key={user.id}>
-                            <TableCell className="font-medium">{user.email}</TableCell>
+                            <TableCell className="font-medium">
+                                {href ? (
+                                    <Link
+                                        href={href}
+                                        className="text-primary hover:underline focus:underline"
+                                    >
+                                        {displayName}
+                                    </Link>
+                                ) : (
+                                    <span>{displayName}</span>
+                                )}
+                                {displayName !== user.email && (
+                                    <span className="block text-xs text-muted-foreground">{user.email}</span>
+                                )}
+                            </TableCell>
                             <TableCell>
                                 {user.super_admin ? (
                                     <Badge variant="default" className="bg-primary/80 hover:bg-primary">
@@ -103,7 +246,7 @@ export function PlatformUsersList() {
                                         Super Admin
                                     </Badge>
                                 ) : (
-                                    <Badge variant="secondary">Usuario</Badge>
+                                    <Badge variant="secondary">{roleLabel}</Badge>
                                 )}
                             </TableCell>
                             <TableCell>{format(user.createdAt, 'dd/MM/yyyy', { locale: es })}</TableCell>
@@ -135,11 +278,14 @@ export function PlatformUsersList() {
                                 </DropdownMenu>
                             </TableCell>
                         </TableRow>
-                    ))}
+                    );
+                    })}
                 </TableBody>
             </Table>
-            {(!isLoading && !platformUsers?.length) && (
-                <p className="text-center text-muted-foreground py-8">No hay usuarios en la plataforma.</p>
+            {(!isLoading && !filteredUsers?.length) && (
+                <p className="text-center text-muted-foreground py-8">
+                    {selectedSchoolId === "all" ? "No hay usuarios en la plataforma." : "No hay usuarios asignados a esta escuela."}
+                </p>
             )}
 
             <AlertDialog open={!!actionToConfirm} onOpenChange={(open) => !open && setActionToConfirm(null)}>

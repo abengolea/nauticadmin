@@ -373,6 +373,7 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
             ...payload,
             createdAt: Timestamp.now(),
             createdBy: profile.uid,
+            evaluatedByName: profile.displayName?.trim() || profile.email || "Entrenador",
         };
 
         const evaluationsCollectionRef = collection(firestore, `schools/${schoolId}/evaluations`);

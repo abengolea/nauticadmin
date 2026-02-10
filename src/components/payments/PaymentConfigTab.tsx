@@ -16,7 +16,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CreditCard, CheckCircle2 } from "lucide-react";
+import { CreditCard, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PaymentConfigTabProps {
   schoolId: string;
@@ -211,12 +212,20 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
             Para que tu escuela cobre directamente en su cuenta de Mercado Pago, conectá tu cuenta (autorización oficial). No tenés que enviar claves ni contraseñas.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {mpConnected ? (
-            <div className="flex items-center gap-2 text-emerald-600">
-              <CheckCircle2 className="h-5 w-5 shrink-0" />
-              <span className="font-medium">Cuenta conectada</span>
-            </div>
+            <>
+              <div className="flex items-center gap-2 text-emerald-600">
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+                <span className="font-medium">Cuenta conectada</span>
+              </div>
+              <Alert variant="default" className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-500/30">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                <AlertDescription>
+                  Ya hay una cuenta de Mercado Pago conectada para esta escuela. Si otro administrador conecta su cuenta, los cobros pasarán a acreditarse en esa cuenta (solo hay una conexión por escuela).
+                </AlertDescription>
+              </Alert>
+            </>
           ) : (
             <Button onClick={handleConnectMercadoPago} disabled={mpConnecting}>
               {mpConnecting ? "Redirigiendo a Mercado Pago…" : "Conectar Mercado Pago"}

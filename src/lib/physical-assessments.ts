@@ -105,16 +105,20 @@ export interface PhysicalAssessmentConfigPartial {
   fieldOverridesByAgeGroup?: Partial<Record<PhysicalAgeGroup, Record<string, Partial<Pick<FieldDef, "label" | "unit" | "min" | "max" | "placeholder">>>>>;
 }
 
+/** Plantilla global: campos aceptados por super admin (disponibles para todas las escuelas). */
+export type GlobalAcceptedFieldsByAgeGroup = Partial<Record<PhysicalAgeGroup, FieldDef[]>>;
+
 /** Aplica overrides a un FieldDef. */
 function applyOverrides(f: FieldDef, overrides?: Partial<Pick<FieldDef, "label" | "unit" | "min" | "max" | "placeholder">>): FieldDef {
   if (!overrides || Object.keys(overrides).length === 0) return f;
   return { ...f, ...overrides };
 }
 
-/** Obtiene los campos efectivos para un grupo. Soporta config con enabled, overrides y custom fields. */
+/** Obtiene los campos efectivos para un grupo. Soporta config con enabled, overrides, custom fields y plantilla global (accepted). */
 export function getFieldsForAgeGroup(
   ageGroup: PhysicalAgeGroup,
-  enabledKeysOrConfig?: string[] | null | PhysicalAssessmentConfigPartial
+  enabledKeysOrConfig?: string[] | null | PhysicalAssessmentConfigPartial,
+  globalAccepted?: GlobalAcceptedFieldsByAgeGroup | null
 ): FieldDef[] {
   const config = typeof enabledKeysOrConfig === "object" && enabledKeysOrConfig !== null && !Array.isArray(enabledKeysOrConfig)
     ? enabledKeysOrConfig
@@ -124,24 +128,31 @@ export function getFieldsForAgeGroup(
     : config?.enabledFieldsByAgeGroup?.[ageGroup];
 
   const baseFields = FIELDS_BY_AGE_GROUP[ageGroup];
+  const acceptedFields = globalAccepted?.[ageGroup] ?? [];
   const overrides = config?.fieldOverridesByAgeGroup?.[ageGroup] ?? {};
   const customFields = config?.customFieldsByAgeGroup?.[ageGroup] ?? [];
+  const acceptedKeysSet = new Set(acceptedFields.map((f) => f.key));
 
-  // Campos base con overrides aplicados
-  let baseWithOverrides = baseFields.map((f) => applyOverrides(f, overrides[f.key]));
+  // Base = predefinidos + aceptados en plantilla global; aplicar overrides
+  const baseWithOverrides = baseFields.map((f) => applyOverrides(f, overrides[f.key]));
+  const acceptedWithOverrides = acceptedFields.map((f) => applyOverrides(f, overrides[f.key]));
 
-  // Filtrar por enabled si está definido
+  // Filtrar base por enabled; los aceptados globalmente siempre se incluyen
   let effectiveBase: FieldDef[];
   if (enabledKeys === undefined || enabledKeys === null) {
-    effectiveBase = baseWithOverrides;
+    effectiveBase = [...baseWithOverrides, ...acceptedWithOverrides];
   } else if (enabledKeys.length === 0) {
-    effectiveBase = [];
+    effectiveBase = [...acceptedWithOverrides];
   } else {
-    effectiveBase = baseWithOverrides.filter((f) => enabledKeys.includes(f.key));
+    const baseFiltered = baseWithOverrides.filter((f) => enabledKeys.includes(f.key));
+    effectiveBase = [...baseFiltered, ...acceptedWithOverrides];
   }
 
-  // Agregar custom fields (siempre habilitados)
-  return [...effectiveBase, ...customFields];
+  const effectiveKeysSet = new Set(effectiveBase.map((f) => f.key));
+  // Custom de la escuela que no estén ya en plantilla base/global (evitar duplicados)
+  const customDeduped = customFields.filter((f) => !effectiveKeysSet.has(f.key));
+
+  return [...effectiveBase, ...customDeduped];
 }
 
 /** Obtiene el label de un campo. Usa PHYSICAL_FIELD_LABELS por defecto; si hay config con overrides/custom, los aplica. */

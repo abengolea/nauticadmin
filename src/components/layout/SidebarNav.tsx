@@ -17,6 +17,9 @@ import {
   Banknote,
   FileText,
   FileHeart,
+  Sliders,
+  History,
+  UserX,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -54,7 +57,12 @@ const schoolUserMenuItems = [
 
 const superAdminMenuItems = [
     { href: "/dashboard", label: "Escuelas", icon: Building },
+    { href: "/dashboard/admin/physical-template", label: "Evaluaciones físicas (plantilla)", icon: Activity },
     { href: "/dashboard/support/operator", label: "Tickets de Soporte", icon: Headphones },
+    { href: "/dashboard/admin/config", label: "Configuración global", icon: Sliders },
+    { href: "/dashboard/admin/test-email", label: "Probar Trigger Email", icon: Mail },
+    { href: "/dashboard/admin/audit", label: "Auditoría", icon: History },
+    { href: "/dashboard/admin/delete-test-users", label: "Borrar usuarios de prueba", icon: UserX },
 ];
 
 
