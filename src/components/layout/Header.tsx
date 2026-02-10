@@ -40,7 +40,7 @@ export function Header() {
     isReady ? "accessRequests" : "",
     { where: ["status", "==", "pending"] }
   );
-  const playersList = players ?? [];
+  const playersList = (players ?? []).filter((p) => !p.archived);
   const birthdaysToday = playersList.filter((p) => isBirthdayToday(p.birthDate));
   const birthdayCount = birthdaysToday.length;
   const solicitudesCount = (pendingPlayers?.length ?? 0) + (accessRequests?.length ?? 0);

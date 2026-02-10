@@ -18,6 +18,7 @@ export default function PendingApprovalPage() {
   const [sending, setSending] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
   const [hasWebRegistrationPending, setHasWebRegistrationPending] = useState<boolean | null>(null);
+  const [isAccountDisabled, setIsAccountDisabled] = useState<boolean | null>(null);
 
   const handleLogout = async () => {
     try {
@@ -40,12 +41,31 @@ export default function PendingApprovalPage() {
     const user = auth.currentUser;
     if (!user?.email) {
       setHasWebRegistrationPending(false);
+      setIsAccountDisabled(false);
       return;
     }
     const emailNorm = user.email.trim().toLowerCase();
     getDoc(doc(firestore, "pendingPlayerByEmail", emailNorm))
       .then((snap) => setHasWebRegistrationPending(snap.exists()))
       .catch(() => setHasWebRegistrationPending(false));
+    getDoc(doc(firestore, "playerLogins", emailNorm))
+      .then((loginSnap) => {
+        if (!loginSnap.exists()) {
+          setIsAccountDisabled(false);
+          return;
+        }
+        const { schoolId: sid, playerId } = loginSnap.data() as { schoolId: string; playerId: string };
+        return getDoc(doc(firestore, `schools/${sid}/players/${playerId}`));
+      })
+      .then((playerSnap) => {
+        if (!playerSnap || !playerSnap.exists()) {
+          setIsAccountDisabled(false);
+          return;
+        }
+        const status = (playerSnap.data() as { status?: string })?.status;
+        setIsAccountDisabled(status !== undefined && status !== "active");
+      })
+      .catch(() => setIsAccountDisabled(false));
   }, [auth.currentUser, firestore]);
 
   const handleRetry = () => {
@@ -88,13 +108,24 @@ export default function PendingApprovalPage() {
     <Card className="w-full max-w-md shadow-2xl border-2">
       <CardHeader className="items-center text-center">
         <UserX className="h-16 w-16 text-destructive" />
-        <CardTitle className="text-2xl font-headline mt-4">Acceso Pendiente</CardTitle>
+        <CardTitle className="text-2xl font-headline mt-4">
+          {isAccountDisabled ? "Cuenta desactivada" : "Acceso Pendiente"}
+        </CardTitle>
         <CardDescription>
-          Tu cuenta está activa, pero no tienes permisos para acceder.
+          {isAccountDisabled
+            ? "Tu cuenta de jugador está desactivada. No podés ingresar al panel. Contactá a la escuela para reactivarla."
+            : "Tu cuenta está activa, pero no tienes permisos para acceder."}
         </CardDescription>
       </CardHeader>
       <CardContent className="text-center space-y-4">
-        {hasWebRegistrationPending ? (
+        {isAccountDisabled ? (
+          <div className="flex flex-col gap-2">
+            <Button onClick={handleLogout} variant="outline" className="w-full">
+              <LogOut className="mr-2 h-4 w-4" />
+              Cerrar sesión
+            </Button>
+          </div>
+        ) : hasWebRegistrationPending ? (
           <>
             <div className="flex justify-center">
               <Clock className="h-12 w-12 text-amber-600 dark:text-amber-400" />
@@ -120,15 +151,17 @@ export default function PendingApprovalPage() {
             )}
           </>
         )}
-        <div className="flex flex-col gap-2">
-          <Button onClick={handleRetry} className="w-full">
-            Reintentar
-          </Button>
-          <Button onClick={handleLogout} variant="outline" className="w-full">
-            <LogOut className="mr-2 h-4 w-4" />
-            Cerrar Sesión
-          </Button>
-        </div>
+        {!isAccountDisabled && (
+          <div className="flex flex-col gap-2">
+            <Button onClick={handleRetry} className="w-full">
+              Reintentar
+            </Button>
+            <Button onClick={handleLogout} variant="outline" className="w-full">
+              <LogOut className="mr-2 h-4 w-4" />
+              Cerrar Sesión
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

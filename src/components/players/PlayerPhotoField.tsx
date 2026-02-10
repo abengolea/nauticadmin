@@ -171,7 +171,7 @@ export function PlayerPhotoField({
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="default"
               size="sm"
               disabled={disabled || uploading}
               onClick={() => setCameraOpen(true)}
@@ -183,11 +183,10 @@ export function PlayerPhotoField({
             <Button type="button" variant="outline" size="sm" disabled={disabled || uploading} asChild>
               <label className="cursor-pointer gap-2 flex items-center">
                 <Upload className="h-4 w-4" />
-                Subir imagen
+                Subir foto
                 <input
                   type="file"
                   accept="image/*"
-                  capture="user"
                   className="sr-only"
                   onChange={handleFileSelect}
                   disabled={disabled || uploading}
@@ -196,7 +195,7 @@ export function PlayerPhotoField({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Sacá una foto con la cámara o subí una imagen desde tu dispositivo (máx. 2MB).
+            Sacá una foto con la cámara o subí una foto desde tu dispositivo (máx. 2MB).
           </p>
         </div>
       </div>

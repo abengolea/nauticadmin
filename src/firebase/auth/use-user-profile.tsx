@@ -98,7 +98,12 @@ export function useUserProfile() {
           if (!playerSnap.exists()) {
             setMemberships([]);
           } else {
-            const playerData = playerSnap.data() as { firstName?: string; lastName?: string };
+            const playerData = playerSnap.data() as { firstName?: string; lastName?: string; status?: string };
+            if (playerData.status !== 'active') {
+              setMemberships([]);
+              setProfileLoading(false);
+              return;
+            }
             const displayName = ([playerData.firstName, playerData.lastName].filter(Boolean).join(' ') || user.email) ?? 'Jugador';
             setMemberships([{
               schoolId,

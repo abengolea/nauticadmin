@@ -70,7 +70,7 @@ export function MassMessageForm() {
     activeSchoolId ? `schools/${activeSchoolId}/players` : "",
     {}
   );
-  const players = Array.isArray(playersData) ? playersData : [];
+  const players = (Array.isArray(playersData) ? playersData : []).filter((p) => !p.archived);
 
   const [allSelected, setAllSelected] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());

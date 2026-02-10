@@ -74,6 +74,7 @@ export function PlatformUsersList() {
     const isLoading = usersLoading;
 
     return (
+        <>
         <Table className="min-w-[480px]">
             <TableHeader>
                 <TableRow>

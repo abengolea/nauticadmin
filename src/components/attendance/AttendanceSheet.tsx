@@ -65,7 +65,7 @@ export function AttendanceSheet({ schoolId }: Props) {
     { orderBy: ["lastName", "asc"] }
   );
 
-  const activePlayers = players?.filter((p) => p.status === "active") ?? [];
+  const activePlayers = players?.filter((p) => !p.archived && p.status === "active") ?? [];
 
   const loadTrainingAndAttendance = useCallback(async () => {
     if (!schoolId) return;

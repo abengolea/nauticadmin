@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server';
 import { listPaymentsSchema } from '@/lib/payments/schemas';
 import { getAdminFirestore } from '@/lib/firebase-admin';
-import { listPayments, getPlayerNames } from '@/lib/payments/db';
+import { listPayments, getPlayerNames, getArchivedPlayerIds } from '@/lib/payments/db';
 import { verifyIdToken } from '@/lib/auth-server';
 
 export async function GET(request: Request) {
@@ -46,11 +46,15 @@ export async function GET(request: Request) {
     const { schoolId: sid, filters, limit, offset } = parsed.data;
     const db = getAdminFirestore();
 
-    const { payments, total } = await listPayments(db, sid, {
+    const archivedIds = await getArchivedPlayerIds(db, sid);
+    const { payments: rawPayments, total: rawTotal } = await listPayments(db, sid, {
       ...filters,
-      limit,
-      offset,
+      limit: 10000,
+      offset: 0,
     });
+    const paymentsFiltered = rawPayments.filter((p) => !archivedIds.has(p.playerId));
+    const total = paymentsFiltered.length;
+    const payments = paymentsFiltered.slice(offset, offset + (limit ?? 50));
 
     // Agrupar playerIds por schoolId del pago (por si algún pago tuviera otra escuela)
     const playerIdsBySchool = new Map<string, Set<string>>();

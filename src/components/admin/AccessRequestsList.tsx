@@ -65,6 +65,7 @@ export function AccessRequestsList() {
     isReady && activeSchoolId ? `schools/${activeSchoolId}/players` : "",
     {}
   );
+  const activePlayers = (players ?? []).filter((p) => !p.archived);
 
   const [actionState, setActionState] = useState<ActionState>(null);
   const [approveDialog, setApproveDialog] = useState<{
@@ -289,7 +290,7 @@ export function AccessRequestsList() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="new">Crear nuevo jugador con este email</SelectItem>
-                    {(players ?? []).map((p) => (
+                    {activePlayers.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.firstName} {p.lastName}
                         {p.email ? ` (${p.email})` : ""}

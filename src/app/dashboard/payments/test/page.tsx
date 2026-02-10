@@ -49,6 +49,7 @@ export default function PaymentsTestPage() {
     schoolId ? `schools/${schoolId}/players` : "",
     { orderBy: ["lastName", "asc"] }
   );
+  const activePlayers = (players ?? []).filter((p) => !p.archived);
 
   const getToken = async () => {
     const auth = getAuth(app);
@@ -188,8 +189,8 @@ export default function PaymentsTestPage() {
           <div>
             <Label className="text-muted-foreground text-xs">Jugadores en esta escuela (colección cliente):</Label>
             <ul className="mt-1 text-sm font-mono space-y-0.5">
-              {(players ?? []).length === 0 && <li className="text-muted-foreground">Ninguno cargado</li>}
-              {(players ?? []).map((p) => (
+              {activePlayers.length === 0 && <li className="text-muted-foreground">Ninguno cargado</li>}
+              {activePlayers.map((p) => (
                 <li key={p.id}>
                   <span className="text-muted-foreground">{p.id}</span> → {[p.lastName, p.firstName].filter(Boolean).join(", ")}
                 </li>
@@ -243,11 +244,11 @@ export default function PaymentsTestPage() {
                 {[
                   ...new Set([
                     ...(verifyResult?.playerIds ?? []),
-                    ...(players?.map((p) => p.id) ?? []),
+                    ...(activePlayers.map((p) => p.id) ?? []),
                   ]),
                 ].map((id) => {
                   const name = verifyResult?.players?.[id] ?? (() => {
-                    const p = players?.find((x) => x.id === id);
+                    const p = activePlayers.find((x) => x.id === id);
                     return p ? [p.lastName, p.firstName].filter(Boolean).join(", ") : "";
                   })();
                   return (

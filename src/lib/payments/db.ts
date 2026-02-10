@@ -128,7 +128,7 @@ export async function getMercadoPagoAccessToken(db: Firestore, schoolId: string)
   return conn?.access_token ?? null;
 }
 
-/** Verifica que el jugador exista en esa escuela (schools/{schoolId}/players/{playerId}). Regla: solo crear pagos con jugadores que existan en la escuela. */
+/** Verifica que el jugador exista en esa escuela y no esté archivado. Regla: solo crear pagos con jugadores no archivados. */
 export async function playerExistsInSchool(
   db: Firestore,
   schoolId: string,
@@ -136,7 +136,9 @@ export async function playerExistsInSchool(
 ): Promise<boolean> {
   const ref = db.collection('schools').doc(schoolId).collection('players').doc(playerId);
   const snap = await ref.get();
-  return snap.exists;
+  if (!snap.exists) return false;
+  const archived = snap.data()?.archived === true;
+  return !archived;
 }
 
 /** Busca pago aprobado por playerId + period (evitar duplicados) */
@@ -321,6 +323,23 @@ export async function getPlayerNames(
   return map;
 }
 
+/** Obtiene los IDs de jugadores archivados de una escuela (para excluir sus pagos de totales). */
+export async function getArchivedPlayerIds(
+  db: Firestore,
+  schoolId: string
+): Promise<Set<string>> {
+  const snap = await db
+    .collection('schools')
+    .doc(schoolId)
+    .collection('players')
+    .get();
+  const ids = new Set<string>();
+  snap.docs.forEach((d) => {
+    if (d.data()?.archived === true) ids.add(d.id);
+  });
+  return ids;
+}
+
 /** Lista pagos con filtros */
 export async function listPayments(
   db: Firestore,
@@ -368,7 +387,7 @@ export async function listPayments(
   return { payments, total };
 }
 
-/** Obtiene jugadores activos de una escuela con su configuración de pago */
+/** Obtiene jugadores activos de una escuela (no archivados) con su configuración de pago */
 export async function getActivePlayersWithConfig(
   db: Firestore,
   schoolId: string
@@ -379,6 +398,8 @@ export async function getActivePlayersWithConfig(
     .collection('players')
     .where('status', 'in', ['active', 'suspended'])
     .get();
+
+  const nonArchived = playersSnap.docs.filter((d) => d.data()?.archived !== true);
 
   const configSnap = await db
     .collection('schools')
@@ -420,7 +441,7 @@ export async function getActivePlayersWithConfig(
         updatedBy: '',
       };
 
-  const players: { player: Player; config: PaymentConfig }[] = playersSnap.docs.map((d) => {
+  const players: { player: Player; config: PaymentConfig }[] = nonArchived.map((d) => {
     const data = d.data();
     const birthDate = data.birthDate?.toDate?.() ?? new Date(data.birthDate);
     return {

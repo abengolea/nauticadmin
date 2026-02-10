@@ -113,6 +113,7 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
     schoolId ? `schools/${schoolId}/players` : "",
     { orderBy: ["lastName", "asc"] }
   );
+  const activePlayers = (players ?? []).filter((p) => !p.archived);
 
   const fetchConfig = useCallback(async () => {
     const token = await getToken();
@@ -429,7 +430,7 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
                   <SelectValue placeholder="Elegí un jugador" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(players ?? []).map((p) => (
+                  {activePlayers.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {[p.firstName, p.lastName].filter(Boolean).join(" ")}
                     </SelectItem>

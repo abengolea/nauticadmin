@@ -15,7 +15,7 @@ const PIE_LABELS: Record<string, string> = {
   ambidiestro: "Ambidiestro",
 };
 
-export function SummaryTab({ player }: { player: Player }) {
+export function SummaryTab({ player, lastCoachComment }: { player: Player; lastCoachComment?: string }) {
     const hasDeportivo = player.posicion_preferida || player.pie_dominante || player.altura_cm || player.peso_kg;
 
     return (
@@ -104,7 +104,7 @@ export function SummaryTab({ player }: { player: Player }) {
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground italic">
-                        {player.observations || "No hay observaciones registradas para este jugador."}
+                        {lastCoachComment?.trim() || player.observations || "No hay observaciones registradas para este jugador."}
                     </p>
                 </CardContent>
             </Card>

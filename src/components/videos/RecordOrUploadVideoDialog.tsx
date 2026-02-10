@@ -82,6 +82,7 @@ export function RecordOrUploadVideoDialog({
   const { data: players } = useCollection<Player>(
     schoolId && !embedded ? `schools/${schoolId}/players` : ""
   );
+  const activePlayers = (players ?? []).filter((p) => !p.archived);
 
   const effectivePlayerId = embedded ? initialPlayerId : playerId;
   const canSubmit =
@@ -281,7 +282,7 @@ export function RecordOrUploadVideoDialog({
               value={playerId}
               onValueChange={(id) => {
                 setPlayerId(id);
-                const p = players?.find((x) => x.id === id);
+                const p = activePlayers.find((x) => x.id === id);
                 setPlayerName(p ? `${p.firstName} ${p.lastName}`.trim() : "");
               }}
             >
@@ -289,7 +290,7 @@ export function RecordOrUploadVideoDialog({
                 <SelectValue placeholder="Elige un jugador" />
               </SelectTrigger>
               <SelectContent>
-                {players?.map((p) => (
+                {activePlayers.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.firstName} {p.lastName}
                   </SelectItem>

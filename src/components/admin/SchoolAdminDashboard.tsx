@@ -13,8 +13,9 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCollection, useUserProfile, useDoc } from "@/firebase";
 import type { Player, School as SchoolType } from "@/lib/types";
+import { getCategoryLabel, compareCategory } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import React from "react";
+import React, { useMemo } from "react";
 
 export function SchoolAdminDashboard() {
   const { profile, isReady, activeSchoolId } = useUserProfile();
@@ -25,8 +26,29 @@ export function SchoolAdminDashboard() {
 
   const { data: players, loading: playersLoading } = useCollection<Player>(
       activeSchoolId ? `schools/${activeSchoolId}/players` : '',
-      { limit: 4, orderBy: ['createdAt', 'desc'] }
+      { limit: 20, orderBy: ['createdAt', 'desc'] }
   );
+
+  const activePlayers = useMemo(() => (players ?? []).filter((p) => !p.archived), [players]);
+
+  const playersByCategory = useMemo(() => {
+    if (!activePlayers.length) return [];
+    return [...activePlayers]
+      .map((p) => ({
+        player: p,
+        category: p.birthDate
+          ? getCategoryLabel(p.birthDate instanceof Date ? p.birthDate : new Date(p.birthDate))
+          : "-",
+      }))
+      .sort((a, b) => {
+        const cmp = compareCategory(a.category, b.category);
+        if (cmp !== 0) return cmp;
+        const lnA = (a.player.lastName ?? "").toLowerCase();
+        const lnB = (b.player.lastName ?? "").toLowerCase();
+        return lnA.localeCompare(lnB);
+      })
+      .slice(0, 8);
+  }, [activePlayers]);
 
   const isLoading = !isReady || schoolLoading || playersLoading;
 
@@ -122,9 +144,9 @@ export function SchoolAdminDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{players?.filter(p => p.status === 'active').length || 0}</div>
+            <div className="text-2xl font-bold">{activePlayers.filter(p => p.status === 'active').length}</div>
             <p className="text-xs text-muted-foreground">
-              {players ? `${players.length} en total` : ''}
+              {activePlayers.length} en total
             </p>
           </CardContent>
         </Card>
@@ -162,7 +184,7 @@ export function SchoolAdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {players?.map((player) => (
+              {playersByCategory.map(({ player, category }) => (
                 <div key={player.id} className="flex items-center">
                   <Avatar className="h-9 w-9">
                     <AvatarImage src={player.photoUrl} alt="Avatar" data-ai-hint="person portrait" />
@@ -170,7 +192,7 @@ export function SchoolAdminDashboard() {
                   </Avatar>
                   <div className="ml-4 space-y-1">
                     <p className="text-sm font-medium leading-none">{player.firstName} {player.lastName}</p>
-                    <p className="text-sm text-muted-foreground">{player.categoryId}</p>
+                    <p className="text-sm text-muted-foreground">{category}</p>
                   </div>
                   <Link href={`/dashboard/players/${player.id}?schoolId=${activeSchoolId}`} className="ml-auto">
                     <Button variant="ghost" size="sm">
@@ -179,9 +201,9 @@ export function SchoolAdminDashboard() {
                   </Link>
                 </div>
               ))}
-               {(!players || players.length === 0) && (
-                 <p className="text-sm text-center text-muted-foreground p-4">No hay jugadores para mostrar.</p>
-                )}
+              {playersByCategory.length === 0 && (
+                <p className="text-sm text-center text-muted-foreground p-4">No hay jugadores para mostrar.</p>
+              )}
             </div>
           </CardContent>
         </Card>

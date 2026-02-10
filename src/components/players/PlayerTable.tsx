@@ -45,19 +45,30 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   );
 
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [categoryFrom, setCategoryFrom] = useState<string>("");
+  const [categoryTo, setCategoryTo] = useState<string>("");
+
+  const activePlayers = useMemo(() => (players ?? []).filter((p) => !p.archived), [players]);
 
   const sortedAndFilteredPlayers = useMemo(() => {
-    if (!players || players.length === 0) return [];
-    const withCategory = players.map((p) => ({
+    if (!activePlayers.length) return [];
+    const withCategory = activePlayers.map((p) => ({
       player: p,
       category: p.birthDate
         ? getCategoryLabel(p.birthDate instanceof Date ? p.birthDate : new Date(p.birthDate))
         : "-",
     }));
-    const filtered =
-      categoryFilter === ""
-        ? withCategory
-        : withCategory.filter((x) => x.category === categoryFilter);
+    let filtered = withCategory;
+    if (categoryFilter !== "") {
+      filtered = filtered.filter((x) => x.category === categoryFilter);
+    } else {
+      if (categoryFrom !== "") {
+        filtered = filtered.filter((x) => compareCategory(x.category, categoryFrom) >= 0);
+      }
+      if (categoryTo !== "") {
+        filtered = filtered.filter((x) => compareCategory(x.category, categoryTo) <= 0);
+      }
+    }
     return filtered.sort((a, b) => {
       const cmp = compareCategory(a.category, b.category);
       if (cmp !== 0) return cmp;
@@ -65,7 +76,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
       const lnB = (b.player.lastName ?? "").toLowerCase();
       return lnA.localeCompare(lnB);
     });
-  }, [players, categoryFilter]);
+  }, [activePlayers, categoryFilter, categoryFrom, categoryTo]);
 
   if (!isReady || loading) {
     return (
@@ -100,28 +111,66 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     return <div className="text-destructive p-4">Error al cargar los jugadores. Es posible que no tengas permisos para verlos.</div>
   }
   
-  if (!players || players.length === 0) {
+  if (!players || activePlayers.length === 0) {
       return <div className="text-center text-muted-foreground p-4">No hay jugadores para mostrar en esta escuela.</div>
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Label className="text-sm text-muted-foreground shrink-0">Categoría</Label>
-        <Select value={categoryFilter || "all"} onValueChange={(v) => setCategoryFilter(v === "all" ? "" : v)}>
-          <SelectTrigger className="w-[140px] sm:w-[160px]">
-            <SelectValue placeholder="Todas" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            {CATEGORY_ORDER.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {categoryFilter && (
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Label className="text-sm text-muted-foreground shrink-0">Categoría</Label>
+          <Select value={categoryFilter || "all"} onValueChange={(v) => setCategoryFilter(v === "all" ? "" : v)}>
+            <SelectTrigger className="w-[140px] sm:w-[160px]">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {CATEGORY_ORDER.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {(!categoryFilter || categoryFilter === "") && (
+          <>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground shrink-0">Desde</Label>
+              <Select value={categoryFrom || "any"} onValueChange={(v) => setCategoryFrom(v === "any" ? "" : v)}>
+                <SelectTrigger className="w-[100px] sm:w-[110px]">
+                  <SelectValue placeholder="Cualquiera" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Cualquiera</SelectItem>
+                  {CATEGORY_ORDER.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground shrink-0">Hasta</Label>
+              <Select value={categoryTo || "any"} onValueChange={(v) => setCategoryTo(v === "any" ? "" : v)}>
+                <SelectTrigger className="w-[100px] sm:w-[110px]">
+                  <SelectValue placeholder="Cualquiera" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Cualquiera</SelectItem>
+                  {CATEGORY_ORDER.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
+        {(categoryFilter || categoryFrom || categoryTo) && (
           <span className="text-xs text-muted-foreground">
             {sortedAndFilteredPlayers.length} jugador{sortedAndFilteredPlayers.length !== 1 ? "es" : ""}
           </span>
@@ -142,7 +191,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
             {sortedAndFilteredPlayers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
-                  Ningún jugador en la categoría seleccionada.
+                  {categoryFrom || categoryTo ? "Ningún jugador en el rango de categorías seleccionado." : "Ningún jugador en la categoría seleccionada."}
                 </TableCell>
               </TableRow>
             ) : (

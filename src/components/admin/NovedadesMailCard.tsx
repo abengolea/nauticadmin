@@ -23,7 +23,7 @@ export function NovedadesMailCard({ schoolId, schoolName }: NovedadesMailCardPro
   const { data: playersData, loading: playersLoading } = useCollection<Player>(
     schoolId ? `schools/${schoolId}/players` : ""
   );
-  const players = playersData ?? [];
+  const players = (playersData ?? []).filter((p) => !p.archived);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
