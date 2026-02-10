@@ -144,6 +144,11 @@ export function SidebarNav() {
     }
   }
 
+  // Evitar ítems duplicados por href (claves únicas y menú sin duplicados)
+  const uniqueMenuItems = Array.from(
+    new Map(menuItems.map((item) => [item.href, item])).values()
+  );
+
   return (
     <>
       <SidebarHeader>
@@ -164,7 +169,7 @@ export function SidebarNav() {
             </div>
         ) : (
             <SidebarMenu>
-            {menuItems.map((item) => (
+            {uniqueMenuItems.map((item) => (
                 <SidebarMenuItem key={`${item.href}-${item.label}`}>
                 <Link href={item.href} className="relative flex items-center" onClick={closeMobileSidebar}>
                     <SidebarMenuButton
