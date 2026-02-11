@@ -32,6 +32,8 @@ import { useCollection } from "@/firebase";
 const registrationSchema = z
   .object({
     schoolId: z.string().min(1, "Seleccioná una escuela."),
+    firstName: z.string().min(1, "El nombre es requerido."),
+    lastName: z.string().min(1, "El apellido es requerido."),
     email: z.string().email("Debe ser un email válido."),
     emailConfirm: z.string().email("Debe ser un email válido."),
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
@@ -48,9 +50,6 @@ const registrationSchema = z
 
 type RegistrationFormValues = z.infer<typeof registrationSchema>;
 
-const PLACEHOLDER_FIRST = "Por completar";
-const PLACEHOLDER_LAST = "";
-
 export function PlayerRegistrationForm() {
   const auth = useAuth();
   const firestore = useFirestore();
@@ -66,6 +65,8 @@ export function PlayerRegistrationForm() {
     resolver: zodResolver(registrationSchema),
     defaultValues: {
       schoolId: "",
+      firstName: "",
+      lastName: "",
       email: "",
       emailConfirm: "",
       password: "",
@@ -80,14 +81,14 @@ export function PlayerRegistrationForm() {
       // 1. Crear cuenta (email + contraseña); el usuario queda logueado
       await createUserWithEmailAndPassword(auth, emailNorm, values.password);
 
-      // 2. Crear solicitud pendiente en la escuela (placeholders; el admin aprueba y después se completa el perfil)
+      // 2. Crear solicitud pendiente en la escuela con nombre y apellido
       const pendingRef = collection(
         firestore,
         `schools/${values.schoolId}/pendingPlayers`
       );
       await addDoc(pendingRef, {
-        firstName: PLACEHOLDER_FIRST,
-        lastName: PLACEHOLDER_LAST,
+        firstName: values.firstName.trim(),
+        lastName: values.lastName.trim(),
         birthDate: Timestamp.fromDate(new Date("2010-01-01")),
         email: emailNorm,
         tutorContact: { name: "", phone: "" },
@@ -171,6 +172,34 @@ export function PlayerRegistrationForm() {
                     ))}
                 </SelectContent>
               </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="firstName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nombre</FormLabel>
+              <FormControl>
+                <Input placeholder="Tu nombre" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="lastName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Apellido</FormLabel>
+              <FormControl>
+                <Input placeholder="Tu apellido" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
