@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -31,7 +32,7 @@ import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useAuth, useFirestore, useUserProfile } from "@/firebase";
+import { useAuth, useFirestore, useStorage, useUserProfile } from "@/firebase";
 import { collection, doc, writeBatch, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -41,6 +42,9 @@ import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getFirebaseConfig } from "@/firebase/config";
+import { PlayerPhotoField } from "./PlayerPhotoField";
+import { uploadPlayerPhoto } from "@/lib/player-photo";
+import { updateDoc } from "firebase/firestore";
 
 function generateRandomPassword(length = 16): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
@@ -67,11 +71,12 @@ const playerSchema = z.object({
   tutorPhone: z.string().min(1, "El teléfono del tutor es requerido."),
   status: z.enum(["active", "inactive"]),
   observations: z.string().optional(),
-  photoUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
+  photoUrl: z.string().optional().or(z.literal("")),
 });
 
 export function AddPlayerForm() {
     const firestore = useFirestore();
+    const storage = useStorage();
     const mainAuth = useAuth();
     const { toast } = useToast();
     const router = useRouter();
@@ -95,6 +100,7 @@ export function AddPlayerForm() {
     });
 
     const hasEmail = !!form.watch("email")?.trim();
+    const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
 
     async function onSubmit(values: z.infer<typeof playerSchema>) {
         if (!profile || !activeSchoolId) {
@@ -156,6 +162,19 @@ export function AddPlayerForm() {
             }
 
             await batch.commit();
+
+            if (pendingPhotoFile) {
+                try {
+                    const photoUrl = await uploadPlayerPhoto(storage, activeSchoolId, newPlayerRef.id, pendingPhotoFile);
+                    await updateDoc(newPlayerRef, { photoUrl });
+                } catch (photoErr) {
+                    toast({
+                        variant: "destructive",
+                        title: "Jugador creado",
+                        description: `Se creó el jugador pero no se pudo subir la foto: ${photoErr instanceof Error ? photoErr.message : "Error desconocido"}`,
+                    });
+                }
+            }
 
             if (sendSetPasswordEmail) {
                 try {
@@ -411,11 +430,17 @@ export function AddPlayerForm() {
                     name="photoUrl"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>URL de Foto (Opcional)</FormLabel>
+                        <FormLabel>Foto del jugador (Opcional)</FormLabel>
                         <FormControl>
-                        <Input placeholder="https://..." {...field} />
+                        <PlayerPhotoField
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                            schoolId={activeSchoolId ?? ""}
+                            onFileChange={setPendingPhotoFile}
+                            playerName={`${form.watch("firstName") ?? ""} ${form.watch("lastName") ?? ""}`.trim()}
+                        />
                         </FormControl>
-                        <FormDescription>URL pública de la imagen del jugador.</FormDescription>
+                        <FormDescription>Sacá una foto con la cámara o subí una imagen desde tu dispositivo.</FormDescription>
                         <FormMessage />
                     </FormItem>
                     )}

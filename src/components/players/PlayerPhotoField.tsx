@@ -13,15 +13,18 @@ import {
 import { useStorage } from "@/firebase/provider";
 import { uploadPlayerPhoto } from "@/lib/player-photo";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Upload, Loader2, User } from "lucide-react";
+import { Camera, Upload, Loader2, User, X } from "lucide-react";
 
 interface PlayerPhotoFieldProps {
   value: string;
   onChange: (url: string) => void;
   schoolId: string;
-  playerId: string;
+  /** Si no se pasa, el componente guarda el archivo y llama a onFileChange (para jugador nuevo). */
+  playerId?: string;
   playerName?: string;
   disabled?: boolean;
+  /** Cuando no hay playerId, se llama con el archivo en lugar de subir (para subir después de crear el jugador). Pasar null para limpiar. */
+  onFileChange?: (file: File | null) => void;
 }
 
 export function PlayerPhotoField({
@@ -31,7 +34,9 @@ export function PlayerPhotoField({
   playerId,
   playerName = "",
   disabled = false,
+  onFileChange,
 }: PlayerPhotoFieldProps) {
+  const isNewPlayer = !playerId;
   const storage = useStorage();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -41,6 +46,7 @@ export function PlayerPhotoField({
   const [cameraOpen, setCameraOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null);
 
   const stopStream = useCallback(() => {
     if (streamRef.current) {
@@ -80,6 +86,12 @@ export function PlayerPhotoField({
     };
   }, [cameraOpen, stopStream]);
 
+  useEffect(() => {
+    return () => {
+      if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
+    };
+  }, [pendingPreviewUrl]);
+
   const handleCapture = async () => {
     const video = videoRef.current;
     if (!video || !streamRef.current || video.readyState < 2) return;
@@ -89,7 +101,7 @@ export function PlayerPhotoField({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<string | void>((resolve, reject) => {
       canvas.toBlob(
         (blob) => {
           if (!blob) {
@@ -97,8 +109,19 @@ export function PlayerPhotoField({
             return;
           }
           const file = new File([blob], "photo.jpg", { type: "image/jpeg" });
+          if (isNewPlayer && onFileChange) {
+            onFileChange(file);
+            setPendingPreviewUrl((prev) => {
+              if (prev) URL.revokeObjectURL(prev);
+              return URL.createObjectURL(file);
+            });
+            setCameraOpen(false);
+            toast({ title: "Foto guardada", description: "La foto se subirá al crear el jugador." });
+            resolve();
+            return;
+          }
           setUploading(true);
-          uploadPlayerPhoto(storage, schoolId, playerId, file)
+          uploadPlayerPhoto(storage, schoolId, playerId!, file)
             .then((url) => {
               onChange(url);
               setCameraOpen(false);
@@ -133,9 +156,18 @@ export function PlayerPhotoField({
       return;
     }
     e.target.value = "";
+    if (isNewPlayer && onFileChange) {
+      onFileChange(file);
+      setPendingPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(file);
+      });
+      toast({ title: "Foto guardada", description: "La foto se subirá al crear el jugador." });
+      return;
+    }
     setUploading(true);
     try {
-      const url = await uploadPlayerPhoto(storage, schoolId, playerId, file);
+      const url = await uploadPlayerPhoto(storage, schoolId, playerId!, file);
       onChange(url);
       toast({ title: "Foto guardada", description: "La foto se subió correctamente." });
     } catch (err) {
@@ -161,7 +193,7 @@ export function PlayerPhotoField({
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start gap-4">
         <Avatar className="h-24 w-24 border-2 border-muted">
-          <AvatarImage src={value || undefined} alt="Foto del jugador" />
+          <AvatarImage src={pendingPreviewUrl || value || undefined} alt="Foto del jugador" />
           <AvatarFallback className="text-2xl">
             {initials || <User className="h-10 w-10 text-muted-foreground" />}
           </AvatarFallback>
@@ -193,6 +225,25 @@ export function PlayerPhotoField({
                 />
               </label>
             </Button>
+            {isNewPlayer && pendingPreviewUrl && onFileChange && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={disabled}
+                onClick={() => {
+                  onFileChange(null);
+                  setPendingPreviewUrl((prev) => {
+                    if (prev) URL.revokeObjectURL(prev);
+                    return null;
+                  });
+                }}
+                className="gap-2 text-muted-foreground"
+              >
+                <X className="h-4 w-4" />
+                Quitar
+              </Button>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">
             Sacá una foto con la cámara o subí una foto desde tu dispositivo (máx. 2MB).
