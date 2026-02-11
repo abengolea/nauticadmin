@@ -1,12 +1,13 @@
 /**
- * Stub de integración con proveedores de pago (MercadoPago, DLocal).
- * TODO: Reemplazar por integración real con credenciales.
+ * Integración con proveedores de pago.
+ * Mercado Pago: preferencia real (Checkout Pro). DLocal: stub pendiente.
  *
  * MercadoPago: https://www.mercadopago.com.ar/developers
  * DLocal: https://docs.dlocal.com/
  */
 
 import type { PaymentProvider } from '@/lib/types/payments';
+import { createMercadoPagoPreference } from './mercadopago-checkout';
 
 export interface CreateIntentResult {
   checkoutUrl: string;
@@ -25,17 +26,33 @@ export interface CreateIntentParams {
 
 /**
  * Crea intención de pago con el proveedor.
- * Para Mercado Pago se usa el access_token de la escuela (OAuth). Stub: retorna URL de ejemplo hasta integrar SDK real.
+ * Mercado Pago: crea preferencia real y devuelve init_point. DLocal: stub.
  */
 export async function createPaymentIntentWithProvider(
   provider: PaymentProvider,
   params: CreateIntentParams
 ): Promise<CreateIntentResult> {
-  if (provider === 'mercadopago' && !params.mercadopagoAccessToken) {
-    throw new Error('La escuela no tiene Mercado Pago conectado. Conectá tu cuenta en Administración → Pagos → Configuración.');
+  if (provider === 'mercadopago') {
+    if (!params.mercadopagoAccessToken) {
+      throw new Error('La escuela no tiene Mercado Pago conectado. Conectá tu cuenta en Administración → Pagos → Configuración.');
+    }
+    const { init_point, preference_id } = await createMercadoPagoPreference(
+      params.mercadopagoAccessToken,
+      {
+        playerId: params.playerId,
+        schoolId: params.schoolId,
+        period: params.period,
+        amount: params.amount,
+        currency: params.currency,
+      }
+    );
+    return {
+      checkoutUrl: init_point,
+      providerPreferenceId: preference_id,
+    };
   }
-  // TODO: MercadoPago SDK - usar params.mercadopagoAccessToken para crear preferencia y obtener init_point
-  // TODO: DLocal - crear orden y obtener checkout_url
+
+  // DLocal: stub hasta integrar
   const prefId = `stub_${provider}_${Date.now()}`;
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:9002';
   return {

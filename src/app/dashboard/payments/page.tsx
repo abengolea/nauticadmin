@@ -11,6 +11,7 @@ import { PaymentsTab } from "@/components/payments/PaymentsTab";
 import { DelinquentsTab } from "@/components/payments/DelinquentsTab";
 import { PaymentConfigTab } from "@/components/payments/PaymentConfigTab";
 import { PlayerPaymentsView } from "@/components/payments/PlayerPaymentsView";
+import { useToast } from "@/hooks/use-toast";
 import { Banknote, AlertTriangle, Settings, FlaskConical } from "lucide-react";
 
 export default function PaymentsPage() {
@@ -18,13 +19,31 @@ export default function PaymentsPage() {
   const router = useRouter();
   const { app } = useFirebase();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
 
   const schoolId = profile?.activeSchoolId;
   const tabFromUrl = searchParams.get("tab");
+  const paymentResult = searchParams.get("payment");
   const defaultTab = useMemo(() => {
     if (tabFromUrl === "config" || tabFromUrl === "delinquents") return tabFromUrl;
     return "payments";
   }, [tabFromUrl]);
+
+  useEffect(() => {
+    if (!paymentResult) return;
+    const messages: Record<string, { title: string; description: string; variant?: "default" | "destructive" }> = {
+      success: { title: "Pago aprobado", description: "Tu pago fue acreditado. La cuota quedará registrada en unos instantes." },
+      pending: { title: "Pago pendiente", description: "Tu pago está en proceso. Te avisaremos cuando se acredite." },
+      failure: { title: "Pago no realizado", description: "El pago no se completó. Podés intentar de nuevo cuando quieras.", variant: "destructive" },
+    };
+    const msg = messages[paymentResult];
+    if (msg) {
+      toast({ ...msg });
+      const url = new URL(window.location.href);
+      url.searchParams.delete("payment");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, [paymentResult, toast]);
 
   const getToken = async () => {
     const auth = getAuth(app);

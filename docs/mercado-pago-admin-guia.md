@@ -27,8 +27,8 @@ Para que **cada escuela cobre directo** en su propia cuenta:
 
 1. **Una sola app en Mercado Pago Developers** (la de la plataforma Escuela River): crear aplicación, tipo “Pagos online” / OAuth.
 2. **OAuth (authorization code)** para que cada escuela autorice la app: el admin va a Administración → Pagos → Configuración → “Conectar Mercado Pago”, se redirige a `auth.mercadopago.com`, autoriza, y el callback intercambia el `code` por `access_token` y `refresh_token` y los guarda por `schoolId` en Firestore (`schools/{schoolId}/mercadopagoConnection/default`).
-3. **Cobrar con el token de la escuela**: al crear una intención de pago para esa escuela, se usa el `access_token` guardado para esa escuela (no un token global).
-4. **Webhooks** para conciliar pagos (ver `docs/payments-module.md` y `src/app/api/payments/webhook/route.ts`).
+3. **Cobrar con el token de la escuela**: al crear una intención de pago (el alumno toca “Pagar”), se crea una preferencia en Mercado Pago con ese `access_token` y se devuelve el `init_point` (Checkout Pro). El alumno paga en MP y vuelve a la app por `back_urls` (success/pending/failure).
+4. **Webhook de pagos**: cada preferencia tiene `notification_url` con `?schoolId=xxx`. Mercado Pago notifica a `POST/GET /api/payments/webhook/mercadopago?schoolId=xxx`; el backend consulta el pago en la API de MP, si está aprobado registra el pago en Firestore y envía el email de recibo.
 
 ### Variables de entorno (servidor)
 
@@ -60,11 +60,13 @@ El `redirect_uri` que usa la app es exactamente: `{NEXT_PUBLIC_APP_URL}/api/paym
 ### Archivos relevantes
 
 - `src/lib/payments/mercadopago-oauth.ts` – URL de autorización, state firmado, intercambio code → tokens.
-- `src/app/api/payments/mercadopago/connect/route.ts` – Devuelve la URL para que el cliente redirija a MP.
+- `src/lib/payments/mercadopago-checkout.ts` – Crea preferencia en MP (Checkout Pro), devuelve `init_point` y `preference_id`.
+- `src/lib/payments/provider-stub.ts` – Para Mercado Pago llama a `createMercadoPagoPreference`; para DLocal sigue en stub.
+- `src/app/api/payments/mercadopago/connect/route.ts` – Devuelve la URL para que el cliente redirija a MP (OAuth).
 - `src/app/api/payments/mercadopago/callback/route.ts` – Recibe `code` y `state`, intercambia tokens, guarda por schoolId, redirige a `/dashboard/payments?tab=config`.
 - `src/app/api/payments/mercadopago/status/route.ts` – GET estado “conectado” por escuela.
+- `src/app/api/payments/webhook/mercadopago/route.ts` – Recibe IPN/Webhook de MP (topic=payment), consulta el pago con el token de la escuela, registra pago aprobado y envía email.
 - `src/lib/payments/db.ts` – `getMercadoPagoConnection`, `setMercadoPagoConnection`, `getMercadoPagoAccessToken`.
-- `src/lib/payments/provider-stub.ts` – Recibe `mercadopagoAccessToken` por escuela; reemplazar por SDK real para crear preferencia y obtener `init_point`.
 
 ### Renovación del access token
 
