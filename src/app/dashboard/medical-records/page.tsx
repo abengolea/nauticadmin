@@ -97,7 +97,7 @@ export default function MedicalRecordsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 min-w-0">
       <div>
         <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">
           Fichas médicas
@@ -154,7 +154,7 @@ export default function MedicalRecordsPage() {
               <p>No hay jugadores pendientes de ficha médica.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 min-w-0">
               <Table>
                 <TableHeader>
                   <TableRow>

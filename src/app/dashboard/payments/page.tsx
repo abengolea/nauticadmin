@@ -11,8 +11,9 @@ import { PaymentsTab } from "@/components/payments/PaymentsTab";
 import { DelinquentsTab } from "@/components/payments/DelinquentsTab";
 import { PaymentConfigTab } from "@/components/payments/PaymentConfigTab";
 import { PlayerPaymentsView } from "@/components/payments/PlayerPaymentsView";
+import { SchoolAdminMensualidadView } from "@/components/payments/SchoolAdminMensualidadView";
 import { useToast } from "@/hooks/use-toast";
-import { Banknote, AlertTriangle, Settings, FlaskConical } from "lucide-react";
+import { Banknote, AlertTriangle, Settings, FlaskConical, Building2 } from "lucide-react";
 
 export default function PaymentsPage() {
   const { profile, isReady, isAdmin, isPlayer } = useUserProfile();
@@ -24,8 +25,9 @@ export default function PaymentsPage() {
   const schoolId = profile?.activeSchoolId;
   const tabFromUrl = searchParams.get("tab");
   const paymentResult = searchParams.get("payment");
+  const schoolFeeResult = searchParams.get("schoolFee");
   const defaultTab = useMemo(() => {
-    if (tabFromUrl === "config" || tabFromUrl === "delinquents") return tabFromUrl;
+    if (tabFromUrl === "config" || tabFromUrl === "delinquents" || tabFromUrl === "mensualidad") return tabFromUrl;
     return "payments";
   }, [tabFromUrl]);
 
@@ -44,6 +46,26 @@ export default function PaymentsPage() {
       window.history.replaceState({}, "", url.pathname + url.search);
     }
   }, [paymentResult, toast]);
+
+  useEffect(() => {
+    if (!schoolFeeResult) return;
+    const messages: Record<string, { title: string; description: string; variant?: "default" | "destructive" }> = {
+      success: { title: "Mensualidad pagada", description: "El pago fue acreditado. La mensualidad quedará registrada en unos instantes." },
+      pending: { title: "Pago en proceso", description: "Tu pago está en proceso. Te avisaremos cuando se acredite." },
+      failure: { title: "Pago no realizado", description: "El pago no se completó. Podés intentar de nuevo cuando quieras.", variant: "destructive" },
+    };
+    const msg = messages[schoolFeeResult];
+    if (msg) {
+      toast({ ...msg });
+      const clearUrl = () => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("schoolFee");
+        url.searchParams.set("tab", "mensualidad");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      };
+      setTimeout(clearUrl, 3000);
+    }
+  }, [schoolFeeResult, toast]);
 
   const getToken = async () => {
     const auth = getAuth(app);
@@ -88,7 +110,7 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">Pagos y Morosidad</h1>
@@ -106,7 +128,7 @@ export default function PaymentsPage() {
       </div>
 
       <Tabs defaultValue={defaultTab} key={tabFromUrl ?? "payments"}>
-        <TabsList className="w-full grid grid-cols-3 gap-1 p-1 h-auto md:h-10 bg-card">
+        <TabsList className="w-full grid grid-cols-4 gap-1 p-1 h-auto md:h-10 bg-card">
           <TabsTrigger value="payments" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
             <Banknote className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
             <span className="hidden sm:inline">Pagos ingresados</span>
@@ -115,6 +137,10 @@ export default function PaymentsPage() {
           <TabsTrigger value="delinquents" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
             <AlertTriangle className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
             <span className="truncate">Morosos</span>
+          </TabsTrigger>
+          <TabsTrigger value="mensualidad" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
+            <Building2 className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+            <span className="truncate">Mensualidad</span>
           </TabsTrigger>
           <TabsTrigger value="config" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
             <Settings className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
@@ -127,6 +153,9 @@ export default function PaymentsPage() {
         </TabsContent>
         <TabsContent value="delinquents">
           <DelinquentsTab schoolId={schoolId} getToken={getToken} />
+        </TabsContent>
+        <TabsContent value="mensualidad">
+          <SchoolAdminMensualidadView schoolId={schoolId} getToken={getToken} refreshTrigger={schoolFeeResult} />
         </TabsContent>
         <TabsContent value="config">
           <PaymentConfigTab schoolId={schoolId} getToken={getToken} />

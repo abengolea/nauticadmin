@@ -170,11 +170,11 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
 
     return (
         <>
-        <div className="flex flex-col gap-4 pb-4">
-            <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
+        <div className="flex flex-col gap-4 pb-4 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+                <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                 <Select value={selectedSchoolId} onValueChange={setSelectedSchoolId}>
-                    <SelectTrigger className="w-[280px]">
+                    <SelectTrigger className="w-full max-w-[280px] min-w-0">
                         <SelectValue placeholder="Filtrar por escuela" />
                     </SelectTrigger>
                     <SelectContent>

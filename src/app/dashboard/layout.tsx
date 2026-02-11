@@ -1,6 +1,7 @@
 "use client";
 import { Header } from "@/components/layout/Header";
 import { SidebarNav } from "@/components/layout/SidebarNav";
+import { SchoolFeeBanner } from "@/components/admin/SchoolFeeBanner";
 import { SidebarProvider, Sidebar, SidebarInset } from "@/components/ui/sidebar";
 import { useUserProfile, useDoc } from "@/firebase";
 import { isPlayerProfileComplete } from "@/lib/utils";
@@ -60,9 +61,10 @@ export default function DashboardLayout({
         <Sidebar variant="inset" collapsible="icon">
           <SidebarNav />
         </Sidebar>
-        <SidebarInset className="bg-background">
+        <SidebarInset className="bg-background min-w-0 overflow-x-hidden">
           <Header />
-          <main className="flex-1 overflow-y-auto p-4 pt-6 md:p-8">
+          <SchoolFeeBanner />
+          <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-4 pt-6 md:p-8">
             {children}
           </main>
         </SidebarInset>

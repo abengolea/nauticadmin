@@ -48,3 +48,6 @@ env:
       - RUNTIME
   - variable: MERCADOPAGO_CLIENT_SECRET
     secret: mercadopago-client-secret
+  # Token de la cuenta de Escuela River para cobrar mensualidades a escuelas (crear secret)
+  - variable: MERCADOPAGO_PLATFORM_ACCESS_TOKEN
+    secret: mercadopago-platform-access-token

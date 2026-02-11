@@ -41,6 +41,8 @@ export interface AuditLogEntry {
 export interface School {
   id: string;
   name: string;
+  /** Slug URL para rutas públicas (ej. /escuelas/escuela-villa-crespo). */
+  slug?: string;
   city: string;
   province: string;
   address: string;
@@ -61,7 +63,7 @@ export interface SchoolUser {
   id: string; // auth uid
   displayName: string;
   email: string;
-  role: 'school_admin' | 'coach' | 'player';
+  role: 'school_admin' | 'coach' | 'editor' | 'viewer' | 'player';
   assignedCategories?: string[]; // IDs de las categorías asignadas
 }
 
@@ -250,7 +252,7 @@ export interface UserProfile extends SchoolUser {
 
 export interface SchoolMembership {
     schoolId: string;
-    role: 'school_admin' | 'coach' | 'player';
+    role: 'school_admin' | 'coach' | 'editor' | 'viewer' | 'player';
 }
 
 /** Evaluación física del jugador. Campos varían según edad. */
@@ -365,7 +367,12 @@ export interface PlayerVideo {
   createdBy: string;
 }
 
+// Re-export posts types
+export * from './posts';
+
 // Re-export support types
 export * from './support';
 // Re-export payments types
 export * from './payments';
+// Re-export platform fee types
+export * from './platform-fee';

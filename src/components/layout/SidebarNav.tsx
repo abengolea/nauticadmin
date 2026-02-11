@@ -20,9 +20,11 @@ import {
   Sliders,
   History,
   UserX,
+  Building2,
+  Newspaper,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   SidebarHeader,
   SidebarContent,
@@ -50,6 +52,7 @@ const schoolUserMenuItems = [
   { href: "/dashboard/physical-assessments-config", label: "Evaluaciones Físicas", icon: Activity },
   { href: "/dashboard/record-video", label: "Videoteca", icon: Video },
   { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
+  { href: "/dashboard/notas", label: "Notas", icon: Newspaper },
 ];
 
 const superAdminMenuItems = [
@@ -60,11 +63,13 @@ const superAdminMenuItems = [
     { href: "/dashboard/admin/test-email", label: "Probar Trigger Email", icon: Mail },
     { href: "/dashboard/admin/audit", label: "Auditoría", icon: History },
     { href: "/dashboard/admin/delete-test-users", label: "Borrar usuarios de prueba", icon: UserX },
+    { href: "/dashboard/notas", label: "Notas", icon: Newspaper },
 ];
 
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isMobile, setOpenMobile } = useSidebar();
   const { app } = useFirebase();
   const { isSuperAdmin, isReady, profile, activeSchoolId, isPlayer } = useUserProfile();
@@ -143,20 +148,24 @@ export function SidebarNav() {
     // Add Pagos, Mensajes y Gestionar Escuela solo para school_admin, en orden de importancia
     if (profile?.role === 'school_admin' && profile.activeSchoolId) {
       const pagos = { href: "/dashboard/payments", label: "Pagos", icon: Banknote };
+      const mensualidades = { href: "/dashboard/payments?tab=mensualidad", label: "Mensualidades", icon: Building2 };
       const mensajes = { href: "/dashboard/messages", label: "Mensajes", icon: Mail };
       const gestionarEscuela = {
         href: `/dashboard/schools/${profile.activeSchoolId}`,
         label: "Gestionar Escuela",
         icon: Shield
       };
-      // Pagos después de Asistencia (muy importante); Mensajes y Gestionar al final
-      const afterAttendance = 3; // índice tras Panel, Jugadores, Asistencia
+      const notas = { href: "/dashboard/notas", label: "Notas", icon: Newspaper };
+      const afterAttendance = 3;
+      const baseWithoutNotas = menuItems.filter((i) => i.href !== "/dashboard/notas");
       menuItems = [
-        ...menuItems.slice(0, afterAttendance),
+        ...baseWithoutNotas.slice(0, afterAttendance),
         pagos,
-        ...menuItems.slice(afterAttendance),
+        mensualidades,
+        ...baseWithoutNotas.slice(afterAttendance),
         mensajes,
-        gestionarEscuela
+        gestionarEscuela,
+        notas
       ];
     }
   }
@@ -190,7 +199,13 @@ export function SidebarNav() {
                 <SidebarMenuItem key={`${item.href}-${item.label}`}>
                 <Link href={item.href} className="relative flex items-center" onClick={closeMobileSidebar}>
                     <SidebarMenuButton
-                    isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
+                    isActive={
+                      item.href.includes("tab=mensualidad")
+                        ? pathname === "/dashboard/payments" && searchParams.get("tab") === "mensualidad"
+                        : item.href === "/dashboard/payments"
+                          ? pathname === "/dashboard/payments" && searchParams.get("tab") !== "mensualidad"
+                          : pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href.split("?")[0]))
+                    }
                     tooltip={item.label}
                     className="font-headline w-full"
                     >

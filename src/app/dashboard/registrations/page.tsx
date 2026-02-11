@@ -2,7 +2,7 @@ import { PendingRegistrations } from "@/components/admin/PendingRegistrations";
 
 export default function RegistrationsPage() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 min-w-0">
       <div className="flex items-center justify-between space-y-2">
         <h1 className="text-3xl font-bold tracking-tight font-headline">Solicitudes</h1>
       </div>

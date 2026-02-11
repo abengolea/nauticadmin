@@ -32,7 +32,7 @@ export default function AttendancePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 min-w-0">
       <div className="flex items-center gap-3">
         <ClipboardCheck className="h-8 w-8 text-primary" />
         <div>

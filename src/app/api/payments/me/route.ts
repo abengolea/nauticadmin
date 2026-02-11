@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth, getAdminFirestore } from '@/lib/firebase-admin';
 import { verifyIdToken } from '@/lib/auth-server';
-import { listPayments, computeDelinquents, getOrCreatePaymentConfig } from '@/lib/payments/db';
+import { listPayments, computeDelinquents, getOrCreatePaymentConfig, getExpectedAmountForPeriod } from '@/lib/payments/db';
 import type { DelinquentInfo } from '@/lib/types/payments';
 
 export async function GET(request: Request) {
@@ -49,6 +49,11 @@ export async function GET(request: Request) {
     const now = new Date();
     const suggestedPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+    const suggestedAmount =
+      myDelinquent != null
+        ? myDelinquent.amount
+        : await getExpectedAmountForPeriod(db, schoolId, playerId, suggestedPeriod, config);
+
     return NextResponse.json({
       schoolId,
       playerId,
@@ -65,7 +70,7 @@ export async function GET(request: Request) {
         : null,
       hasOverdue,
       suggestedPeriod,
-      suggestedAmount: config.amount,
+      suggestedAmount,
       suggestedCurrency: config.currency,
     });
   } catch (e) {

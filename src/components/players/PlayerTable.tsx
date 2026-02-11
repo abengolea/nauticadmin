@@ -18,12 +18,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import type { Player } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { calculateAge, getCategoryLabel, compareCategory, CATEGORY_ORDER } from "@/lib/utils";
 import { useCollection, useUserProfile } from "@/firebase";
 import { Skeleton } from "../ui/skeleton";
 import React, { useMemo, useState } from "react";
+import { FileDown } from "lucide-react";
 
 export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   const router = useRouter();
@@ -77,6 +79,52 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
       return lnA.localeCompare(lnB);
     });
   }, [activePlayers, categoryFilter, categoryFrom, categoryTo]);
+
+  const handleExportCsv = () => {
+    const cols = [
+      "Nombre",
+      "Apellido",
+      "Fecha de nacimiento",
+      "Edad",
+      "Categoría",
+      "DNI",
+      "Obra social",
+      "Email",
+      "Teléfono tutor",
+      "Nombre tutor",
+      "Posición",
+      "Estado",
+      "Observaciones",
+    ];
+    const escape = (v: string | number | undefined) => {
+      if (v == null || v === "") return "";
+      const s = String(v);
+      return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = sortedAndFilteredPlayers.map(({ player, category }) => [
+      escape(player.firstName),
+      escape(player.lastName),
+      escape(player.birthDate ? (player.birthDate instanceof Date ? player.birthDate.toISOString().slice(0, 10) : new Date(player.birthDate).toISOString().slice(0, 10)) : ""),
+      escape(player.birthDate ? String(calculateAge(player.birthDate)) : ""),
+      escape(category),
+      escape(player.dni),
+      escape(player.healthInsurance),
+      escape(player.email),
+      escape(player.tutorContact?.phone),
+      escape(player.tutorContact?.name),
+      escape(player.posicion_preferida ? posicionLabel[player.posicion_preferida] ?? player.posicion_preferida : ""),
+      escape(player.status === "active" ? "Activo" : player.status === "suspended" ? "Mora" : "Inactivo"),
+      escape(player.observations),
+    ]);
+    const csv = [cols.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `jugadores-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (!isReady || loading) {
     return (
@@ -174,6 +222,18 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
           <span className="text-xs text-muted-foreground">
             {sortedAndFilteredPlayers.length} jugador{sortedAndFilteredPlayers.length !== 1 ? "es" : ""}
           </span>
+        )}
+        {canListPlayers && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCsv}
+            disabled={sortedAndFilteredPlayers.length === 0}
+            className="ml-auto shrink-0"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            Exportar CSV
+          </Button>
         )}
       </div>
       <div className="rounded-md border overflow-x-auto min-w-0">

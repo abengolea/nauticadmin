@@ -5,26 +5,28 @@ import Image from "next/image";
 
 export default function LandingPage() {
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <header className="px-4 lg:px-6 h-14 flex items-center">
-        <Link href="/" className="flex items-center justify-center">
-          <RiverPlateLogo className="h-8 w-8" />
-          <span className="ml-2 text-lg font-bold font-headline uppercase">
+    <div className="flex flex-col min-h-screen bg-background overflow-x-hidden w-full max-w-full">
+      <header className="px-4 lg:px-6 h-14 flex items-center min-w-0 gap-2 sm:gap-4">
+        <Link href="/" className="flex items-center justify-center shrink-0 min-w-0">
+          <RiverPlateLogo className="h-8 w-8 shrink-0" />
+          <span className="ml-2 text-base sm:text-lg font-bold font-headline uppercase truncate max-w-[50vw] sm:max-w-none">
             <span className="text-red-600">ESCUELAS</span>{" "}
             <span className="text-black dark:text-white">RIVER</span>{" "}
             <span className="text-red-600">SN</span>
           </span>
         </Link>
-        <nav className="ml-auto flex items-center gap-4 sm:gap-6">
-          <Button variant="ghost" asChild>
-            <Link
-              href="/auth/login"
-            >
-              Iniciar Sesión
-            </Link>
+        <nav className="ml-auto flex items-center gap-2 sm:gap-4 shrink-0">
+          <Button variant="ghost" asChild size="sm" className="text-xs sm:text-sm">
+            <Link href="/notas">Notas</Link>
           </Button>
-          <Button asChild>
-            <Link href="/auth/registro">Registrarme como jugador</Link>
+          <Button variant="ghost" asChild size="sm" className="text-xs sm:text-sm">
+            <Link href="/auth/login">Iniciar Sesión</Link>
+          </Button>
+          <Button asChild size="sm" className="text-xs sm:text-sm">
+            <Link href="/auth/registro">
+              <span className="hidden sm:inline">Registrarme como jugador</span>
+              <span className="sm:hidden">Registrarme</span>
+            </Link>
           </Button>
         </nav>
       </header>
@@ -49,11 +51,10 @@ export default function LandingPage() {
                 </div>
               </div>
               <Image
-                src="https://picsum.photos/seed/soccer-kids/1200/800"
-                width="600"
-                height="400"
-                alt="Hero"
-                data-ai-hint="kids playing soccer"
+                src="/images/hero-chicos-futbol.png.jpeg"
+                width={600}
+                height={400}
+                alt="Chicos jugando fútbol en Escuelas River"
                 className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last"
               />
             </div>
@@ -64,11 +65,10 @@ export default function LandingPage() {
           <div className="container px-4 md:px-6">
             <div className="grid items-center gap-6 lg:grid-cols-[1fr_500px] lg:gap-12 xl:grid-cols-[1fr_550px]">
               <Image
-                src="https://picsum.photos/seed/player-progress/1200/800"
+                src="/images/river_foto2.jpeg"
                 width={550}
                 height={310}
-                alt="Player"
-                data-ai-hint="soccer player checking phone"
+                alt="Jugadores de Escuelas River"
                 className="mx-auto aspect-video overflow-hidden rounded-xl object-cover object-center sm:w-full lg:order-first"
               />
               <div className="flex flex-col justify-center space-y-4">

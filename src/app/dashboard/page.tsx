@@ -21,7 +21,7 @@ export default function DashboardPage() {
 
   if (!isReady) {
     return (
-       <div className="flex flex-col gap-4">
+       <div className="flex flex-col gap-4 min-w-0">
         <div className="flex items-center justify-between space-y-2">
             <Skeleton className="h-10 w-1/3" />
         </div>

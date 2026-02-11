@@ -51,11 +51,11 @@ export function Header() {
   };
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
-       <div className="md:hidden">
+    <header className="flex h-14 items-center gap-2 sm:gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 min-w-0">
+       <div className="md:hidden shrink-0">
          <SidebarTrigger />
        </div>
-      <div className="w-full flex-1">
+      <div className="w-full flex-1 min-w-0">
         {isStaff && (
           <form>
             <div className="relative">

@@ -56,7 +56,7 @@ export default function SchoolAdminPage() {
 
   // User is authorized and data is loaded, so render the page.
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 min-w-0">
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         <Button variant="outline" size="icon" asChild className="shrink-0">
           <Link href="/dashboard">

@@ -221,3 +221,82 @@ export const enforceDelinquencyAndSuspensions = onSchedule(
     logger.info(`enforceDelinquencyAndSuspensions done: processed=${processed}, suspended=${suspended}, emailsSent=${emailsSent}`);
   }
 );
+
+/**
+ * Job diario: suspender escuelas en mora de mensualidad a la plataforma.
+ * Si una escuela supera delinquencyDaysSuspension días sin pagar, se suspende.
+ */
+export const enforceSchoolFeeSuspensions = onSchedule(
+  {
+    schedule: '0 10 * * *', // 10:00 UTC = 7:00 Argentina
+    timeZone: 'America/Argentina/Buenos_Aires',
+  },
+  async () => {
+    logger.info('Starting enforceSchoolFeeSuspensions');
+    const now = new Date();
+
+    const platformCfgSnap = await db.collection('platformConfig').doc('platformFeeConfig').get();
+    const platformCfg = platformCfgSnap.data();
+    const dueDay = platformCfg?.dueDayOfMonth ?? 10;
+    const suspensionDays = platformCfg?.delinquencyDaysSuspension ?? 30;
+
+    const schoolsSnap = await db.collection('schools').get();
+    let suspendedCount = 0;
+
+    for (const schoolDoc of schoolsSnap.docs) {
+      const schoolId = schoolDoc.id;
+      const schoolData = schoolDoc.data();
+      if (schoolData.status === 'suspended') continue;
+
+      const feeCfgSnap = await db
+        .collection('schools')
+        .doc(schoolId)
+        .collection('schoolFeeConfig')
+        .doc('default')
+        .get();
+      const feeCfg = feeCfgSnap.data();
+      if (feeCfg?.isBonified) continue;
+
+      const monthlyAmount = feeCfg?.monthlyAmount ?? platformCfg?.defaultMonthlyAmount ?? 0;
+      if (monthlyAmount <= 0) continue;
+
+      const createdAt = schoolData.createdAt?.toDate?.() ?? new Date(schoolData.createdAt);
+      let d = new Date(createdAt.getFullYear(), createdAt.getMonth(), 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      let shouldSuspend = false;
+      while (d <= end) {
+        const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const [y, m] = period.split('-').map(Number);
+        const lastDay = new Date(y, m, 0).getDate();
+        const day = Math.min(dueDay, lastDay);
+        const dueDate = new Date(y, m - 1, day);
+        if (dueDate <= now) {
+          const paySnap = await db
+            .collection('schoolFeePayments')
+            .where('schoolId', '==', schoolId)
+            .where('period', '==', period)
+            .where('status', '==', 'approved')
+            .limit(1)
+            .get();
+          if (paySnap.empty) {
+            const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (24 * 60 * 60 * 1000));
+            if (daysOverdue >= suspensionDays) {
+              shouldSuspend = true;
+              break;
+            }
+          }
+        }
+        d.setMonth(d.getMonth() + 1);
+      }
+
+      if (shouldSuspend) {
+        await db.collection('schools').doc(schoolId).update({ status: 'suspended' });
+        suspendedCount++;
+        logger.info(`School ${schoolId} suspended for platform fee delinquency`);
+      }
+    }
+
+    logger.info(`enforceSchoolFeeSuspensions done: suspended=${suspendedCount}`);
+  }
+);

@@ -82,6 +82,10 @@ export interface PaymentConfig {
   delinquencyDaysSuspension?: number;
   /** Monto del derecho de inscripción inicial (puede ser distinto a la cuota mensual). 0 = sin inscripción. */
   registrationAmount?: number;
+  /** Montos de cuota mensual por categoría (SUB-5, SUB-6, ... SUB-18). Si no hay valor para una categoría, se usa amount. */
+  amountByCategory?: Record<string, number>;
+  /** Montos de inscripción por categoría. Si no hay valor para una categoría, se usa registrationAmount. */
+  registrationAmountByCategory?: Record<string, number>;
   /** true: pagar inscripción cuenta como pagar la cuota del mes de alta. false: inscripción y cuota se pagan por separado (cuota a mes vencido). Default true. */
   registrationCancelsMonthFee?: boolean;
   /** Plantillas opcionales (por ahora placeholders). */

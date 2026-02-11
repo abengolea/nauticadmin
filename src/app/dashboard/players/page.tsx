@@ -37,7 +37,7 @@ export default function PlayersPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">Jugadores</h1>
         <Button asChild className="w-full sm:w-auto">

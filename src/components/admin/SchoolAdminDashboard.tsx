@@ -54,7 +54,7 @@ export function SchoolAdminDashboard() {
 
   if (isLoading) {
     return (
-       <div className="flex flex-col gap-4">
+       <div className="flex flex-col gap-4 min-w-0">
         <div className="flex items-center justify-between space-y-2">
           <h1 className="text-3xl font-bold tracking-tight font-headline">Panel Principal</h1>
         </div>

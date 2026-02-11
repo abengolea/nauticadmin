@@ -79,7 +79,29 @@ service cloud.firestore {
     // --- Schema Validation Helpers ---
 
     function isValidSchoolUserRole(role) {
-      return role in ['school_admin', 'coach'];
+      return role in ['school_admin', 'coach', 'editor', 'viewer'];
+    }
+
+    function isEditor(schoolId) {
+      let userData = getSchoolUserData(schoolId);
+      return isSignedIn()
+          && userData != null
+          && userData.role == 'editor';
+    }
+
+    function isViewer(schoolId) {
+      let userData = getSchoolUserData(schoolId);
+      return isSignedIn()
+          && userData != null
+          && userData.role == 'viewer';
+    }
+
+    function isStaffOfSchool(schoolId) {
+      return isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || isCoach(schoolId)
+          || isEditor(schoolId)
+          || isViewer(schoolId);
     }
 
     // --- Rules ---
@@ -312,6 +334,21 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Configuración de mensualidad de escuela a plataforma (solo super admin escribe)
+    match /schools/{schoolId}/schoolFeeConfig/{configId} {
+      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow create, update: if isSuperAdmin();
+      allow delete: if false;
+    }
+
+    // Pagos de mensualidad de escuelas a la plataforma (solo servidor escribe; super admin y escuela leen)
+    match /schoolFeePayments/{paymentId} {
+      allow read: if isSuperAdmin()
+        || (resource.data.schoolId != null && isSchoolAdmin(resource.data.schoolId))
+        || (resource.data.schoolId != null && isCoach(resource.data.schoolId));
+      allow write: if false;
+    }
+
     // Conexión OAuth Mercado Pago por escuela (tokens; solo servidor debería escribir en producción)
     match /schools/{schoolId}/mercadopagoConnection/{docId} {
       allow read: if isSuperAdmin() || isSchoolAdmin(schoolId);
@@ -374,6 +411,14 @@ service cloud.firestore {
       allow read: if isSuperAdmin();
       allow create: if isSuperAdmin();
       allow update, delete: if false;
+    }
+
+    // --- Notas (posts) ---
+    // Lectura: públicos si published; staff de la escuela si draft/archived
+    match /posts/{postId} {
+      allow read: if resource.data.status == 'published'
+        || (isSignedIn() && resource.data.schoolId != null && isStaffOfSchool(resource.data.schoolId));
+      allow write: if false;  // Solo Admin SDK vía API routes
     }
   }
 }

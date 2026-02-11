@@ -6,6 +6,7 @@
 import { initializeApp, getApps, type App } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { getStorage } from 'firebase-admin/storage';
 
 let adminApp: App;
 
@@ -17,9 +18,10 @@ function getAdminApp(): App {
   if (!projectId) {
     throw new Error('NEXT_PUBLIC_FIREBASE_PROJECT_ID is required for firebase-admin');
   }
+  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? `${projectId}.appspot.com`;
   // En local: GOOGLE_APPLICATION_CREDENTIALS o default credentials
   // En producción (App Hosting / Cloud Functions): Application Default Credentials
-  adminApp = initializeApp({ projectId });
+  adminApp = initializeApp({ projectId, storageBucket });
   return adminApp;
 }
 
@@ -29,4 +31,8 @@ export function getAdminFirestore() {
 
 export function getAdminAuth() {
   return getAuth(getAdminApp());
+}
+
+export function getAdminStorage() {
+  return getStorage(getAdminApp());
 }
