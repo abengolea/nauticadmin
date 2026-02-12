@@ -43,11 +43,10 @@ env:
       - RUNTIME
   # Mercado Pago OAuth (crear secret: firebase apphosting:secrets:set mercadopago-client-secret)
   - variable: MERCADOPAGO_CLIENT_ID
-    value: "5150882001064843"
+    value: "3983794964230965"
     availability:
       - RUNTIME
   - variable: MERCADOPAGO_CLIENT_SECRET
     secret: mercadopago-client-secret
-  # Token de la cuenta de Escuela River para cobrar mensualidades a escuelas (crear secret)
   - variable: MERCADOPAGO_PLATFORM_ACCESS_TOKEN
     secret: mercadopago-platform-access-token

@@ -13,15 +13,18 @@ Sistema de control de pagos mensuales que las escuelas adheridas realizan a Escu
 
 ### 1. Mercado Pago - Cuenta de la plataforma
 
-Para que las escuelas paguen a la plataforma, necesitás un **access token** de la cuenta de Escuela River en Mercado Pago (no el OAuth por escuela).
+Para que las escuelas paguen a la plataforma, necesitás un **access token** de la cuenta de **Notificassrl** (titular de la app) en Mercado Pago (no el OAuth por escuela).
 
-1. Crear o usar una aplicación en [Mercado Pago Developers](https://www.mercadopago.com.ar/developers/panel/app).
-2. Obtener las credenciales de producción (Access Token).
-3. Configurar el secret en Firebase App Hosting:
+1. Entrar con la cuenta de **Notificassrl** en [Mercado Pago Developers](https://www.mercadopago.com.ar/developers/panel/app).
+2. Crear o usar una aplicación.
+3. Obtener las credenciales de **producción** (Access Token).
+4. Configurar el secret en Firebase App Hosting:
    ```bash
    firebase apphosting:secrets:set mercadopago-platform-access-token
    ```
-4. Pegar el Access Token cuando lo solicite.
+5. Pegar el Access Token cuando lo solicite. Responder **Yes** al grant access para el backend.
+6. En la app de Mercado Pago, configurar la **notification_url** para webhooks:
+   - Producción: `https://escuelariver--lexflow-consultas.us-east4.hosted.app/api/payments/webhook/mercadopago-platform`
 
 ### 2. Configuración global (Super Admin)
 
