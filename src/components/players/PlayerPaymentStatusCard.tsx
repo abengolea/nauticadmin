@@ -4,11 +4,23 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, CreditCard } from "lucide-react";
+import { AlertTriangle, CheckCircle, CreditCard, ExternalLink, Shirt } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 import type { DelinquentInfo } from "@/lib/types/payments";
 
 const REGISTRATION_PERIOD = "inscripcion";
+
+type ClothingPendingItem = { period: string; amount: number; installmentIndex: number; totalInstallments: number };
+
+function formatPeriodLabel(period: string): string {
+  if (period === REGISTRATION_PERIOD) return "Inscripción";
+  if (period?.startsWith?.("ropa-")) return `Ropa (cuota ${period.replace("ropa-", "")})`;
+  if (!period || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return period;
+  const [y, m] = period.split("-");
+  const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  return `${months[parseInt(m, 10) - 1]} ${y}`;
+}
 
 interface PlayerPaymentStatusCardProps {
   getToken: () => Promise<string | null>;
@@ -19,8 +31,12 @@ interface PlayerPaymentStatusCardProps {
 
 export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, schoolId: propSchoolId }: PlayerPaymentStatusCardProps) {
   const [loading, setLoading] = useState(true);
-  const [delinquent, setDelinquent] = useState<(DelinquentInfo & { dueDate?: string }) | null>(null);
+  const [delinquents, setDelinquents] = useState<(DelinquentInfo & { dueDate?: string })[]>([]);
+  const [clothingPending, setClothingPending] = useState<ClothingPendingItem[]>([]);
+  const [suggestedCurrency, setSuggestedCurrency] = useState("ARS");
   const [error, setError] = useState<string | null>(null);
+  const [creatingLink, setCreatingLink] = useState(false);
+  const { toast } = useToast();
 
   const isAdminView = Boolean(propPlayerId && propSchoolId);
 
@@ -32,19 +48,35 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
     }
     try {
       if (isAdminView) {
-        const res = await fetch(`/api/payments/delinquents?schoolId=${encodeURIComponent(propSchoolId!)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setError(body.error ?? "Error al cargar");
-          setDelinquent(null);
+        const [delRes, clothRes] = await Promise.all([
+          fetch(`/api/payments/delinquents?schoolId=${encodeURIComponent(propSchoolId!)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          propPlayerId && propSchoolId
+            ? fetch(`/api/payments/clothing-pending?schoolId=${encodeURIComponent(propSchoolId)}&playerId=${encodeURIComponent(propPlayerId)}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+            : Promise.resolve(null),
+        ]);
+        const delBody = await delRes.json().catch(() => ({}));
+        if (!delRes.ok) {
+          setError(delBody.error ?? "Error al cargar");
+          setDelinquents([]);
+          setClothingPending([]);
           return;
         }
-        const playerDelinquent = (body.delinquents ?? []).find(
+        const playerDelinquents = (delBody.delinquents ?? []).filter(
           (d: DelinquentInfo) => d.playerId === propPlayerId
-        ) ?? null;
-        setDelinquent(playerDelinquent ? { ...playerDelinquent, dueDate: (playerDelinquent as { dueDate?: string }).dueDate } : null);
+        );
+        setDelinquents(playerDelinquents);
+
+        if (clothRes) {
+          const clothBody = await clothRes.json().catch(() => ({}));
+          setClothingPending(clothBody.clothingPending ?? []);
+          if (clothBody.currency) setSuggestedCurrency(clothBody.currency);
+        } else {
+          setClothingPending([]);
+        }
       } else {
         const res = await fetch("/api/payments/me", {
           headers: { Authorization: `Bearer ${token}` },
@@ -52,15 +84,19 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
           setError(body.error ?? "Error al cargar");
-          setDelinquent(null);
+          setDelinquents([]);
+          setClothingPending([]);
           return;
         }
-        setDelinquent(body.delinquent ?? null);
+        setDelinquents(body.delinquent ? [body.delinquent] : []);
+        setClothingPending(body.clothingPending ?? []);
+        setSuggestedCurrency(body.suggestedCurrency ?? "ARS");
       }
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
-      setDelinquent(null);
+      setDelinquents([]);
+      setClothingPending([]);
     } finally {
       setLoading(false);
     }
@@ -69,6 +105,51 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus]);
+
+  const allPending = [
+    ...delinquents.map((d) => ({ type: "delinquent" as const, period: d.period, amount: d.amount, currency: d.currency })),
+    ...clothingPending.map((c) => ({ type: "clothing" as const, period: c.period, amount: c.amount, currency: suggestedCurrency })),
+  ];
+  const firstPending = allPending[0];
+  const hasPending = allPending.length > 0;
+
+  const handleCreateLink = useCallback(async () => {
+    if (!firstPending || !propPlayerId || !propSchoolId) return;
+    const token = await getToken();
+    if (!token) return;
+    setCreatingLink(true);
+    try {
+      const res = await fetch("/api/payments/intent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          provider: "mercadopago",
+          playerId: propPlayerId,
+          schoolId: propSchoolId,
+          period: firstPending.period,
+          amount: firstPending.amount,
+          currency: firstPending.currency,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Error al crear link");
+      if (data.checkoutUrl) {
+        window.open(data.checkoutUrl, "_blank");
+        toast({ title: "Link generado", description: "Se abrió la ventana de pago." });
+      }
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo generar el link de pago",
+      });
+    } finally {
+      setCreatingLink(false);
+    }
+  }, [firstPending, propPlayerId, propSchoolId, getToken, toast]);
 
   if (loading) {
     return (
@@ -95,64 +176,80 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
     );
   }
 
-  const hasRegistrationPending = delinquent?.period === REGISTRATION_PERIOD;
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="font-headline flex items-center gap-2">
           <CreditCard className="h-5 w-5" />
-          Pagos
+          {isAdminView ? "Pagos del jugador" : "Pagos"}
         </CardTitle>
         <CardDescription>
-          {delinquent ? (
+          {hasPending ? (
             isAdminView ? (
-              hasRegistrationPending ? (
-                <>Inscripción pendiente.</>
-              ) : (
-                <>Cuota pendiente.</>
-              )
-            ) : hasRegistrationPending ? (
-              <>Tenés el derecho de inscripción pendiente.</>
+              <>Lo que debe este jugador: {[
+                delinquents.some((d) => d.period === REGISTRATION_PERIOD) && "inscripción",
+                delinquents.some((d) => d.period !== REGISTRATION_PERIOD && !d.period?.startsWith?.("ropa-")) && "cuota mensual",
+                clothingPending.length > 0 && "ropa",
+              ].filter(Boolean).join(", ")}.</>
             ) : (
-              <>Tenés una cuota pendiente.</>
+              <>Tenés pagos pendientes.</>
             )
           ) : (
             isAdminView ? (
               <>Al día con pagos.</>
             ) : (
-              <>Estado de tus cuotas e inscripción.</>
+              <>Estado de tus cuotas, inscripción y ropa.</>
             )
           )}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {delinquent ? (
+        {hasPending ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
               <AlertTriangle className="h-5 w-5 shrink-0" />
-              <span className="font-medium">
-                {hasRegistrationPending ? "Inscripción pendiente" : "Cuota pendiente"}
-              </span>
+              <span className="font-medium">Pagos pendientes</span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Monto: {delinquent.currency} {delinquent.amount.toLocaleString("es-AR")}
-            </p>
-            <Button asChild className="w-full sm:w-auto">
-              <Link href={isAdminView ? "/dashboard/payments?tab=delinquents" : "/dashboard/payments"}>
-                <CreditCard className="h-4 w-4 mr-2" />
-                {isAdminView
-                  ? "Ver en Pagos"
-                  : hasRegistrationPending
-                    ? "Pagar inscripción"
-                    : "Pagar cuota"}
-              </Link>
-            </Button>
+            <ul className="text-sm space-y-1 list-disc list-inside text-muted-foreground">
+              {delinquents.map((d) => (
+                <li key={d.period}>
+                  {formatPeriodLabel(d.period)}: {d.currency} {d.amount.toLocaleString("es-AR")}
+                </li>
+              ))}
+              {clothingPending.map((c) => (
+                <li key={c.period}>
+                  <span className="inline-flex items-center gap-1">
+                    <Shirt className="h-3.5 w-3.5" />
+                    Cuota {c.installmentIndex} de {c.totalInstallments}: {suggestedCurrency} {c.amount.toLocaleString("es-AR")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              {isAdminView ? (
+                <Button onClick={handleCreateLink} disabled={creatingLink}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  {creatingLink ? "Generando…" : "Crear link de pago"}
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link href="/dashboard/payments">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Pagar
+                  </Link>
+                </Button>
+              )}
+              {isAdminView && (
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard/payments?tab=delinquents">Ver en Pagos</Link>
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
             <CheckCircle className="h-5 w-5 shrink-0" />
-            <span className="font-medium">Al día</span>
+            <span className="font-medium">Al día (inscripción, cuota y ropa)</span>
           </div>
         )}
       </CardContent>

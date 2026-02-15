@@ -21,18 +21,65 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import type { Player } from "@/lib/types";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { calculateAge, getCategoryLabel, compareCategory, CATEGORY_ORDER } from "@/lib/utils";
 import { useCollection, useUserProfile } from "@/firebase";
 import { Skeleton } from "../ui/skeleton";
-import React, { useMemo, useState } from "react";
-import { FileDown } from "lucide-react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { FileDown, CreditCard, CheckCircle } from "lucide-react";
+
+type DelinquentInfo = {
+  playerId: string;
+  period: string;
+  amount: number;
+  currency: string;
+  isRegistration?: boolean;
+};
+
+type ClothingPendingItem = { period: string; amount: number; installmentIndex: number; totalInstallments: number };
 
 export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   const router = useRouter();
-  const { isReady, activeSchoolId: userActiveSchoolId, profile } = useUserProfile();
+  const { isReady, activeSchoolId: userActiveSchoolId, profile, user, isAdmin } = useUserProfile();
 
   const schoolId = propSchoolId || userActiveSchoolId;
   const canListPlayers = profile?.role !== "player";
+  const canSeePaymentStatus = isAdmin && !!schoolId;
+
+  const [paymentStatus, setPaymentStatus] = useState<{
+    delinquents: (DelinquentInfo & { dueDate: string })[];
+    clothingPendingByPlayer: Record<string, ClothingPendingItem[]>;
+  } | null>(null);
+  const [paymentStatusLoading, setPaymentStatusLoading] = useState(false);
+
+  const fetchPaymentStatus = useCallback(async () => {
+    if (!canSeePaymentStatus || !schoolId) return;
+    const token = await user?.getIdToken?.();
+    if (!token) return;
+    setPaymentStatusLoading(true);
+    try {
+      const res = await fetch(`/api/payments/players-status?schoolId=${encodeURIComponent(schoolId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPaymentStatus({
+          delinquents: data.delinquents ?? [],
+          clothingPendingByPlayer: data.clothingPendingByPlayer ?? {},
+        });
+      } else {
+        setPaymentStatus(null);
+      }
+    } catch {
+      setPaymentStatus(null);
+    } finally {
+      setPaymentStatusLoading(false);
+    }
+  }, [canSeePaymentStatus, schoolId, user]);
+
+  useEffect(() => {
+    fetchPaymentStatus();
+  }, [fetchPaymentStatus]);
 
   const posicionLabel: Record<string, string> = {
     arquero: "Arquero",
@@ -49,6 +96,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [categoryFrom, setCategoryFrom] = useState<string>("");
   const [categoryTo, setCategoryTo] = useState<string>("");
+  const [generoFilter, setGeneroFilter] = useState<string>("");
 
   const activePlayers = useMemo(() => (players ?? []).filter((p) => !p.archived), [players]);
 
@@ -61,6 +109,9 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
         : "-",
     }));
     let filtered = withCategory;
+    if (generoFilter === "masculino" || generoFilter === "femenino") {
+      filtered = filtered.filter((x) => x.player.genero === generoFilter);
+    }
     if (categoryFilter !== "") {
       filtered = filtered.filter((x) => x.category === categoryFilter);
     } else {
@@ -78,7 +129,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
       const lnB = (b.player.lastName ?? "").toLowerCase();
       return lnA.localeCompare(lnB);
     });
-  }, [activePlayers, categoryFilter, categoryFrom, categoryTo]);
+  }, [activePlayers, categoryFilter, categoryFrom, categoryTo, generoFilter]);
 
   const handleExportCsv = () => {
     const cols = [
@@ -87,6 +138,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
       "Fecha de nacimiento",
       "Edad",
       "Categoría",
+      "Género",
       "DNI",
       "Obra social",
       "Email",
@@ -107,6 +159,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
       escape(player.birthDate ? (player.birthDate instanceof Date ? player.birthDate.toISOString().slice(0, 10) : new Date(player.birthDate).toISOString().slice(0, 10)) : ""),
       escape(player.birthDate ? String(calculateAge(player.birthDate)) : ""),
       escape(category),
+      escape(player.genero === "masculino" ? "Masculino" : player.genero === "femenino" ? "Femenino" : ""),
       escape(player.dni),
       escape(player.healthInsurance),
       escape(player.email),
@@ -126,6 +179,8 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     URL.revokeObjectURL(url);
   };
 
+  const colCount = 5 + (canSeePaymentStatus ? 1 : 0);
+
   if (!isReady || loading) {
     return (
         <div className="rounded-md border">
@@ -137,6 +192,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                         <TableHead>Posición</TableHead>
                         <TableHead>Categoría</TableHead>
                         <TableHead>Estado</TableHead>
+                        {canSeePaymentStatus && <TableHead>Pagos</TableHead>}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -147,6 +203,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                             <TableCell><Skeleton className="h-8 w-24" /></TableCell>
                             <TableCell><Skeleton className="h-8 w-16" /></TableCell>
                             <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                            {canSeePaymentStatus && <TableCell><Skeleton className="h-8 w-20" /></TableCell>}
                         </TableRow>
                     ))}
                 </TableBody>
@@ -166,6 +223,19 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Label className="text-sm text-muted-foreground shrink-0">Género</Label>
+          <Select value={generoFilter || "all"} onValueChange={(v) => setGeneroFilter(v === "all" ? "" : v)}>
+            <SelectTrigger className="w-[130px] sm:w-[140px]">
+              <SelectValue placeholder="Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="masculino">Masculino</SelectItem>
+              <SelectItem value="femenino">Femenino</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Label className="text-sm text-muted-foreground shrink-0">Categoría</Label>
           <Select value={categoryFilter || "all"} onValueChange={(v) => setCategoryFilter(v === "all" ? "" : v)}>
@@ -218,7 +288,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
             </div>
           </>
         )}
-        {(categoryFilter || categoryFrom || categoryTo) && (
+        {(generoFilter || categoryFilter || categoryFrom || categoryTo) && (
           <span className="text-xs text-muted-foreground">
             {sortedAndFilteredPlayers.length} jugador{sortedAndFilteredPlayers.length !== 1 ? "es" : ""}
           </span>
@@ -237,7 +307,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
         )}
       </div>
       <div className="rounded-md border overflow-x-auto min-w-0">
-        <Table className="min-w-[520px]">
+        <Table className="min-w-[520px] sm:min-w-[600px]">
           <TableHeader>
             <TableRow>
               <TableHead className="text-xs sm:text-sm">Nombre</TableHead>
@@ -245,17 +315,26 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
               <TableHead className="text-xs sm:text-sm whitespace-nowrap">Posición</TableHead>
               <TableHead className="text-xs sm:text-sm whitespace-nowrap">Categoría</TableHead>
               <TableHead className="text-xs sm:text-sm whitespace-nowrap">Estado</TableHead>
+              {canSeePaymentStatus && <TableHead className="text-xs sm:text-sm whitespace-nowrap">Pagos</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedAndFilteredPlayers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={colCount} className="text-center text-muted-foreground py-6">
                   {categoryFrom || categoryTo ? "Ningún jugador en el rango de categorías seleccionado." : "Ningún jugador en la categoría seleccionada."}
                 </TableCell>
               </TableRow>
             ) : (
-              sortedAndFilteredPlayers.map(({ player, category }) => (
+              sortedAndFilteredPlayers.map(({ player, category }) => {
+                const playerDelinquents = paymentStatus?.delinquents?.filter((d) => d.playerId === player.id) ?? [];
+                const clothingPending = paymentStatus?.clothingPendingByPlayer?.[player.id] ?? [];
+                const hasPending = playerDelinquents.length > 0 || clothingPending.length > 0;
+                const pendingLabels: string[] = [];
+                if (playerDelinquents.some((d) => d.period === "inscripcion")) pendingLabels.push("inscripción");
+                if (playerDelinquents.some((d) => d.period !== "inscripcion" && !d.period?.startsWith?.("ropa-"))) pendingLabels.push("cuota");
+                if (clothingPending.length > 0) pendingLabels.push("ropa");
+                return (
                 <TableRow
                   key={player.id}
                   className="cursor-pointer"
@@ -297,8 +376,28 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                     : "Inactivo"}
                 </Badge>
               </TableCell>
+              {canSeePaymentStatus && (
+                <TableCell className="py-2 sm:py-3" onClick={(e) => e.stopPropagation()}>
+                  {paymentStatusLoading ? (
+                    <Skeleton className="h-6 w-16" />
+                  ) : hasPending ? (
+                    <Button variant="outline" size="sm" className="h-7 text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-600 dark:hover:bg-amber-950/50" asChild>
+                      <Link href={`/dashboard/players/${player.id}?schoolId=${schoolId}`}>
+                        <CreditCard className="h-3.5 w-3.5 mr-1.5" />
+                        Debe {pendingLabels.join(", ")}
+                      </Link>
+                    </Button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Al día
+                    </span>
+                  )}
+                </TableCell>
+              )}
             </TableRow>
-              ))
+              );
+            })
             )}
         </TableBody>
       </Table>

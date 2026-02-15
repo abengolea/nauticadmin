@@ -37,7 +37,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { AlertCircle, Archive, Lock, FileHeart } from "lucide-react";
+import { AlertCircle, Archive, ArchiveRestore, Lock, FileHeart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PlayerPaymentStatusCard } from "@/components/players/PlayerPaymentStatusCard";
 
@@ -61,6 +61,7 @@ export default function PlayerProfilePage() {
   const [editingEvaluation, setEditingEvaluation] = useState<Evaluation | null>(null);
   const [isEditPlayerOpen, setEditPlayerOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [unarchiving, setUnarchiving] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
 
@@ -132,6 +133,11 @@ export default function PlayerProfilePage() {
     !player.archived &&
     (profile?.role === "school_admin" || isSuperAdmin);
 
+  const canUnarchive =
+    !!schoolId &&
+    !!player.archived &&
+    (profile?.role === "school_admin" || isSuperAdmin);
+
   const canToggleStatus =
     !!schoolId &&
     !player.archived &&
@@ -201,6 +207,37 @@ export default function PlayerProfilePage() {
       });
     } finally {
       setArchiving(false);
+    }
+  };
+
+  const handleUnarchive = async () => {
+    if (!user || !schoolId) return;
+    setUnarchiving(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/players/unarchive", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ schoolId, playerId: id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Error al desarchivar");
+      toast({
+        title: "Jugador desarchivado",
+        description: "El jugador volverá a aparecer en listados y en totales.",
+      });
+      router.refresh();
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo desarchivar el jugador",
+      });
+    } finally {
+      setUnarchiving(false);
     }
   };
 
@@ -290,11 +327,24 @@ export default function PlayerProfilePage() {
           <AlertDescription>
             Este jugador está archivado. No aparece en listados ni en totales de la escuela.
           </AlertDescription>
-          <Button variant="outline" size="sm" className="mt-2" asChild>
-            <Link href={schoolId ? `/dashboard/players?schoolId=${schoolId}` : "/dashboard/players"}>
-              Volver a jugadores
-            </Link>
-          </Button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {canUnarchive && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleUnarchive}
+                disabled={unarchiving}
+              >
+                <ArchiveRestore className="mr-2 h-4 w-4" />
+                {unarchiving ? "Desarchivando…" : "Desarchivar jugador"}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" asChild>
+              <Link href={schoolId ? `/dashboard/players?schoolId=${schoolId}` : "/dashboard/players"}>
+                Volver a jugadores
+              </Link>
+            </Button>
+          </div>
         </Alert>
       )}
 

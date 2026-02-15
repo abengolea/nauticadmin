@@ -65,6 +65,7 @@ const playerSchema = z.object({
   peso_kg: z.union([z.number().min(15, "Mín. 15 kg").max(150, "Máx. 150 kg"), z.undefined()]).optional(),
   pie_dominante: z.enum(["derecho", "izquierdo", "ambidiestro"]).optional(),
   posicion_preferida: z.enum(["delantero", "mediocampo", "defensor", "arquero"]).optional(),
+  genero: z.enum(["masculino", "femenino"]).optional(),
 });
 
 interface EditPlayerDialogProps {
@@ -112,6 +113,7 @@ export function EditPlayerDialog({
       peso_kg: player.peso_kg ?? undefined,
       pie_dominante: player.pie_dominante ?? undefined,
       posicion_preferida: player.posicion_preferida ?? undefined,
+      genero: player.genero ?? undefined,
     },
   });
 
@@ -139,6 +141,7 @@ export function EditPlayerDialog({
         peso_kg: player.peso_kg ?? undefined,
         pie_dominante: player.pie_dominante ?? undefined,
         posicion_preferida: player.posicion_preferida ?? undefined,
+        genero: player.genero ?? undefined,
       });
     }
   }, [isOpen, player, form]);
@@ -164,6 +167,7 @@ export function EditPlayerDialog({
       peso_kg: values.peso_kg ?? null,
       pie_dominante: values.pie_dominante ?? null,
       posicion_preferida: values.posicion_preferida ?? null,
+      genero: (values.genero && values.genero.trim()) ? values.genero : null,
     };
 
     const showSuccess = () => {
@@ -333,6 +337,32 @@ export function EditPlayerDialog({
                             />
                           </PopoverContent>
                         </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="genero"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Género / Categoría</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value ?? ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">No especificado</SelectItem>
+                            <SelectItem value="masculino">Masculino</SelectItem>
+                            <SelectItem value="femenino">Femenino</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>Categorías femenino y masculino usan los mismos años (SUB-5 a SUB-18).</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

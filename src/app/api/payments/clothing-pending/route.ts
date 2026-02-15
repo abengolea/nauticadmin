@@ -36,6 +36,7 @@ export async function GET(request: Request) {
       totalInstallments: config.clothingInstallments ?? 2,
       clothingAmount: config.clothingAmount ?? 0,
       clothingConfigured: (config.clothingAmount ?? 0) > 0,
+      currency: config.currency ?? 'ARS',
     });
   } catch (e) {
     console.error('[payments/clothing-pending]', e);

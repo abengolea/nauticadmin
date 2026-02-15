@@ -95,6 +95,8 @@ export interface Player {
   pie_dominante?: 'derecho' | 'izquierdo' | 'ambidiestro';
   /** Posición preferida en cancha. */
   posicion_preferida?: 'delantero' | 'mediocampo' | 'defensor' | 'arquero';
+  /** Género para categorías femenino/masculino (mismos años SUB-5 a SUB-18). */
+  genero?: 'masculino' | 'femenino';
   /** Número de camiseta (opcional). */
   numero_camiseta?: number;
   /** Talle de camiseta (opcional). */
@@ -187,6 +189,30 @@ export interface Training {
     dateStr?: string;
     createdAt: Date;
     createdBy: string; // uid
+}
+
+/** Slot de entrenamiento recurrente: día, horario, rango de categorías, cupo y entrenador asignado. */
+export interface TrainingSlot {
+  /** Día de la semana: 0=domingo, 1=lunes, ..., 6=sábado */
+  dayOfWeek: number;
+  /** Hora en formato "HH:mm" (ej. "17:00") */
+  time?: string;
+  /** Categoría inicial del rango (ej. "SUB-5") */
+  categoryFrom: string;
+  /** Categoría final del rango (ej. "SUB-10") */
+  categoryTo: string;
+  /** Cupo máximo de jugadores en este slot */
+  maxQuota: number;
+  /** UID del entrenador asignado (SchoolUser con role coach) */
+  coachId: string;
+}
+
+/** Configuración de horarios de entrenamiento por escuela. Almacenada en schools/{schoolId}/trainingConfig/default */
+export interface TrainingConfig {
+  id: string;
+  slots: TrainingSlot[];
+  updatedAt: Date;
+  updatedBy: string;
 }
 
 export interface Attendance {

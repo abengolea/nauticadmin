@@ -131,7 +131,7 @@ export function SidebarNav() {
         { href: tab("evaluations"), label: "Evaluaciones deportivas", icon: FileText },
         { href: tab("physical"), label: "Evaluaciones físicas", icon: Activity },
         { href: tab("videoteca"), label: "Videoteca", icon: Video },
-        { href: "/dashboard/payments", label: "Pago de cuotas", icon: Banknote, badgeOverdue: true },
+        { href: "/dashboard/payments", label: "Mis pagos", icon: Banknote, badgeOverdue: true },
       ];
     } else {
       const tab = (t: string) => `${profileHref}&tab=${t}`;
@@ -139,7 +139,7 @@ export function SidebarNav() {
         { href: "/dashboard", label: "Panel Principal", icon: Home },
         { href: profileHref, label: "Mi perfil", icon: Users },
         { href: tab("videoteca"), label: "Videoteca", icon: Video },
-        { href: "/dashboard/payments", label: "Pago de cuotas", icon: Banknote, badgeOverdue: true },
+        { href: "/dashboard/payments", label: "Mis pagos", icon: Banknote, badgeOverdue: true },
         { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
       ];
     }

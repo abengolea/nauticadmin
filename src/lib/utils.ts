@@ -42,6 +42,18 @@ export function compareCategory(a: string, b: string): number {
   return i - j;
 }
 
+/** Indica si la categoría del jugador está dentro del rango [categoryFrom, categoryTo] (inclusive). */
+export function isCategoryInRange(
+  playerCategory: string,
+  categoryFrom: string,
+  categoryTo: string
+): boolean {
+  const cmp = compareCategory(playerCategory, categoryFrom);
+  if (cmp < 0) return false;
+  const cmpTo = compareCategory(playerCategory, categoryTo);
+  return cmpTo <= 0;
+}
+
 /** Indica si la fecha de nacimiento corresponde al día de hoy (mes y día). */
 export function isBirthdayToday(birthDate: Date | undefined | null): boolean {
   if (!birthDate) return false;

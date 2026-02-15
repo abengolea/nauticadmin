@@ -72,6 +72,7 @@ const playerSchema = z.object({
   status: z.enum(["active", "inactive"]),
   observations: z.string().optional(),
   photoUrl: z.string().optional().or(z.literal("")),
+  genero: z.enum(["masculino", "femenino"]).optional(),
 });
 
 export function AddPlayerForm() {
@@ -94,6 +95,7 @@ export function AddPlayerForm() {
             status: "active",
             photoUrl: "",
             observations: "",
+            genero: undefined,
             dni: "",
             healthInsurance: "",
         },
@@ -145,6 +147,7 @@ export function AddPlayerForm() {
                 status: values.status,
                 photoUrl: values.photoUrl,
                 observations: values.observations,
+                ...(values.genero?.trim() && { genero: values.genero.trim() }),
                 createdAt: Timestamp.now(),
                 createdBy: profile.uid,
             };
@@ -402,6 +405,29 @@ export function AddPlayerForm() {
                         </FormControl>
                         <FormMessage />
                     </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="genero"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Género / Categoría</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar (opcional)" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                <SelectItem value="">No especificado</SelectItem>
+                                <SelectItem value="masculino">Masculino</SelectItem>
+                                <SelectItem value="femenino">Femenino</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <FormDescription>Categorías femenino y masculino usan los mismos años (SUB-5 a SUB-18).</FormDescription>
+                        <FormMessage />
+                        </FormItem>
                     )}
                 />
                 <FormField

@@ -263,6 +263,30 @@ export async function getClothingPendingForPlayer(
   return pending;
 }
 
+/** Obtiene las cuotas de ropa pendientes por jugador para todos los jugadores activos de la escuela. */
+export async function getClothingPendingByPlayerMap(
+  db: Firestore,
+  schoolId: string
+): Promise<Record<string, ClothingPendingItem[]>> {
+  const playersWithConfig = await getActivePlayersWithConfig(db, schoolId);
+  if (playersWithConfig.length === 0) return {};
+  const config = playersWithConfig[0].config;
+  if ((config.clothingAmount ?? 0) <= 0) return {};
+
+  const results = await Promise.all(
+    playersWithConfig.map(async ({ player }) => {
+      const pending = await getClothingPendingForPlayer(db, schoolId, player.id, config);
+      return { playerId: player.id, pending } as const;
+    })
+  );
+
+  const map: Record<string, ClothingPendingItem[]> = {};
+  for (const { playerId, pending } of results) {
+    if (pending.length > 0) map[playerId] = pending;
+  }
+  return map;
+}
+
 /** Busca pago por provider + providerPaymentId (evitar duplicados) */
 export async function findPaymentByProviderId(
   db: Firestore,
