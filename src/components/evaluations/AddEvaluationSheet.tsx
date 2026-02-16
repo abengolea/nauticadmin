@@ -457,7 +457,6 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.onresult = (event: SpeechRecognitionEvent) => {
-            // Actualizar transcripción por índice (interim y final) para evitar duplicados
             const startIdx = typeof event.resultIndex === "number" ? event.resultIndex : 0;
             for (let i = startIdx; i < event.results.length; i++) {
                 const r = event.results[i];
@@ -467,7 +466,9 @@ export function AddEvaluationSheet({ playerId, schoolId, isOpen, onOpenChange, p
             const parts = Array.from(transcriptByIndexRef.current.entries())
                 .sort((a, b) => a[0] - b[0])
                 .map(([, text]) => text);
-            const fullTranscript = parts.join(" ");
+            // En Chrome móvil la API repite la misma frase varias veces; filtrar duplicados consecutivos
+            const deduped = parts.filter((p, i) => i === 0 || p !== parts[i - 1]);
+            const fullTranscript = deduped.join(" ");
             if (fullTranscript) onChange(baseValue ? `${baseValue} ${fullTranscript}` : fullTranscript);
         };
         recognition.onend = () => {
