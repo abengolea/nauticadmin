@@ -9,6 +9,9 @@ runConfig:
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     value: AIzaSyBggeQWGSw0MWuaj9hgSaXl8oJU8fA7rlA
+    availability:
+      - BUILD
+      - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
     value: nauticadmin.firebaseapp.com
     availability:
@@ -40,14 +43,9 @@ env:
     availability:
       - BUILD
       - RUNTIME
-  # Mercado Pago: temporalmente vacíos hasta configurar secrets.
-  # Cuando estén listos: firebase apphosting:secrets:set mercadopago-client-secret
-  # y mercadopago-platform-access-token, luego cambiar a secret: <nombre>
+  # Mercado Pago - secrets pendientes de configurar
   - variable: MERCADOPAGO_CLIENT_ID
     value: "3983794964230965"
     availability:
       - RUNTIME
-  - variable: MERCADOPAGO_CLIENT_SECRET
-    value: ""
-  - variable: MERCADOPAGO_PLATFORM_ACCESS_TOKEN
-    value: ""
+
