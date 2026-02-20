@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Camera, Upload, X } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
+import { compressImageForUpload } from '@/lib/image-compress';
 
 interface ExpenseCaptureProps {
   schoolId: string;
@@ -63,8 +64,10 @@ export function ExpenseCapture({
 
     try {
       const token = await user.getIdToken();
+      setProgress(15);
+      const fileToUpload = await compressImageForUpload(file);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', fileToUpload);
       formData.append('schoolId', schoolId);
 
       setProgress(30);

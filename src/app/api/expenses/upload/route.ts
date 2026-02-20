@@ -89,10 +89,14 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   } catch (err) {
-    console.error('[expenses/upload]', err);
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error('[expenses/upload]', { message, stack, err });
     return NextResponse.json(
       { error: 'Error al subir el gasto' },
       { status: 500 }
     );
   }
 }
+
+export const maxDuration = 60;
