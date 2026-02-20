@@ -47,6 +47,8 @@ const PutBodySchema = z.object({
   amount: z.number().min(0),
   currency: z.string().min(1).default('ARS'),
   dueDayOfMonth: z.number().int().min(1).max(31),
+  /** Día del mes para considerar moroso. Si no se cumple, no se cuenta como moroso. Default: dueDayOfMonth. */
+  regularizationDayOfMonth: z.number().int().min(1).max(31).optional(),
   moraFromActivationMonth: z.boolean().optional(),
   prorateDayOfMonth: z.number().int().min(0).max(31).optional(),
   proratePercent: z.number().int().min(0).max(100).optional(),
@@ -85,6 +87,7 @@ export async function PUT(request: Request) {
       amount,
       currency,
       dueDayOfMonth,
+      regularizationDayOfMonth,
       moraFromActivationMonth,
       prorateDayOfMonth,
       proratePercent,
@@ -107,6 +110,7 @@ export async function PUT(request: Request) {
       updatedAt: admin.firestore.Timestamp.now(),
       updatedBy: auth.uid,
     };
+    if (regularizationDayOfMonth !== undefined) update.regularizationDayOfMonth = regularizationDayOfMonth;
     if (moraFromActivationMonth !== undefined) update.moraFromActivationMonth = moraFromActivationMonth;
     if (prorateDayOfMonth !== undefined) update.prorateDayOfMonth = prorateDayOfMonth;
     if (proratePercent !== undefined) update.proratePercent = proratePercent;

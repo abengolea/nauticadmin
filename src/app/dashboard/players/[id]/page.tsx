@@ -5,27 +5,16 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cake, User, Contact, Bot, FilePlus, ArrowLeft, UserX, ClipboardCheck, Video } from "lucide-react";
-import { calculateAge, isPlayerProfileComplete } from "@/lib/utils";
+import { User, Contact, ArrowLeft, UserX } from "lucide-react";
+import { isPlayerProfileComplete } from "@/lib/utils";
 import { useDoc, useUserProfile, useCollection, useUser, useFirebase } from "@/firebase";
 import { getAuth } from "firebase/auth";
-import type { Player, Evaluation } from "@/lib/types";
+import type { Player } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SummaryTab } from "@/components/players/PlayerProfile/SummaryTab";
-import { MedicalRecordField } from "@/components/players/MedicalRecordField";
-import { isMedicalRecordApproved, isMedicalRecordRejected } from "@/lib/utils";
-import { AnalyticsTab } from "@/components/players/PlayerProfile/AnalyticsTab";
 import { useState } from "react";
-import { AddEvaluationSheet } from "@/components/evaluations/AddEvaluationSheet";
-import { EvaluationsTab } from "@/components/evaluations/EvaluationsTab";
-import { PlayerVideoteca } from "@/components/videos/PlayerVideoteca";
-import { AttendanceHistory } from "@/components/attendance/AttendanceHistory";
-import { PhysicalAssessmentsTab } from "@/components/physical-assessments/PhysicalAssessmentsTab";
-import { Activity } from "lucide-react";
 import { EditPlayerDialog } from "@/components/players/EditPlayerDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { AlertCircle, Archive, ArchiveRestore, Lock, FileHeart } from "lucide-react";
+import { AlertCircle, Archive, ArchiveRestore } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PlayerPaymentStatusCard } from "@/components/players/PlayerPaymentStatusCard";
 
@@ -57,8 +46,6 @@ export default function PlayerProfilePage() {
   const { toast } = useToast();
   const router = useRouter();
   const isViewingAsPlayer = profile?.role === "player" && String(profile?.playerId ?? "") === String(id);
-  const [isEvalSheetOpen, setEvalSheetOpen] = useState(false);
-  const [editingEvaluation, setEditingEvaluation] = useState<Evaluation | null>(null);
   const [isEditPlayerOpen, setEditPlayerOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [unarchiving, setUnarchiving] = useState(false);
@@ -72,12 +59,7 @@ export default function PlayerProfilePage() {
       profileReady && schoolId ? `schools/${schoolId}/players/${id}` : ''
   );
 
-  const { data: evaluations, loading: evalsLoading, error: evalsError } = useCollection<Evaluation>(
-    profileReady && schoolId ? `schools/${schoolId}/evaluations` : '',
-    { where: ['playerId', '==', id], orderBy: ['date', 'desc'], limit: 20 }
-  );
-
-  const isLoading = playerLoading || !profileReady || evalsLoading;
+  const isLoading = playerLoading || !profileReady;
 
   if (isLoading) {
     return (
@@ -108,17 +90,17 @@ export default function PlayerProfilePage() {
           <UserX className="h-12 w-12 text-muted-foreground" />
         </div>
         <div className="text-center space-y-2">
-          <h2 className="text-xl font-semibold">Jugador no encontrado</h2>
+          <h2 className="text-xl font-semibold">Cliente no encontrado</h2>
           <p className="text-muted-foreground max-w-sm">
             {schoolId
-              ? "No existe un jugador con este ID en la escuela seleccionada, o no tienes permiso para verlo."
-              : "Falta el identificador de escuela. Entra desde la lista de jugadores de tu escuela."}
+              ? "No existe un cliente con este ID en la náutica seleccionada, o no tienes permiso para verlo."
+              : "Falta el identificador de náutica. Entra desde la lista de clientes."}
           </p>
         </div>
         <Button variant="outline" asChild>
           <Link href={schoolId ? `/dashboard/players?schoolId=${schoolId}` : "/dashboard/players"}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a jugadores
+            Volver a clientes
           </Link>
         </Button>
       </div>
@@ -161,11 +143,11 @@ export default function PlayerProfilePage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Error al cambiar estado");
       toast({
-        title: newStatus === "active" ? "Jugador activado" : "Jugador desactivado",
+        title: newStatus === "active" ? "Cliente activado" : "Cliente desactivado",
         description:
           newStatus === "active"
-            ? "El jugador ya puede ingresar al panel."
-            : "El jugador ya no puede ingresar al panel.",
+            ? "El cliente ya puede ingresar al panel."
+            : "El cliente ya no puede ingresar al panel.",
       });
     } catch (e) {
       toast({
@@ -195,15 +177,15 @@ export default function PlayerProfilePage() {
       if (!res.ok) throw new Error(data.error ?? "Error al archivar");
       setArchiveDialogOpen(false);
       toast({
-        title: "Jugador archivado",
-        description: "El jugador ya no aparecerá en listados ni en totales.",
+        title: "Cliente archivado",
+        description: "El cliente ya no aparecerá en listados ni en totales.",
       });
       router.push(`/dashboard/players?schoolId=${schoolId}`);
     } catch (e) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: e instanceof Error ? e.message : "No se pudo archivar el jugador",
+        description: e instanceof Error ? e.message : "No se pudo archivar el cliente",
       });
     } finally {
       setArchiving(false);
@@ -226,15 +208,15 @@ export default function PlayerProfilePage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Error al desarchivar");
       toast({
-        title: "Jugador desarchivado",
-        description: "El jugador volverá a aparecer en listados y en totales.",
+        title: "Cliente desarchivado",
+        description: "El cliente volverá a aparecer en listados y en totales.",
       });
       router.refresh();
     } catch (e) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: e instanceof Error ? e.message : "No se pudo desarchivar el jugador",
+        description: e instanceof Error ? e.message : "No se pudo desarchivar el cliente",
       });
     } finally {
       setUnarchiving(false);
@@ -243,18 +225,6 @@ export default function PlayerProfilePage() {
 
   return (
     <>
-    <AddEvaluationSheet
-      playerId={id}
-      schoolId={schoolId!}
-      isOpen={isEvalSheetOpen}
-      onOpenChange={(open) => {
-        setEvalSheetOpen(open);
-        if (!open) setEditingEvaluation(null);
-      }}
-      playerName={`${player.firstName ?? ""} ${player.lastName ?? ""}`.trim()}
-      evaluationsSummary={evaluations?.map((e) => ({ date: e.date, coachComments: e.coachComments ?? "" })) ?? []}
-      editingEvaluation={editingEvaluation}
-    />
     <EditPlayerDialog
       player={player}
       schoolId={schoolId!}
@@ -302,30 +272,23 @@ export default function PlayerProfilePage() {
           )}
           <h1 className="text-4xl font-bold font-headline">{player.firstName || ''} {player.lastName || ''}</h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-             {player.birthDate && <div className="flex items-center gap-1"><Cake className="h-4 w-4" /> {calculateAge(player.birthDate)} años</div>}
-             {player.tutorContact?.name && <div className="flex items-center gap-1"><User className="h-4 w-4" /> Tutor: {player.tutorContact.name}</div>}
-             {player.tutorContact?.phone && <div className="flex items-center gap-1"><Contact className="h-4 w-4" /> {player.tutorContact.phone}</div>}
+             {player.tutorContact?.name && <div className="flex items-center gap-1"><User className="h-4 w-4" /> Contacto: {player.tutorContact.name}</div>}
+             {player.tutorContact?.phone?.trim() && <div className="flex items-center gap-1"><Contact className="h-4 w-4" /> {player.tutorContact.phone}</div>}
           </div>
         </div>
         <div className="flex flex-wrap items-start gap-2">
           <Button variant="outline" onClick={() => setEditPlayerOpen(true)}>
             Editar Perfil
           </Button>
-          {!isViewingAsPlayer && (
-            <Button onClick={() => setEvalSheetOpen(true)}>
-              <FilePlus className="mr-2 h-4 w-4" />
-              Nueva Evaluación
-            </Button>
-          )}
         </div>
       </header>
 
       {player.archived && (
         <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500">
           <Archive className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <AlertTitle>Jugador archivado</AlertTitle>
+          <AlertTitle>Cliente archivado</AlertTitle>
           <AlertDescription>
-            Este jugador está archivado. No aparece en listados ni en totales de la escuela.
+            Este cliente está archivado. No aparece en listados ni en totales de la náutica.
           </AlertDescription>
           <div className="mt-2 flex flex-wrap gap-2">
             {canUnarchive && (
@@ -336,25 +299,25 @@ export default function PlayerProfilePage() {
                 disabled={unarchiving}
               >
                 <ArchiveRestore className="mr-2 h-4 w-4" />
-                {unarchiving ? "Desarchivando…" : "Desarchivar jugador"}
+                {unarchiving ? "Desarchivando…" : "Desarchivar cliente"}
               </Button>
             )}
             <Button variant="outline" size="sm" asChild>
               <Link href={schoolId ? `/dashboard/players?schoolId=${schoolId}` : "/dashboard/players"}>
-                Volver a jugadores
+                Volver a clientes
               </Link>
             </Button>
           </div>
         </Alert>
       )}
 
-      {/* Cartel obligatorio para el jugador con perfil incompleto: no puede ver evaluaciones, videos, etc. */}
+      {/* Cartel obligatorio para el cliente con perfil incompleto */}
       {showLockedContent && (
         <Alert className="border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500 shadow-md">
           <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-          <AlertTitle className="text-lg">Completá tu perfil para desbloquear todo</AlertTitle>
+          <AlertTitle className="text-lg">Completá tu perfil</AlertTitle>
           <AlertDescription className="mt-1">
-            Para ver tus evaluaciones, videos y más, tenés que completar <strong>todos</strong> los datos de tu perfil: nombre, apellido, fecha de nacimiento, tutor (nombre y teléfono), email y <strong>foto</strong>. Podés sacar una foto con la cámara o subir una desde tu dispositivo en &quot;Editar Perfil&quot;.
+            Completá <strong>todos</strong> los datos de tu perfil: nombre, apellido, contacto, email y <strong>foto de la embarcación</strong>. Podés sacar una foto o subir una desde tu dispositivo en &quot;Editar Perfil&quot;.
           </AlertDescription>
           <Button className="mt-4" size="lg" onClick={() => setEditPlayerOpen(true)}>
             Completar perfil
@@ -362,193 +325,22 @@ export default function PlayerProfilePage() {
         </Alert>
       )}
 
-      {!isViewingAsPlayer && !player.email && (
-        <Alert variant="destructive" className="border-amber-500 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-600">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Este jugador no puede iniciar sesión</AlertTitle>
-          <AlertDescription>
-            Falta completar el <strong>Email (acceso al panel)</strong> en Editar perfil. Sin ese email, al iniciar sesión verá &quot;Acceso Pendiente&quot;. Agregá el mismo email con el que el jugador se registra y guardá.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <Tabs
-        defaultValue={
-          (() => {
-            const t = searchParams.get("tab");
-            return t && ["summary", "evaluations", "physical", "videoteca", "attendance", "analytics"].includes(t)
-              ? t
-              : "summary";
-          })()
-        }
-        className="w-full"
-      >
-        {/* Móvil: grid 3 columnas (2 filas) para usar todo el ancho; md+: una fila */}
-        <TabsList
-          className={`
-            w-full bg-card grid grid-cols-3 gap-1 p-1 h-auto md:h-10
-            ${isViewingAsPlayer ? "md:grid-cols-5" : "md:grid-cols-6"}
-          `}
-        >
-          <TabsTrigger value="summary" className="text-xs px-2 py-2 md:text-sm md:px-3 md:py-1.5">
-            Resumen
-          </TabsTrigger>
-          <TabsTrigger value="evaluations" className="text-xs px-2 py-2 md:text-sm md:px-3 md:py-1.5">
-            <span className="hidden sm:inline">Evaluaciones</span>
-            <span className="sm:hidden">Eval.</span>
-          </TabsTrigger>
-          <TabsTrigger value="physical" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
-            <span className="hidden sm:inline">Físicas</span>
-            <span className="sm:hidden">Fís.</span>
-            <Activity className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-          </TabsTrigger>
-          <TabsTrigger value="videoteca" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
-            <Video className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-            <span className="truncate">Videoteca</span>
-          </TabsTrigger>
-          <TabsTrigger value="attendance" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
-            <ClipboardCheck className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-            <span className="truncate">Asistencia</span>
-          </TabsTrigger>
-          {!isViewingAsPlayer && (
-          <TabsTrigger value="analytics" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
-            <Bot className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-            <span className="truncate">Análisis IA</span>
-            <Badge variant="secondary" className="text-[9px] font-normal shrink-0 hidden sm:inline-flex">En desarrollo</Badge>
-          </TabsTrigger>
-          )}
-        </TabsList>
-        <TabsContent value="summary">
-          {isViewingAsPlayer && !isMedicalRecordApproved(player) && (
-            <Alert className={`mb-4 ${isMedicalRecordRejected(player) ? "border-red-500 bg-red-50 dark:bg-red-950/40 dark:border-red-500" : "border-amber-500 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500"}`}>
-              <FileHeart className={`h-4 w-4 ${isMedicalRecordRejected(player) ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`} />
-              <AlertTitle>{isMedicalRecordRejected(player) ? "Ficha médica rechazada" : "Ficha médica obligatoria"}</AlertTitle>
-              <AlertDescription>
-                {isMedicalRecordRejected(player) && player.medicalRecord?.rejectionReason ? (
-                  <>
-                    Tu ficha médica no fue aprobada. Motivo: <strong>{player.medicalRecord.rejectionReason}</strong>.
-                    Por favor subí una nueva ficha corregida en la sección de abajo.
-                  </>
-                ) : (
-                  <>
-                    Debes cargar tu ficha médica en PDF. Podés subirla en la sección &quot;Ficha médica&quot; más abajo. Una vez revisada por el entrenador o administrador, quedará marcada como cumplida.
-                  </>
-                )}
-              </AlertDescription>
-            </Alert>
-          )}
-          <SummaryTab
-            player={playerWithSchool}
-            lastCoachComment={evaluations?.[0]?.coachComments}
-            canEditCoachFeedback={!isViewingAsPlayer && (profile?.role === "school_admin" || profile?.role === "coach")}
-            schoolId={schoolId ?? undefined}
-            playerId={id}
+      <div className="w-full">
+        <SummaryTab
+          player={playerWithSchool}
+          lastCoachComment={undefined}
+          canEditCoachFeedback={false}
+          schoolId={schoolId ?? undefined}
+          playerId={id}
+        />
+        <div className="mt-4">
+          <PlayerPaymentStatusCard
+            getToken={getToken}
+            playerId={isViewingAsPlayer ? undefined : id}
+            schoolId={isViewingAsPlayer ? undefined : schoolId ?? undefined}
           />
-          <div className="mt-4">
-            <PlayerPaymentStatusCard
-              getToken={getToken}
-              playerId={isViewingAsPlayer ? undefined : id}
-              schoolId={isViewingAsPlayer ? undefined : schoolId ?? undefined}
-            />
-          </div>
-          <Card className="mt-4">
-            <CardHeader>
-              <CardTitle className="font-headline">Ficha médica</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                PDF obligatorio. El jugador puede subirla aquí; el entrenador o administrador la revisa y marca como cumplida.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <MedicalRecordField
-                value={player.medicalRecord}
-                onChange={() => {}}
-                onApprove={() => {}}
-                onReject={() => {}}
-                schoolId={schoolId!}
-                playerId={id}
-                playerName={`${player.firstName ?? ""} ${player.lastName ?? ""}`.trim()}
-                playerEmail={player.email}
-                canApprove={!isViewingAsPlayer && (profile?.role === "school_admin" || profile?.role === "coach")}
-                disabled={false}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="evaluations">
-          {showLockedContent ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <Lock className="h-12 w-12 text-muted-foreground mb-4 opacity-60" />
-                <h3 className="font-semibold text-lg mb-2">Completá tu perfil</h3>
-                <p className="text-muted-foreground max-w-sm mb-4">
-                  Para ver tus evaluaciones necesitás completar todos los datos de tu perfil, incluida la foto (podés sacarla con la cámara o subir una).
-                </p>
-                <Button onClick={() => setEditPlayerOpen(true)}>Completar perfil</Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <EvaluationsTab
-              playerId={id}
-              schoolId={schoolId!}
-              evaluations={evaluations}
-              loading={evalsLoading}
-              error={evalsError}
-              onOpenCreate={() => setEvalSheetOpen(true)}
-              onEditClick={(evalData) => {
-                setEditingEvaluation(evalData);
-                setEvalSheetOpen(true);
-              }}
-              isViewingAsPlayer={isViewingAsPlayer}
-            />
-          )}
-        </TabsContent>
-        <TabsContent value="physical">
-          {showLockedContent ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <Lock className="h-12 w-12 text-muted-foreground mb-4 opacity-60" />
-                <h3 className="font-semibold text-lg mb-2">Completá tu perfil</h3>
-                <p className="text-muted-foreground max-w-sm mb-4">
-                  Para ver tus evaluaciones físicas completá todos los datos de tu perfil, incluida la foto.
-                </p>
-                <Button onClick={() => setEditPlayerOpen(true)}>Completar perfil</Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <PhysicalAssessmentsTab player={playerWithSchool} schoolId={schoolId!} isViewingAsPlayer={isViewingAsPlayer} />
-          )}
-        </TabsContent>
-        <TabsContent value="videoteca">
-          {showLockedContent ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <Lock className="h-12 w-12 text-muted-foreground mb-4 opacity-60" />
-                <h3 className="font-semibold text-lg mb-2">Completá tu perfil</h3>
-                <p className="text-muted-foreground max-w-sm mb-4">
-                  Para ver tu videoteca completá todos los datos de tu perfil, incluida la foto (sacala con la cámara o subila).
-                </p>
-                <Button onClick={() => setEditPlayerOpen(true)}>Completar perfil</Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <PlayerVideoteca
-              schoolId={schoolId!}
-              playerId={id}
-              playerName={`${player.firstName ?? ""} ${player.lastName ?? ""}`.trim()}
-              embedded
-              isViewingAsPlayer={isViewingAsPlayer}
-            />
-          )}
-        </TabsContent>
-        <TabsContent value="attendance">
-          <AttendanceHistory schoolId={schoolId!} playerId={id} />
-        </TabsContent>
-        {!isViewingAsPlayer && (
-        <TabsContent value="analytics">
-          <AnalyticsTab player={playerWithSchool} evaluations={evaluations || []} />
-        </TabsContent>
-        )}
-      </Tabs>
+        </div>
+      </div>
 
       {canArchive && (
         <div className="flex justify-end">
@@ -556,13 +348,13 @@ export default function PlayerProfilePage() {
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-600 dark:hover:bg-amber-950/50">
                 <Archive className="mr-2 h-4 w-4" />
-                Archivar jugador
+                Archivar cliente
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
-              <AlertDialogTitle>¿Archivar este jugador?</AlertDialogTitle>
+              <AlertDialogTitle>¿Archivar este cliente?</AlertDialogTitle>
               <AlertDialogDescription>
-                El jugador dejará de aparecer en listados, no se contará en cantidad de jugadores ni sus pagos en los totales. Es útil para jugadores de prueba. Los datos se conservan pero quedan ocultos.
+                El cliente dejará de aparecer en listados, no se contará en cantidad de clientes ni sus pagos en los totales. Es útil para clientes de prueba. Los datos se conservan pero quedan ocultos.
               </AlertDialogDescription>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>

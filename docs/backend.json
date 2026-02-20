@@ -56,7 +56,6 @@
       "properties": {
         "firstName": { "type": "string" },
         "lastName": { "type": "string" },
-        "birthDate": { "type": "string", "format": "date-time" },
         "dni": { "type": "string", "description": "Documento Nacional de Identidad del jugador." },
         "healthInsurance": { "type": "string", "description": "Obra social o seguro médico del jugador." },
         "tutorContact": { "type": "object", "properties": { "name": { "type": "string" }, "phone": { "type": "string" } }, "required": ["name", "phone"]},
@@ -66,7 +65,7 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "createdBy": { "type": "string" }
       },
-      "required": ["firstName", "lastName", "birthDate", "tutorContact", "status", "createdAt", "createdBy"]
+      "required": ["firstName", "lastName", "tutorContact", "status", "createdAt", "createdBy"]
     },
     "PendingPlayer": {
       "title": "Jugador Pendiente",
@@ -75,12 +74,11 @@
       "properties": {
         "firstName": { "type": "string" },
         "lastName": { "type": "string" },
-        "birthDate": { "type": "string", "format": "date-time" },
         "dni": { "type": "string" },
         "tutorContact": { "type": "object", "properties": { "name": { "type": "string" }, "phone": { "type": "string" } }, "required": ["name", "phone"]},
         "submittedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["firstName", "lastName", "birthDate", "tutorContact", "submittedAt"]
+      "required": ["firstName", "lastName", "tutorContact", "submittedAt"]
     },
     "Evaluation": {
       "title": "Evaluación",

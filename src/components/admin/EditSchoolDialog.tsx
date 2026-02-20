@@ -62,7 +62,6 @@ export function EditSchoolDialog({ school, children }: EditSchoolDialogProps) {
 
   async function onSubmit(values: z.infer<typeof schoolSchema>) {
     const schoolRef = doc(firestore, 'schools', school.id);
-    
     try {
       await updateDoc(schoolRef, {
         name: values.name,
@@ -82,7 +81,7 @@ export function EditSchoolDialog({ school, children }: EditSchoolDialogProps) {
       }
 
       toast({
-        title: "¡Escuela actualizada!",
+        title: "¡Náutica actualizada!",
         description: `Los datos de "${values.name}" han sido guardados.`,
       });
       setOpen(false);
@@ -103,9 +102,9 @@ export function EditSchoolDialog({ school, children }: EditSchoolDialogProps) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Editar Escuela</DialogTitle>
+          <DialogTitle>Editar Náutica</DialogTitle>
           <DialogDescription>
-            Modifica los datos de la sede. Los cambios se aplicarán inmediatamente.
+            Modifica los datos de la náutica. Los cambios se aplicarán inmediatamente.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -115,9 +114,9 @@ export function EditSchoolDialog({ school, children }: EditSchoolDialogProps) {
                 name="name"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Nombre de la Sede</FormLabel>
+                    <FormLabel>Nombre de la Náutica</FormLabel>
                     <FormControl>
-                        <Input placeholder="Ej: Escuela de River - Córdoba" {...field} />
+                        <Input placeholder="Ej: Club Náutico San Isidro" {...field} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>

@@ -8,12 +8,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowUpRight, PlusCircle, Users, School, ClipboardCheck } from "lucide-react";
+import { PlusCircle, Users, School } from "lucide-react";
 import Link from "next/link";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCollection, useUserProfile, useDoc } from "@/firebase";
 import type { Player, School as SchoolType } from "@/lib/types";
-import { getCategoryLabel, compareCategory } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import React, { useMemo } from "react";
 
@@ -26,29 +24,10 @@ export function SchoolAdminDashboard() {
 
   const { data: players, loading: playersLoading } = useCollection<Player>(
       activeSchoolId ? `schools/${activeSchoolId}/players` : '',
-      { limit: 20, orderBy: ['createdAt', 'desc'] }
+      {}
   );
 
   const activePlayers = useMemo(() => (players ?? []).filter((p) => !p.archived), [players]);
-
-  const playersByCategory = useMemo(() => {
-    if (!activePlayers.length) return [];
-    return [...activePlayers]
-      .map((p) => ({
-        player: p,
-        category: p.birthDate
-          ? getCategoryLabel(p.birthDate instanceof Date ? p.birthDate : new Date(p.birthDate))
-          : "-",
-      }))
-      .sort((a, b) => {
-        const cmp = compareCategory(a.category, b.category);
-        if (cmp !== 0) return cmp;
-        const lnA = (a.player.lastName ?? "").toLowerCase();
-        const lnB = (b.player.lastName ?? "").toLowerCase();
-        return lnA.localeCompare(lnB);
-      })
-      .slice(0, 8);
-  }, [activePlayers]);
 
   const isLoading = !isReady || schoolLoading || playersLoading;
 
@@ -61,7 +40,7 @@ export function SchoolAdminDashboard() {
          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Jugadores Totales</CardTitle>
+                    <CardTitle className="text-sm font-medium">Clientes Activos</CardTitle>
                     <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -78,23 +57,13 @@ export function SchoolAdminDashboard() {
                 </CardContent>
             </Card>
          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
+          <div className="grid gap-4 md:grid-cols-1">
+            <Card>
                 <CardHeader>
                     <CardTitle>Actividad Reciente</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground p-4">No hay actividad reciente para mostrar.</p>
-                </CardContent>
-            </Card>
-             <Card className="col-span-3">
-                <CardHeader>
-                    <CardTitle>Jugadores Recientes</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
                 </CardContent>
             </Card>
           </div>
@@ -110,37 +79,18 @@ export function SchoolAdminDashboard() {
             <p className="text-muted-foreground">Bienvenido, {profile?.displayName}.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant={profile?.role === 'coach' ? 'default' : 'outline'}>
-            <Link href="/dashboard/attendance">
-                <ClipboardCheck className="mr-2 h-4 w-4" />
-                Tomar asistencia
-            </Link>
-          </Button>
           <Button asChild variant="outline">
             <Link href="/dashboard/players/new">
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Añadir Jugador
+                Añadir Cliente
             </Link>
           </Button>
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Link href="/dashboard/attendance">
-          <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tomar asistencia</CardTitle>
-              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                Planilla de control por entrenamiento
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Jugadores Activos</CardTitle>
+            <CardTitle className="text-sm font-medium">Clientes Activos</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -163,8 +113,8 @@ export function SchoolAdminDashboard() {
           </CardContent>
         </Card>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+      <div className="grid gap-4 md:grid-cols-1">
+        <Card>
           <CardHeader>
             <CardTitle>Actividad Reciente</CardTitle>
             <CardDescription>
@@ -173,38 +123,6 @@ export function SchoolAdminDashboard() {
           </CardHeader>
           <CardContent className="pl-2">
             <p className="text-sm text-muted-foreground p-4">Funcionalidad en construcción.</p>
-          </CardContent>
-        </Card>
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Jugadores Añadidos Recientemente</CardTitle>
-            <CardDescription>
-              Últimos jugadores registrados en la escuela.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {playersByCategory.map(({ player, category }) => (
-                <div key={player.id} className="flex items-center">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={player.photoUrl} alt="Avatar" data-ai-hint="person portrait" />
-                    <AvatarFallback>{player.firstName[0]}{player.lastName[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="ml-4 space-y-1">
-                    <p className="text-sm font-medium leading-none">{player.firstName} {player.lastName}</p>
-                    <p className="text-sm text-muted-foreground">{category}</p>
-                  </div>
-                  <Link href={`/dashboard/players/${player.id}?schoolId=${activeSchoolId}`} className="ml-auto">
-                    <Button variant="ghost" size="sm">
-                       Ver <ArrowUpRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </Link>
-                </div>
-              ))}
-              {playersByCategory.length === 0 && (
-                <p className="text-sm text-center text-muted-foreground p-4">No hay jugadores para mostrar.</p>
-              )}
-            </div>
           </CardContent>
         </Card>
       </div>

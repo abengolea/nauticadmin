@@ -28,6 +28,7 @@ interface PaymentConfigTabProps {
 export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) {
   const [amount, setAmount] = useState("");
   const [dueDayOfMonth, setDueDayOfMonth] = useState("10");
+  const [regularizationDayOfMonth, setRegularizationDayOfMonth] = useState("");
   const [registrationAmount, setRegistrationAmount] = useState("");
   const [clothingAmount, setClothingAmount] = useState("");
   const [clothingInstallments, setClothingInstallments] = useState("2");
@@ -66,7 +67,10 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
   useEffect(() => {
     (async () => {
       const token = await getToken();
-      if (!token) return;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
       try {
         const [configRes, statusRes] = await Promise.all([
           fetch(`/api/payments/config?schoolId=${schoolId}`, {
@@ -80,6 +84,9 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
           const data = await configRes.json();
           setAmount(String(data.amount ?? ""));
           setDueDayOfMonth(String(data.dueDayOfMonth ?? 10));
+          setRegularizationDayOfMonth(
+            data.regularizationDayOfMonth != null ? String(data.regularizationDayOfMonth) : ""
+          );
           setRegistrationAmount(String(data.registrationAmount ?? ""));
           setClothingAmount(String(data.clothingAmount ?? ""));
           setClothingInstallments(String(data.clothingInstallments ?? 2));
@@ -126,6 +133,11 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
     }
     if (isNaN(day) || day < 1 || day > 31) {
       toast({ title: "Error", description: "Día de vencimiento debe ser 1-31", variant: "destructive" });
+      return;
+    }
+    const regDayVal = regularizationDayOfMonth === "" ? undefined : parseInt(regularizationDayOfMonth, 10);
+    if (regDayVal !== undefined && (isNaN(regDayVal) || regDayVal < 1 || regDayVal > 31)) {
+      toast({ title: "Error", description: "Día de regularización debe ser 1-31", variant: "destructive" });
       return;
     }
     if (isNaN(prorateDay) || prorateDay < 0 || prorateDay > 31) {
@@ -190,6 +202,7 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
           amount: am,
           currency: "ARS",
           dueDayOfMonth: day,
+          regularizationDayOfMonth: regDayVal,
           registrationAmount: regAm,
           clothingAmount: clothAm,
           clothingInstallments: clothAm > 0 ? clothInst : undefined,
@@ -307,6 +320,21 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
               onChange={(e) => setDueDayOfMonth(e.target.value)}
             />
           </div>
+          <div>
+            <Label htmlFor="regDay">Día de regularización (1-31)</Label>
+            <p className="text-sm text-muted-foreground mb-1">
+              No se consideran morosos hasta que pase este día del mes. Vacío = mismo que vencimiento.
+            </p>
+            <Input
+              id="regDay"
+              type="number"
+              min={1}
+              max={31}
+              value={regularizationDayOfMonth}
+              onChange={(e) => setRegularizationDayOfMonth(e.target.value)}
+              placeholder={dueDayOfMonth}
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -314,7 +342,7 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
         <CardHeader>
           <CardTitle>Derecho de inscripción (cuota de ingreso)</CardTitle>
           <CardDescription>
-            Definí el costo que paga cada jugador al inscribirse. Este es el valor que se cobra cuando el jugador paga la cuota de ingreso. Puede ser distinto a la cuota mensual. 0 = sin cobro de inscripción.
+            Definí el costo que paga cada cliente al inscribirse. Este es el valor que se cobra cuando el cliente paga la cuota de ingreso. Puede ser distinto a la cuota mensual. 0 = sin cobro de inscripción.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -457,7 +485,7 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
             <div>
               <Label htmlFor="moraFrom">Mora desde mes de activación</Label>
               <p className="text-sm text-muted-foreground">
-                Si está activado, el jugador solo debe desde el mes en que se dio de alta. Si no, se consideran todos los períodos.
+                Si está activado, el cliente solo debe desde el mes en que se dio de alta. Si no, se consideran todos los períodos.
               </p>
             </div>
             <Switch
@@ -472,7 +500,7 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
           <div>
             <Label htmlFor="prorateDay">Día límite para prorrata (0 = sin prorrata)</Label>
             <p className="text-sm text-muted-foreground mb-1">
-              Si el jugador se activa después de este día, paga un porcentaje de la cuota en su primer mes.
+              Si el cliente se activa después de este día, paga un porcentaje de la cuota en su primer mes.
             </p>
             <Input
               id="prorateDay"
@@ -514,7 +542,7 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
           <div>
             <Label htmlFor="daysSusp">Días de mora para suspensión</Label>
             <p className="text-sm text-muted-foreground mb-1">
-              Se marca al jugador como suspendido pasados estos días sin pago.
+              Se marca al cliente como suspendido pasados estos días sin pago.
             </p>
             <Input
               id="daysSusp"

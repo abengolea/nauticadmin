@@ -10,8 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Oswald', 'sans-serif'],
+        body: ['Lora', 'Georgia', 'serif'],
+        headline: ['Playfair Display', 'Georgia', 'serif'],
         code: ['Source Code Pro', 'monospace'],
       },
       colors: {

@@ -254,7 +254,7 @@ export function SchoolAdminMensualidadView({ schoolId, getToken, refreshTrigger 
             Historial de mensualidades
           </CardTitle>
           <CardDescription>
-            Pagos que tu escuela realizó a la plataforma
+            Tu Nautica está al día con la plataforma
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -15,7 +15,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useUserProfile, useCollection, useFirestore } from "@/firebase";
 import type { Player } from "@/lib/types";
-import { getCategoryLabel } from "@/lib/utils";
 import { buildEmailHtml, htmlToPlainText, sendMailDoc } from "@/lib/email";
 import { improveMassMessageWithAI } from "@/ai/flows/improve-mass-message";
 import {
@@ -25,40 +24,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Mail, Loader2, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-/** Categorías de edad (SUB-9, SUB-10, ...) derivadas de los jugadores. */
-function getCategoriesFromPlayers(players: Player[]): string[] {
-  const set = new Set<string>();
-  for (const p of players) {
-    if (p.birthDate) {
-      set.add(getCategoryLabel(p.birthDate instanceof Date ? p.birthDate : new Date(p.birthDate)));
-    }
-  }
-  return Array.from(set).sort((a, b) => {
-    const nA = parseInt(a.replace("U", ""), 10);
-    const nB = parseInt(b.replace("U", ""), 10);
-    return nA - nB;
-  });
-}
 
 /** Jugadores con email válido. */
 function playersWithEmail(players: Player[]): Player[] {
   return players.filter((p) => p.email?.trim());
-}
-
-/** Filtra jugadores por categorías seleccionadas (o todos si allSelected). */
-function filterByCategories(
-  players: Player[],
-  allSelected: boolean,
-  selectedCategories: Set<string>
-): Player[] {
-  if (allSelected) return players;
-  return players.filter((p) => {
-    if (!p.birthDate) return false;
-    const cat = getCategoryLabel(p.birthDate instanceof Date ? p.birthDate : new Date(p.birthDate));
-    return selectedCategories.has(cat);
-  });
 }
 
 export function MassMessageForm() {
@@ -72,33 +41,13 @@ export function MassMessageForm() {
   );
   const players = (Array.isArray(playersData) ? playersData : []).filter((p) => !p.archived);
 
-  const [allSelected, setAllSelected] = useState(true);
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [improving, setImproving] = useState(false);
 
-  const categories = useMemo(() => getCategoriesFromPlayers(players), [players]);
   const withEmail = useMemo(() => playersWithEmail(players), [players]);
-  const filtered = useMemo(
-    () => filterByCategories(withEmail, allSelected, selectedCategories),
-    [withEmail, allSelected, selectedCategories]
-  );
-
-  const toggleCategory = (cat: string) => {
-    setSelectedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
-  };
-
-  const toggleAll = () => {
-    setAllSelected((prev) => !prev);
-    if (!allSelected) setSelectedCategories(new Set());
-  };
+  const filtered = withEmail;
 
   const handleImproveWithAI = async () => {
     setImproving(true);
@@ -147,7 +96,7 @@ export function MassMessageForm() {
       toast({
         variant: "destructive",
         title: "Sin destinatarios",
-        description: "No hay jugadores con email en la selección. Agregá emails en los perfiles o elegí otras categorías.",
+        description: "No hay clientes con email cargado en su perfil. Agregá emails en los perfiles.",
       });
       return;
     }
@@ -214,52 +163,14 @@ export function MassMessageForm() {
           Enviar mensaje a los chicos
         </CardTitle>
         <CardDescription>
-          Elegí destinatarios por categoría (o todos). Solo reciben el correo los jugadores que tienen email cargado en su perfil. Los envíos se realizan mediante Trigger Email.
+          Solo reciben el correo los clientes que tienen email cargado en su perfil. Los envíos se realizan mediante Trigger Email.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
           <Label>Destinatarios</Label>
           <p className="text-xs text-muted-foreground">
-            Hacé clic en &quot;Todos&quot; o en cada categoría para sumar o quitar.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={toggleAll}
-              className={cn(
-                "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
-                allSelected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-input bg-background hover:bg-accent"
-              )}
-            >
-              Todos
-            </button>
-            {categories.map((cat) => {
-              const selected = allSelected || selectedCategories.has(cat);
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => {
-                    setAllSelected(false);
-                    toggleCategory(cat);
-                  }}
-                  className={cn(
-                    "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
-                    selected
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-background hover:bg-accent"
-                  )}
-                >
-                  {cat}
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {filtered.length} jugador{filtered.length !== 1 ? "es" : ""} con email recibirán el mensaje.
+            {filtered.length} cliente{filtered.length !== 1 ? "s" : ""} con email recibirán el mensaje.
             {withEmail.length < players.length && (
               <> {players.length - withEmail.length} no tienen email cargado.</>
             )}

@@ -6,12 +6,18 @@ import { useDoc, useUserProfile } from "@/firebase";
 import type { School } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, Shield, Users } from "lucide-react";
+import { ChevronLeft, Shield, Users, Clock, FileSpreadsheet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SchoolUsersList } from "@/components/admin/SchoolUsersList";
 import { useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlayerTable } from "@/components/players/PlayerTable";
+import { AppointmentConfigForm } from "@/components/appointments/AppointmentConfigForm";
+import { AppointmentsList } from "@/components/appointments/AppointmentsList";
+import { ImportClientsFromExcel } from "@/components/clients/ImportClientsFromExcel";
+import { ImportClienteDesde } from "@/components/clients/ImportClienteDesde";
+import { ImportPaymentsFromExcel } from "@/components/payments/ImportPaymentsFromExcel";
+import { ImportUsuarioId } from "@/components/clients/ImportUsuarioId";
 
 export default function SchoolAdminPage() {
   const params = useParams();
@@ -72,20 +78,28 @@ export default function SchoolAdminPage() {
       {!school ? (
         <Card>
             <CardHeader>
-                <CardTitle>Escuela no encontrada</CardTitle>
-                <CardDescription>La escuela que buscas no existe o fue eliminada.</CardDescription>
+                <CardTitle>Náutica no encontrada</CardTitle>
+                <CardDescription>La náutica que buscas no existe o fue eliminada.</CardDescription>
             </CardHeader>
         </Card>
       ) : (
         <Tabs defaultValue="users" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 gap-1 p-1 h-auto md:h-10 bg-card">
+            <TabsList className="grid w-full grid-cols-4 gap-1 p-1 h-auto md:h-10 bg-card">
                 <TabsTrigger value="users" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
                     <Shield className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
                     <span className="truncate">Responsables</span>
                 </TabsTrigger>
                 <TabsTrigger value="players" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
                     <Users className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-                    <span className="truncate">Jugadores</span>
+                    <span className="truncate">Clientes</span>
+                </TabsTrigger>
+                <TabsTrigger value="importar" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
+                    <FileSpreadsheet className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+                    <span className="truncate">Importar</span>
+                </TabsTrigger>
+                <TabsTrigger value="turnos" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
+                    <Clock className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+                    <span className="truncate">Turnos</span>
                 </TabsTrigger>
             </TabsList>
             <TabsContent value="users">
@@ -94,8 +108,8 @@ export default function SchoolAdminPage() {
             <TabsContent value="players">
                  <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-lg sm:text-xl">Plantel de Jugadores</CardTitle>
-                        <CardDescription className="text-sm">Gestiona los jugadores de esta escuela.</CardDescription>
+                        <CardTitle className="text-lg sm:text-xl">Listado de Clientes</CardTitle>
+                        <CardDescription className="text-sm">Gestiona los clientes de esta náutica.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-0 sm:p-6">
                         <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
@@ -103,6 +117,16 @@ export default function SchoolAdminPage() {
                         </div>
                     </CardContent>
                 </Card>
+            </TabsContent>
+            <TabsContent value="importar" className="space-y-6 overflow-y-auto">
+                <ImportUsuarioId schoolId={schoolId} />
+                <ImportPaymentsFromExcel schoolId={schoolId} />
+                <ImportClienteDesde schoolId={schoolId} />
+                <ImportClientsFromExcel schoolId={schoolId} />
+            </TabsContent>
+            <TabsContent value="turnos" className="space-y-4">
+                <AppointmentConfigForm schoolId={schoolId} />
+                <AppointmentsList schoolId={schoolId} />
             </TabsContent>
         </Tabs>
       )}

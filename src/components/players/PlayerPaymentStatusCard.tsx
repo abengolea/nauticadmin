@@ -181,12 +181,12 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
       <CardHeader>
         <CardTitle className="font-headline flex items-center gap-2">
           <CreditCard className="h-5 w-5" />
-          {isAdminView ? "Pagos del jugador" : "Pagos"}
+          {isAdminView ? "Pagos del cliente" : "Pagos"}
         </CardTitle>
         <CardDescription>
           {hasPending ? (
             isAdminView ? (
-              <>Lo que debe este jugador: {[
+              <>Lo que debe este cliente: {[
                 delinquents.some((d) => d.period === REGISTRATION_PERIOD) && "inscripción",
                 delinquents.some((d) => d.period !== REGISTRATION_PERIOD && !d.period?.startsWith?.("ropa-")) && "cuota mensual",
                 clothingPending.length > 0 && "ropa",

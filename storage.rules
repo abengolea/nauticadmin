@@ -22,6 +22,14 @@ service firebase.storage {
         && firestore.exists(/databases/(default)/documents/schools/$(schoolId)/users/$(request.auth.uid))
         && firestore.get(/databases/(default)/documents/schools/$(schoolId)/users/$(request.auth.uid)).data.get('role', '') in ['school_admin', 'coach'];
     }
+    // Gastos: facturas/tickets - solo staff de la escuela puede leer
+    match /schools/{schoolId}/expenses/{expenseId}/{allPaths=**} {
+      allow read: if request.auth != null
+        && firestore.exists(/databases/(default)/documents/schools/$(schoolId)/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/schools/$(schoolId)/users/$(request.auth.uid)).data.get('role', '') in ['school_admin', 'coach', 'editor', 'viewer'];
+      allow write: if false;  // Solo Admin SDK vía API
+    }
+
     // Imágenes de posts (notas): lectura pública (notas publicadas visibles para todos)
     match /schools/{schoolId}/posts/{allPaths=**} {
       allow read: if true;

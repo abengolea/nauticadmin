@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { RiverPlateLogo } from "@/components/icons/RiverPlateLogo";
+import { NauticAdminLogo } from "@/components/icons/NauticAdminLogo";
 
 export default function EscuelasLayout({
   children,
@@ -11,17 +11,10 @@ export default function EscuelasLayout({
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-10 border-b bg-card px-4 lg:px-6 h-14 flex items-center gap-4">
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <RiverPlateLogo className="h-8 w-8 shrink-0" />
-          <span className="font-bold font-headline uppercase text-base sm:text-lg">
-            <span className="text-red-600">ESCUELAS</span>{" "}
-            <span className="text-black dark:text-white">RIVER</span>{" "}
-            <span className="text-red-600">SN</span>
-          </span>
+          <NauticAdminLogo className="h-8 w-8 shrink-0" />
+          <span className="font-bold font-headline text-base sm:text-lg">NauticAdmin</span>
         </Link>
         <nav className="flex items-center gap-2 ml-auto">
-          <Button variant="ghost" asChild size="sm">
-            <Link href="/notas">Notas</Link>
-          </Button>
           <Button variant="ghost" asChild size="sm">
             <Link href="/auth/login">Iniciar Sesión</Link>
           </Button>
@@ -33,7 +26,7 @@ export default function EscuelasLayout({
       <main className="flex-1">{children}</main>
       <footer className="border-t py-6 px-4 lg:px-6">
         <p className="text-xs text-muted-foreground text-center">
-          &copy; {new Date().getFullYear()} ESCUELAS RIVER SN. Todos los derechos reservados.
+          &copy; {new Date().getFullYear()} NauticAdmin. Todos los derechos reservados.
         </p>
       </footer>
     </div>

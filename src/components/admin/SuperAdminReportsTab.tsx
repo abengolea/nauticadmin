@@ -112,7 +112,6 @@ export function SuperAdminReportsTab({
             schoolId,
             firstName: data.firstName ?? "",
             lastName: data.lastName ?? "",
-            birthDate: data.birthDate?.toDate?.() ?? new Date(),
             tutorContact: data.tutorContact ?? { name: "", phone: "" },
             status: data.status ?? "active",
             createdAt,

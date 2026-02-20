@@ -51,6 +51,7 @@ export function useCollection<T extends { id: string }>(
             setLoading(false);
             return;
         }
+        setLoading(true); // Al cambiar a una query válida, marcar como cargando
         const unsubscribe = onSnapshot(collectionQuery, (snapshot) => {
             const data = snapshot.docs.map(doc => processDoc<T>(doc));
             setData(data);

@@ -4,10 +4,13 @@
  * Así evitamos NOT_FOUND cuando la cuenta solo tiene acceso a ciertos modelos/regiones.
  */
 
-const API_KEY =
-  process.env.GEMINI_API_KEY ??
-  process.env.GOOGLE_API_KEY ??
-  process.env.GOOGLE_GENAI_API_KEY;
+function getApiKey(): string | null {
+  const key =
+    process.env.GEMINI_API_KEY ??
+    process.env.GOOGLE_API_KEY ??
+    process.env.GOOGLE_GENAI_API_KEY;
+  return key?.trim() || null;
+}
 
 const MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -31,17 +34,29 @@ interface ListModelsResponse {
   }>;
 }
 
+/** Modelo por defecto cuando la API de listado falla pero la key existe */
+const DEFAULT_MODEL = 'gemini-1.5-flash';
+
 /**
  * Devuelve el ID de modelo (sin prefijo "models/") a usar, o null si no hay key o no hay modelos.
  */
 export async function getAvailableGeminiModel(): Promise<string | null> {
-  if (!API_KEY?.trim()) return null;
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
 
   try {
     const res = await fetch(`${MODELS_URL}?pageSize=100`, {
-      headers: { 'x-goog-api-key': API_KEY },
+      headers: { 'x-goog-api-key': apiKey },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Si la API falla (ej. key inválida, región), usar modelo por defecto
+      console.warn(
+        '[getAvailableGeminiModel] List models failed:',
+        res.status,
+        await res.text().catch(() => '')
+      );
+      return DEFAULT_MODEL;
+    }
 
     const data = (await res.json()) as ListModelsResponse;
     const models = data.models ?? [];
@@ -67,8 +82,15 @@ export async function getAvailableGeminiModel(): Promise<string | null> {
     );
     if (gemini) return toId(gemini.name);
 
-    return null;
-  } catch {
-    return null;
+    // Lista vacía o sin match: usar modelo por defecto
+    return DEFAULT_MODEL;
+  } catch (err) {
+    console.warn('[getAvailableGeminiModel] Error:', err);
+    return DEFAULT_MODEL;
   }
+}
+
+/** Para verificar si la API key está configurada (sin hacer fetch) */
+export function hasGeminiApiKey(): boolean {
+  return !!getApiKey();
 }

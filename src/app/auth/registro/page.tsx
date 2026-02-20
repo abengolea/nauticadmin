@@ -8,9 +8,9 @@ export default function RegistroPage() {
   return (
     <Card className="w-full max-w-md shadow-2xl border-2">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline">Registro de Jugador</CardTitle>
+        <CardTitle className="text-2xl font-headline">Registro de Cliente</CardTitle>
         <CardDescription>
-          Elegí tu escuela, ingresá tu email dos veces y una contraseña. Un administrador o entrenador revisará tu solicitud y te avisará cuando te aprueben.
+          Elegí tu náutica, ingresá tu email dos veces y una contraseña. Un administrador revisará tu solicitud y te avisará cuando te aprueben.
         </CardDescription>
       </CardHeader>
       <CardContent>

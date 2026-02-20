@@ -39,9 +39,9 @@ export const listPaymentsSchema = z.object({
     playerId: z.string().optional(),
     status: z.enum(['pending', 'approved', 'rejected', 'refunded']).optional(),
     period: periodSchema.optional(),
-    provider: z.enum(['mercadopago', 'dlocal', 'manual']).optional(),
+    provider: z.enum(['mercadopago', 'dlocal', 'manual', 'excel_import']).optional(),
   }).optional(),
-  limit: z.number().int().min(1).max(100).default(50),
+  limit: z.number().int().min(1).max(500).default(200),
   offset: z.number().int().min(0).default(0),
 });
 

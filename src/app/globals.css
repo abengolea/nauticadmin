@@ -4,58 +4,59 @@
 
 @layer base {
   :root {
+    /* Marinas del Yaguarón - paleta azul marítima */
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --foreground: 210 63% 18%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 210 63% 18%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 352 80% 45%;
+    --popover-foreground: 210 63% 18%;
+    --primary: 210 63% 28%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 95%;
-    --secondary-foreground: 240 10% 3.9%;
-    --muted: 0 0% 90%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 352 80% 55%;
+    --secondary: 204 72% 95%;
+    --secondary-foreground: 210 63% 28%;
+    --muted: 204 30% 92%;
+    --muted-foreground: 210 30% 45%;
+    --accent: 204 72% 61%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 85%;
-    --input: 0 0% 90%;
-    --ring: 352 80% 45%;
+    --border: 204 25% 88%;
+    --input: 204 25% 92%;
+    --ring: 210 63% 28%;
     --radius: 0.5rem;
-    --chart-1: 352 80% 45%;
-    --chart-2: 0 0% 50%;
-    --chart-3: 352 80% 65%;
-    --chart-4: 0 0% 70%;
-    --chart-5: 352 80% 85%;
+    --chart-1: 210 63% 28%;
+    --chart-2: 204 65% 49%;
+    --chart-3: 204 72% 61%;
+    --chart-4: 210 50% 40%;
+    --chart-5: 204 40% 75%;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 210 30% 8%;
     --foreground: 0 0% 98%;
-    --card: 240 5% 8%;
+    --card: 210 25% 10%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 5% 8%;
+    --popover: 210 25% 10%;
     --popover-foreground: 0 0% 98%;
-    --primary: 352 75% 50%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 12%;
+    --primary: 204 72% 61%;
+    --primary-foreground: 210 63% 18%;
+    --secondary: 210 30% 15%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 12%;
+    --muted: 210 25% 15%;
     --muted-foreground: 0 0% 63%;
-    --accent: 352 75% 60%;
+    --accent: 204 65% 49%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 4% 15%;
-    --input: 240 4% 15%;
-    --ring: 352 75% 50%;
-    --chart-1: 352 75% 50%;
-    --chart-2: 0 0% 50%;
-    --chart-3: 352 75% 30%;
-    --chart-4: 0 0% 30%;
-    --chart-5: 352 75% 20%;
+    --border: 210 25% 18%;
+    --input: 210 25% 18%;
+    --ring: 204 72% 61%;
+    --chart-1: 204 72% 61%;
+    --chart-2: 204 65% 49%;
+    --chart-3: 210 63% 28%;
+    --chart-4: 204 50% 65%;
+    --chart-5: 210 40% 45%;
   }
 }
 

@@ -15,13 +15,13 @@ export default function NewPlayerPage() {
             <ChevronLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <h1 className="text-3xl font-bold tracking-tight font-headline">Añadir Nuevo Jugador</h1>
+        <h1 className="text-3xl font-bold tracking-tight font-headline">Añadir Nuevo Cliente</h1>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Formulario de Registro de Jugador</CardTitle>
+          <CardTitle>Formulario de Registro de Cliente</CardTitle>
           <CardDescription>
-            Completa los detalles a continuación para añadir un nuevo jugador al sistema.
+            Completa los detalles a continuación para añadir un nuevo cliente al sistema.
           </CardDescription>
         </CardHeader>
         <CardContent>

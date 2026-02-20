@@ -1,5 +1,6 @@
 {
   "indexes": [
+    {"collectionGroup":"expenses","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"amounts.total","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"posts","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"publishedAt","order":"DESCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"posts","queryScope":"COLLECTION","fields":[{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"publishedAt","order":"DESCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"posts","queryScope":"COLLECTION","fields":[{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
@@ -12,12 +13,14 @@
     {"collectionGroup":"supportTickets","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"assignedToUid","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"supportConversations","queryScope":"COLLECTION","fields":[{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"supportTickets","queryScope":"COLLECTION","fields":[{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
-    {"collectionGroup":"payments","queryScope":"COLLECTION","fields":[{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},{"collectionGroup":"payments","queryScope":"COLLECTION","fields":[{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"playerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"payments","queryScope":"COLLECTION","fields":[{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},{"collectionGroup":"payments","queryScope":"COLLECTION","fields":[{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"ASCENDING"}]},{"collectionGroup":"payments","queryScope":"COLLECTION","fields":[{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"playerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"payments","queryScope":"COLLECTION","fields":[{"fieldPath":"playerId","order":"ASCENDING"},{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},{"collectionGroup":"payments","queryScope":"COLLECTION","fields":[{"fieldPath":"playerId","order":"ASCENDING"},{"fieldPath":"period","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"}]},
-    {"collectionGroup":"payments","queryScope":"COLLECTION","fields":[{"fieldPath":"provider","order":"ASCENDING"},{"fieldPath":"providerPaymentId","order":"ASCENDING"}]},
+    {"collectionGroup":"payments","queryScope":"COLLECTION","fields":[{"fieldPath":"provider","order":"ASCENDING"},{"fieldPath":"providerPaymentId","order":"ASCENDING"}]},{"collectionGroup":"payments","queryScope":"COLLECTION","fields":[{"fieldPath":"period","order":"ASCENDING"},{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"schoolFeePayments","queryScope":"COLLECTION","fields":[{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"period","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"}]},
     {"collectionGroup":"schoolFeePayments","queryScope":"COLLECTION","fields":[{"fieldPath":"schoolId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
-    {"collectionGroup":"schoolFeePayments","queryScope":"COLLECTION","fields":[{"fieldPath":"provider","order":"ASCENDING"},{"fieldPath":"providerPaymentId","order":"ASCENDING"}]}
+    {"collectionGroup":"schoolFeePayments","queryScope":"COLLECTION","fields":[{"fieldPath":"provider","order":"ASCENDING"},{"fieldPath":"providerPaymentId","order":"ASCENDING"}]},
+    {"collectionGroup":"solicitudesEmbarcacion","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"ASCENDING"}]},
+    {"collectionGroup":"solicitudesEmbarcacion","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"salioAt","order":"DESCENDING"}]}
   ],
   "fieldOverrides": [
     {"collectionGroup":"users","fieldPath":"email","indexes":[{"order":"ASCENDING","queryScope":"COLLECTION_GROUP"}]},

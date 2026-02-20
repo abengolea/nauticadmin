@@ -22,16 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { Loader2 } from "lucide-react";
 import { useAuth, useFirestore, useStorage, useUserProfile } from "@/firebase";
 import { collection, doc, writeBatch, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -58,21 +49,17 @@ function generateRandomPassword(length = 16): string {
 const playerSchema = z.object({
   firstName: z.string().min(1, "El nombre es requerido."),
   lastName: z.string().min(1, "El apellido es requerido."),
-  birthDate: z.date({ required_error: "La fecha de nacimiento es requerida." }),
   dni: z.string().optional(),
-  healthInsurance: z.string().optional(),
   email: z.string().email("Debe ser un email válido.").optional().or(z.literal("")),
   initialPassword: z
     .string()
     .optional()
     .transform((v) => v ?? "")
     .refine((v) => v.length === 0 || v.length >= 6, "Mínimo 6 caracteres."),
-  tutorName: z.string().min(1, "El nombre del tutor es requerido."),
-  tutorPhone: z.string().min(1, "El teléfono del tutor es requerido."),
+  tutorPhone: z.string().optional(),
   status: z.enum(["active", "inactive"]),
   observations: z.string().optional(),
   photoUrl: z.string().optional().or(z.literal("")),
-  genero: z.enum(["masculino", "femenino"]).optional(),
 });
 
 export function AddPlayerForm() {
@@ -90,14 +77,11 @@ export function AddPlayerForm() {
             lastName: "",
             email: "",
             initialPassword: "",
-            tutorName: "",
             tutorPhone: "",
             status: "active",
             photoUrl: "",
             observations: "",
-            genero: undefined,
             dni: "",
-            healthInsurance: "",
         },
     });
 
@@ -136,18 +120,15 @@ export function AddPlayerForm() {
             const playerData = {
                 firstName: values.firstName,
                 lastName: values.lastName,
-                birthDate: Timestamp.fromDate(values.birthDate),
                 dni: values.dni,
-                healthInsurance: values.healthInsurance,
                 ...(emailNorm && { email: emailNorm }),
                 tutorContact: {
-                    name: values.tutorName,
-                    phone: values.tutorPhone,
+                    name: `${values.firstName} ${values.lastName}`.trim() || "Sin datos",
+                    phone: values.tutorPhone ?? "",
                 },
                 status: values.status,
                 photoUrl: values.photoUrl,
                 observations: values.observations,
-                ...(values.genero?.trim() && { genero: values.genero.trim() }),
                 createdAt: Timestamp.now(),
                 createdBy: profile.uid,
             };
@@ -174,7 +155,7 @@ export function AddPlayerForm() {
                     toast({
                         variant: "destructive",
                         title: "Jugador creado",
-                        description: `Se creó el jugador pero no se pudo subir la foto: ${photoErr instanceof Error ? photoErr.message : "Error desconocido"}`,
+                        description: `Se creó el cliente pero no se pudo subir la foto: ${photoErr instanceof Error ? photoErr.message : "Error desconocido"}`,
                     });
                 }
             }
@@ -310,51 +291,6 @@ export function AddPlayerForm() {
                     )}
                   />
                 )}
-                 <FormField
-                    control={form.control}
-                    name="birthDate"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                        <FormLabel>Fecha de Nacimiento</FormLabel>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                            <FormControl>
-                                <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                )}
-                                >
-                                {field.value ? (
-                                    format(field.value, "PPP", { locale: es })
-                                ) : (
-                                    <span>Elige una fecha</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                            </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                captionLayout="dropdown"
-                                fromYear={2000}
-                                toYear={new Date().getFullYear()}
-                                locale={es}
-                                disabled={(date) =>
-                                date > new Date() || date < new Date("2000-01-01")
-                                }
-                                initialFocus
-                            />
-                            </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
                 <FormField
                     control={form.control}
                     name="dni"
@@ -370,67 +306,15 @@ export function AddPlayerForm() {
                 />
                  <FormField
                     control={form.control}
-                    name="tutorName"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Nombre del Tutor</FormLabel>
-                        <FormControl>
-                        <Input placeholder="Jorge Messi" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
                     name="tutorPhone"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Teléfono del Tutor</FormLabel>
+                        <FormLabel>Teléfono de contacto (Opcional)</FormLabel>
                         <FormControl>
                         <Input placeholder="+54 9 ..." {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="healthInsurance"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Obra Social (Opcional)</FormLabel>
-                        <FormControl>
-                        <Input placeholder="Nombre de la obra social" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="genero"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Género / Categoría</FormLabel>
-                        <Select
-                            onValueChange={(v) => field.onChange(v === "__none__" ? undefined : v)}
-                            value={field.value ?? "__none__"}
-                        >
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar (opcional)" />
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                <SelectItem value="__none__">No especificado</SelectItem>
-                                <SelectItem value="masculino">Masculino</SelectItem>
-                                <SelectItem value="femenino">Femenino</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <FormDescription>Categorías femenino y masculino usan los mismos años (SUB-5 a SUB-18).</FormDescription>
-                        <FormMessage />
-                        </FormItem>
                     )}
                 />
                 <FormField
@@ -459,7 +343,7 @@ export function AddPlayerForm() {
                     name="photoUrl"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Foto del jugador (Opcional)</FormLabel>
+                        <FormLabel>Foto de la embarcación (Opcional)</FormLabel>
                         <FormControl>
                         <PlayerPhotoField
                             value={field.value ?? ""}
@@ -469,7 +353,7 @@ export function AddPlayerForm() {
                             playerName={`${form.watch("firstName") ?? ""} ${form.watch("lastName") ?? ""}`.trim()}
                         />
                         </FormControl>
-                        <FormDescription>Sacá una foto con la cámara o subí una imagen desde tu dispositivo.</FormDescription>
+                        <FormDescription>Sacá una foto de la embarcación o subí una imagen desde tu dispositivo.</FormDescription>
                         <FormMessage />
                     </FormItem>
                     )}
@@ -491,7 +375,7 @@ export function AddPlayerForm() {
             
             <Button type="submit" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {form.formState.isSubmitting ? "Guardando..." : "Añadir Jugador"}
+                {form.formState.isSubmitting ? "Guardando..." : "Añadir Cliente"}
             </Button>
         </form>
         </Form>

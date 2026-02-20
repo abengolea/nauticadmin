@@ -31,7 +31,7 @@ import { useCollection } from "@/firebase";
 
 const registrationSchema = z
   .object({
-    schoolId: z.string().min(1, "Seleccioná una escuela."),
+    schoolId: z.string().min(1, "Seleccioná una náutica."),
     firstName: z.string().min(1, "El nombre es requerido."),
     lastName: z.string().min(1, "El apellido es requerido."),
     email: z.string().email("Debe ser un email válido."),
@@ -89,7 +89,6 @@ export function PlayerRegistrationForm() {
       await addDoc(pendingRef, {
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
-        birthDate: Timestamp.fromDate(new Date("2010-01-01")),
         email: emailNorm,
         tutorContact: { name: "", phone: "" },
         submittedAt: Timestamp.now(),
@@ -108,7 +107,7 @@ export function PlayerRegistrationForm() {
       toast({
         title: "Solicitud enviada",
         description:
-          "Un administrador o entrenador de la escuela revisará tu solicitud. Cuando te aprueben, ingresá con tu email y la contraseña que elegiste.",
+          "Un administrador de la náutica revisará tu solicitud. Cuando te aprueben, ingresá con tu email y la contraseña que elegiste.",
       });
     } catch (err: unknown) {
       const error = err as { code?: string; message?: string };
@@ -120,7 +119,7 @@ export function PlayerRegistrationForm() {
         variant: "destructive",
         title: "Error",
         description: isEmailInUse
-          ? "Este email ya está registrado. Si tenés cuenta, iniciá sesión. Si pediste acceso y aún no te aprobaron, contactá a la escuela."
+          ? "Este email ya está registrado. Si tenés cuenta, iniciá sesión. Si pediste acceso y aún no te aprobaron, contactá a la náutica."
           : isRateLimit
             ? "Demasiados intentos. Probá de nuevo en unos minutos."
             : isPermissionDenied
@@ -138,7 +137,7 @@ export function PlayerRegistrationForm() {
         </div>
         <h3 className="text-lg font-semibold text-center">Solicitud enviada</h3>
         <p className="text-sm text-muted-foreground text-center">
-          Un administrador o entrenador de la escuela revisará tu solicitud. Cuando te aprueben, podrás ingresar al panel con tu <strong>email</strong> y la <strong>contraseña</strong> que elegiste.
+          Un administrador de la náutica revisará tu solicitud. Cuando te aprueben, podrás ingresar al panel con tu <strong>email</strong> y la <strong>contraseña</strong> que elegiste.
         </p>
         <p className="text-xs text-muted-foreground text-center">
           Si olvidás tu contraseña, en la pantalla de inicio de sesión usá <strong>Olvidé mi contraseña</strong>.
@@ -155,11 +154,11 @@ export function PlayerRegistrationForm() {
           name="schoolId"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Escuela</FormLabel>
+              <FormLabel>Náutica</FormLabel>
               <Select onValueChange={field.onChange} value={field.value} disabled={schoolsLoading}>
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccioná tu escuela" />
+                    <SelectValue placeholder="Seleccioná tu náutica" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>

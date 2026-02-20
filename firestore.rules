@@ -327,6 +327,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Pagos no aplicados (Aplicada=No) con observaciones. Solo Admin SDK vía API.
+    match /schools/{schoolId}/unappliedPayments/{docId} {
+      allow read, write: if false;
+    }
+
     // Configuración de cuotas por escuela
     match /schools/{schoolId}/paymentConfig/{configId} {
       allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
@@ -347,6 +352,32 @@ service cloud.firestore {
         || (resource.data.schoolId != null && isSchoolAdmin(resource.data.schoolId))
         || (resource.data.schoolId != null && isCoach(resource.data.schoolId));
       allow write: if false;
+    }
+
+    // Configuración de turnos por náutica (admin configura; clientes leen si está habilitado)
+    match /schools/{schoolId}/appointmentConfig/{configId} {
+      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId)
+          || (isMemberOfSchool(schoolId) && resource.data.get('enabled', false) == true);
+      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      allow delete: if false;
+    }
+
+    // Turnos reservados: admin/coach leen todos; cliente crea y lee los suyos (por playerId)
+    match /schools/{schoolId}/appointments/{appointmentId} {
+      allow read: if isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || isCoach(schoolId)
+          || (isMemberOfSchool(schoolId) && resource.data.playerId != null
+              && (isOwnPlayer(schoolId, resource.data.playerId)
+                  || hasPlayerLoginFor(schoolId, resource.data.playerId)));
+      allow create: if isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || isCoach(schoolId)
+          || (isMemberOfSchool(schoolId) && request.resource.data.playerId != null
+              && request.resource.data.schoolId == schoolId
+              && (isOwnPlayer(schoolId, request.resource.data.playerId)
+                  || hasPlayerLoginFor(schoolId, request.resource.data.playerId)));
+      allow update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
     }
 
     // Conexión OAuth Mercado Pago por escuela (tokens; solo servidor debería escribir en producción)
@@ -411,6 +442,41 @@ service cloud.firestore {
       allow read: if isSuperAdmin();
       allow create: if isSuperAdmin();
       allow update, delete: if false;
+    }
+
+    // --- Conciliación de Pagos (solo Admin SDK vía API; cliente no accede directo) ---
+    match /schools/{schoolId}/recClients/{docId} {
+      allow read, write: if false;
+    }
+    match /schools/{schoolId}/recPayments/{docId} {
+      allow read, write: if false;
+    }
+    match /schools/{schoolId}/recMatches/{docId} {
+      allow read, write: if false;
+    }
+    match /schools/{schoolId}/recPayerAliases/{docId} {
+      allow read, write: if false;
+    }
+    match /schools/{schoolId}/recImportBatches/{docId} {
+      allow read, write: if false;
+    }
+
+    // --- Gastos (expenses) ---
+    match /schools/{schoolId}/expenses/{expenseId} {
+      allow read: if isStaffOfSchool(schoolId);
+      allow write: if false;  // Solo Admin SDK vía API
+    }
+    match /schools/{schoolId}/expenseVendors/{vendorId} {
+      allow read: if isStaffOfSchool(schoolId);
+      allow write: if false;  // Solo Admin SDK vía API
+    }
+    match /schools/{schoolId}/vendorAccounts/{vendorId}/entries/{entryId} {
+      allow read: if isStaffOfSchool(schoolId);
+      allow write: if false;  // Solo Admin SDK vía API
+    }
+    match /schools/{schoolId}/expensePayments/{paymentId} {
+      allow read: if isStaffOfSchool(schoolId);
+      allow write: if false;  // Solo Admin SDK vía API
     }
 
     // --- Notas (posts) ---

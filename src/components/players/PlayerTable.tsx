@@ -10,23 +10,17 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import type { Player } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { calculateAge, getCategoryLabel, compareCategory, CATEGORY_ORDER } from "@/lib/utils";
 import { useCollection, useUserProfile } from "@/firebase";
 import { Skeleton } from "../ui/skeleton";
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { FileDown, CreditCard, CheckCircle } from "lucide-react";
+import { FileDown, CreditCard, CheckCircle, Loader2, Search, Mail } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
 
 type DelinquentInfo = {
   playerId: string;
@@ -40,12 +34,17 @@ type ClothingPendingItem = { period: string; amount: number; installmentIndex: n
 
 export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   const router = useRouter();
-  const { isReady, activeSchoolId: userActiveSchoolId, profile, user, isAdmin } = useUserProfile();
+  const { isReady, activeSchoolId: userActiveSchoolId, profile, user, isAdmin, isCoach } = useUserProfile();
+  const canInviteAccess = isAdmin || isCoach;
 
   const schoolId = propSchoolId || userActiveSchoolId;
   const canListPlayers = profile?.role !== "player";
   const canSeePaymentStatus = isAdmin && !!schoolId;
 
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [inviting, setInviting] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<{
     delinquents: (DelinquentInfo & { dueDate: string })[];
     clothingPendingByPlayer: Record<string, ClothingPendingItem[]>;
@@ -75,7 +74,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     } finally {
       setPaymentStatusLoading(false);
     }
-  }, [canSeePaymentStatus, schoolId, user]);
+  }, [canSeePaymentStatus, schoolId, user?.uid]);
 
   useEffect(() => {
     fetchPaymentStatus();
@@ -93,51 +92,118 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     { orderBy: ['lastName', 'asc'] }
   );
 
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [categoryFrom, setCategoryFrom] = useState<string>("");
-  const [categoryTo, setCategoryTo] = useState<string>("");
-  const [generoFilter, setGeneroFilter] = useState<string>("");
-
   const activePlayers = useMemo(() => (players ?? []).filter((p) => !p.archived), [players]);
 
   const sortedAndFilteredPlayers = useMemo(() => {
     if (!activePlayers.length) return [];
-    const withCategory = activePlayers.map((p) => ({
-      player: p,
-      category: p.birthDate
-        ? getCategoryLabel(p.birthDate instanceof Date ? p.birthDate : new Date(p.birthDate))
-        : "-",
-    }));
-    let filtered = withCategory;
-    if (generoFilter === "masculino" || generoFilter === "femenino") {
-      filtered = filtered.filter((x) => x.player.genero === generoFilter);
-    }
-    if (categoryFilter !== "") {
-      filtered = filtered.filter((x) => x.category === categoryFilter);
-    } else {
-      if (categoryFrom !== "") {
-        filtered = filtered.filter((x) => compareCategory(x.category, categoryFrom) >= 0);
-      }
-      if (categoryTo !== "") {
-        filtered = filtered.filter((x) => compareCategory(x.category, categoryTo) <= 0);
-      }
-    }
-    return filtered.sort((a, b) => {
-      const cmp = compareCategory(a.category, b.category);
+    return [...activePlayers].sort((a, b) => {
+      const lnA = (a.lastName ?? "").toLowerCase();
+      const lnB = (b.lastName ?? "").toLowerCase();
+      const cmp = lnA.localeCompare(lnB);
       if (cmp !== 0) return cmp;
-      const lnA = (a.player.lastName ?? "").toLowerCase();
-      const lnB = (b.player.lastName ?? "").toLowerCase();
-      return lnA.localeCompare(lnB);
+      const fnA = (a.firstName ?? "").toLowerCase();
+      const fnB = (b.firstName ?? "").toLowerCase();
+      return fnA.localeCompare(fnB);
     });
-  }, [activePlayers, categoryFilter, categoryFrom, categoryTo, generoFilter]);
+  }, [activePlayers]);
+
+  const filteredBySearch = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return sortedAndFilteredPlayers;
+    return sortedAndFilteredPlayers.filter((p) => {
+      const fullName = `${p.firstName ?? ""} ${p.lastName ?? ""}`.toLowerCase();
+      const embarcacion = (p.embarcacionNombre ?? "").toLowerCase();
+      const matricula = (p.embarcacionMatricula ?? "").toLowerCase();
+      const ubicacion = (p.ubicacion ?? "").toLowerCase();
+      const dni = (p.dni ?? "").toLowerCase();
+      const email = (p.email ?? "").toLowerCase();
+      const tutorName = (p.tutorContact?.name ?? "").toLowerCase();
+      const observations = (p.observations ?? "").toLowerCase();
+      return (
+        fullName.includes(q) ||
+        embarcacion.includes(q) ||
+        matricula.includes(q) ||
+        ubicacion.includes(q) ||
+        dni.includes(q) ||
+        email.includes(q) ||
+        tutorName.includes(q) ||
+        observations.includes(q)
+      );
+    });
+  }, [sortedAndFilteredPlayers, searchQuery]);
+
+  const playersWithEmail = useMemo(
+    () => filteredBySearch.filter((p) => (p.email ?? "").trim().includes("@")),
+    [filteredBySearch]
+  );
+
+  const toggleSelect = (playerId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(playerId)) next.delete(playerId);
+      else next.add(playerId);
+      return next;
+    });
+  };
+
+  const allWithEmailSelected =
+    playersWithEmail.length > 0 && playersWithEmail.every((p) => selectedIds.has(p.id));
+
+  const toggleSelectAllWithEmail = () => {
+    if (allWithEmailSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(playersWithEmail.map((p) => p.id)));
+    }
+  };
+
+  const handleInviteAccess = async () => {
+    if (!schoolId || selectedIds.size === 0 || !user) return;
+    setInviting(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/players/invite-access", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ schoolId, playerIds: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? data.detail ?? "Error al enviar invitaciones");
+      }
+      const { summary } = data;
+      setSelectedIds(new Set());
+      toast({
+        title: data.message ?? "Listo",
+        description:
+          summary?.sent > 0
+            ? `Se enviaron ${summary.sent} invitación${summary.sent !== 1 ? "es" : ""}. Los clientes recibirán un correo para crear su contraseña.`
+            : summary?.skipped > 0
+              ? "Los jugadores seleccionados no tienen email cargado."
+              : undefined,
+        duration: 6000,
+      });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudieron enviar las invitaciones.",
+      });
+    } finally {
+      setInviting(false);
+    }
+  };
 
   const handleExportCsv = () => {
     const cols = [
       "Nombre",
       "Apellido",
-      "Fecha de nacimiento",
-      "Edad",
-      "Categoría",
+      "Nombre de Embarcación",
+      "Matrícula",
+      "Ubicación",
       "Género",
       "DNI",
       "Obra social",
@@ -153,12 +219,12 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
       const s = String(v);
       return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const rows = sortedAndFilteredPlayers.map(({ player, category }) => [
+    const rows = filteredBySearch.map((player) => [
       escape(player.firstName),
       escape(player.lastName),
-      escape(player.birthDate ? (player.birthDate instanceof Date ? player.birthDate.toISOString().slice(0, 10) : new Date(player.birthDate).toISOString().slice(0, 10)) : ""),
-      escape(player.birthDate ? String(calculateAge(player.birthDate)) : ""),
-      escape(category),
+      escape(player.embarcacionNombre),
+      escape(player.embarcacionMatricula),
+      escape(player.ubicacion),
       escape(player.genero === "masculino" ? "Masculino" : player.genero === "femenino" ? "Femenino" : ""),
       escape(player.dni),
       escape(player.healthInsurance),
@@ -179,36 +245,21 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     URL.revokeObjectURL(url);
   };
 
-  const colCount = 5 + (canSeePaymentStatus ? 1 : 0);
+  const hasInviteColumn = canInviteAccess && playersWithEmail.length > 0;
+  const colCount = 6 + (hasInviteColumn ? 1 : 0) + (canSeePaymentStatus ? 1 : 0);
 
-  if (!isReady || loading) {
+  // Mostrar loading cuando: perfil no listo, datos cargando, o staff sin náutica seleccionada
+  const isWaitingForSchool = canListPlayers && !schoolId;
+  const showLoading = !isReady || loading || isWaitingForSchool;
+
+  if (showLoading) {
     return (
-        <div className="rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Nombre</TableHead>
-                        <TableHead>Edad</TableHead>
-                        <TableHead>Posición</TableHead>
-                        <TableHead>Categoría</TableHead>
-                        <TableHead>Estado</TableHead>
-                        {canSeePaymentStatus && <TableHead>Pagos</TableHead>}
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {[...Array(5)].map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell><Skeleton className="h-8 w-48" /></TableCell>
-                            <TableCell><Skeleton className="h-8 w-16" /></TableCell>
-                            <TableCell><Skeleton className="h-8 w-24" /></TableCell>
-                            <TableCell><Skeleton className="h-8 w-16" /></TableCell>
-                            <TableCell><Skeleton className="h-8 w-20" /></TableCell>
-                            {canSeePaymentStatus && <TableCell><Skeleton className="h-8 w-20" /></TableCell>}
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
+      <div className="flex flex-col items-center justify-center gap-3 py-12">
+        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          {isWaitingForSchool ? "Cargando náutica…" : "Cargando clientes…"}
+        </p>
+      </div>
     )
   }
 
@@ -217,116 +268,82 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   }
   
   if (!players || activePlayers.length === 0) {
-      return <div className="text-center text-muted-foreground p-4">No hay jugadores para mostrar en esta escuela.</div>
+      return <div className="text-center text-muted-foreground p-4">No hay jugadores para mostrar en esta náutica.</div>
   }
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Label className="text-sm text-muted-foreground shrink-0">Género</Label>
-          <Select value={generoFilter || "all"} onValueChange={(v) => setGeneroFilter(v === "all" ? "" : v)}>
-            <SelectTrigger className="w-[130px] sm:w-[140px]">
-              <SelectValue placeholder="Todos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="masculino">Masculino</SelectItem>
-              <SelectItem value="femenino">Femenino</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre, embarcación, matrícula, ubicación..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Label className="text-sm text-muted-foreground shrink-0">Categoría</Label>
-          <Select value={categoryFilter || "all"} onValueChange={(v) => setCategoryFilter(v === "all" ? "" : v)}>
-            <SelectTrigger className="w-[140px] sm:w-[160px]">
-              <SelectValue placeholder="Todas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {CATEGORY_ORDER.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {(!categoryFilter || categoryFilter === "") && (
-          <>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground shrink-0">Desde</Label>
-              <Select value={categoryFrom || "any"} onValueChange={(v) => setCategoryFrom(v === "any" ? "" : v)}>
-                <SelectTrigger className="w-[100px] sm:w-[110px]">
-                  <SelectValue placeholder="Cualquiera" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Cualquiera</SelectItem>
-                  {CATEGORY_ORDER.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground shrink-0">Hasta</Label>
-              <Select value={categoryTo || "any"} onValueChange={(v) => setCategoryTo(v === "any" ? "" : v)}>
-                <SelectTrigger className="w-[100px] sm:w-[110px]">
-                  <SelectValue placeholder="Cualquiera" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Cualquiera</SelectItem>
-                  {CATEGORY_ORDER.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </>
-        )}
-        {(generoFilter || categoryFilter || categoryFrom || categoryTo) && (
-          <span className="text-xs text-muted-foreground">
-            {sortedAndFilteredPlayers.length} jugador{sortedAndFilteredPlayers.length !== 1 ? "es" : ""}
-          </span>
-        )}
         {canListPlayers && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCsv}
-            disabled={sortedAndFilteredPlayers.length === 0}
-            className="ml-auto shrink-0"
-          >
-            <FileDown className="h-4 w-4 mr-2" />
-            Exportar CSV
-          </Button>
+          <>
+            {hasInviteColumn && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleInviteAccess}
+                disabled={selectedIds.size === 0 || inviting}
+                className="shrink-0"
+              >
+                {inviting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4 mr-2" />
+                )}
+                Enviar invitaciones ({selectedIds.size})
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={filteredBySearch.length === 0}
+              className="ml-auto shrink-0"
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
+          </>
         )}
       </div>
       <div className="rounded-md border overflow-x-auto min-w-0">
         <Table className="min-w-[520px] sm:min-w-[600px]">
           <TableHeader>
             <TableRow>
+              {hasInviteColumn && (
+                <TableHead className="w-10 px-2">
+                  <Checkbox
+                    checked={allWithEmailSelected ? true : selectedIds.size > 0 ? "indeterminate" : false}
+                    onCheckedChange={toggleSelectAllWithEmail}
+                    aria-label="Seleccionar todos con email"
+                  />
+                </TableHead>
+              )}
               <TableHead className="text-xs sm:text-sm">Nombre</TableHead>
-              <TableHead className="text-xs sm:text-sm whitespace-nowrap">Edad</TableHead>
-              <TableHead className="text-xs sm:text-sm whitespace-nowrap">Posición</TableHead>
-              <TableHead className="text-xs sm:text-sm whitespace-nowrap">Categoría</TableHead>
+              <TableHead className="text-xs sm:text-sm whitespace-nowrap">Nombre de Embarcación</TableHead>
+              <TableHead className="text-xs sm:text-sm whitespace-nowrap pr-1">Matrícula</TableHead>
+              <TableHead className="text-xs sm:text-sm whitespace-nowrap pl-1">Ubicación</TableHead>
               <TableHead className="text-xs sm:text-sm whitespace-nowrap">Estado</TableHead>
               {canSeePaymentStatus && <TableHead className="text-xs sm:text-sm whitespace-nowrap">Pagos</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedAndFilteredPlayers.length === 0 ? (
+            {filteredBySearch.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={colCount} className="text-center text-muted-foreground py-6">
-                  {categoryFrom || categoryTo ? "Ningún jugador en el rango de categorías seleccionado." : "Ningún jugador en la categoría seleccionada."}
+                  No hay clientes para mostrar.
                 </TableCell>
               </TableRow>
             ) : (
-              sortedAndFilteredPlayers.map(({ player, category }) => {
+              filteredBySearch.map((player) => {
                 const playerDelinquents = paymentStatus?.delinquents?.filter((d) => d.playerId === player.id) ?? [];
                 const clothingPending = paymentStatus?.clothingPendingByPlayer?.[player.id] ?? [];
                 const hasPending = playerDelinquents.length > 0 || clothingPending.length > 0;
@@ -340,6 +357,16 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                   className="cursor-pointer"
                   onClick={() => router.push(`/dashboard/players/${player.id}?schoolId=${schoolId}`)}
                 >
+              {hasInviteColumn && (
+                <TableCell className="w-10 px-2 py-2 sm:py-3" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={selectedIds.has(player.id)}
+                    onCheckedChange={() => toggleSelect(player.id)}
+                    disabled={!(player.email ?? "").trim().includes("@")}
+                    aria-label={player.email ? `Seleccionar ${player.firstName} ${player.lastName}` : "Sin email"}
+                  />
+                </TableCell>
+              )}
               <TableCell className="font-medium py-2 sm:py-3">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   <Avatar className="h-8 w-8 sm:h-9 sm:w-9 shrink-0">
@@ -349,9 +376,15 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                   <span className="truncate text-sm sm:text-base">{player.firstName} {player.lastName}</span>
                 </div>
               </TableCell>
-              <TableCell className="text-xs sm:text-sm py-2 sm:py-3">{player.birthDate ? calculateAge(player.birthDate) : '-'}</TableCell>
-              <TableCell className="text-xs sm:text-sm py-2 sm:py-3 whitespace-nowrap">{player.posicion_preferida ? posicionLabel[player.posicion_preferida] ?? player.posicion_preferida : '-'}</TableCell>
-              <TableCell className="text-xs sm:text-sm py-2 sm:py-3 whitespace-nowrap">{category}</TableCell>
+              <TableCell className="text-xs sm:text-sm py-2 sm:py-3 truncate max-w-[140px]" title={player.embarcacionNombre ?? undefined}>
+                {player.embarcacionNombre || '-'}
+              </TableCell>
+              <TableCell className="text-xs sm:text-sm py-2 sm:py-3 whitespace-nowrap pr-1">
+                {player.embarcacionMatricula || '-'}
+              </TableCell>
+              <TableCell className="text-xs sm:text-sm py-2 sm:py-3 min-w-[180px] whitespace-normal pl-1">
+                {player.ubicacion || '-'}
+              </TableCell>
               <TableCell className="py-2 sm:py-3">
                 <Badge
                   variant={

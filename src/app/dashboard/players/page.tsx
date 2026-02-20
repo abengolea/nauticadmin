@@ -39,18 +39,18 @@ export default function PlayersPage() {
   return (
     <div className="flex flex-col gap-4 min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">Jugadores</h1>
+        <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">Clientes</h1>
         <Button asChild className="w-full sm:w-auto">
           <Link href="/dashboard/players/new">
             <PlusCircle className="mr-2 h-4 w-4" />
-            Añadir Jugador
+            Añadir Cliente
           </Link>
         </Button>
       </div>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg sm:text-xl">Plantel de Jugadores</CardTitle>
-          <CardDescription className="text-sm">Gestiona los jugadores de tu escuela y mira sus perfiles.</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">Listado de Clientes</CardTitle>
+          <CardDescription className="text-sm">Gestiona los clientes de tu náutica y mira sus perfiles.</CardDescription>
         </CardHeader>
         <CardContent className="p-0 sm:p-6">
           <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">

@@ -30,40 +30,58 @@ export default function LoginPage() {
   }, [user, authLoading, router, isLoggingIn]);
 
 
+  const INITIAL_DATA_TIMEOUT_MS = 15_000;
+
   const createInitialData = async (user: User) => {
     const platformUserRef = doc(firestore, 'platformUsers', user.uid);
+
+    const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout: la operación tardó más de ${ms / 1000}s. Revisá la consola de Firebase y ejecutá: npx tsx scripts/create-super-admin.ts`)), ms)
+        ),
+      ]);
+    };
 
     // Bootstrap logic for the super admin. On every login, it ensures the super_admin
     // flag is correctly set, creating or updating the document as needed.
     if (user.email === 'abengolea1@gmail.com') {
       try {
-        await setDoc(platformUserRef, { 
-          super_admin: true,
-          email: user.email,
-          createdAt: Timestamp.now() 
-        }, { merge: true });
-        return; // Exit after handling super admin
+        await withTimeout(
+          setDoc(platformUserRef, {
+            super_admin: true,
+            email: user.email,
+            createdAt: Timestamp.now(),
+          }, { merge: true }),
+          INITIAL_DATA_TIMEOUT_MS
+        );
+        return;
       } catch (error) {
         console.error("Failed to create/update super admin role:", error);
-        throw new Error("No se pudo configurar el rol de super administrador.");
+        const msg = error instanceof Error ? error.message : "No se pudo configurar el rol de super administrador.";
+        throw new Error(msg.includes("Timeout")
+          ? msg
+          : "No se pudo configurar el rol de super administrador. Ejecutá: ADMIN_PASSWORD=tucontraseña npx tsx scripts/create-super-admin.ts");
       }
     }
 
     // For all other users, check if their platformUser document exists.
-    // If not, create a basic one. This ensures every user has a record.
     try {
-      const docSnap = await getDoc(platformUserRef);
+      const docSnap = await withTimeout(getDoc(platformUserRef), INITIAL_DATA_TIMEOUT_MS);
       if (!docSnap.exists()) {
-        await setDoc(platformUserRef, {
-          email: user.email,
-          super_admin: false,
-          createdAt: Timestamp.now()
-        });
+        await withTimeout(
+          setDoc(platformUserRef, {
+            email: user.email,
+            super_admin: false,
+            createdAt: Timestamp.now(),
+          }),
+          INITIAL_DATA_TIMEOUT_MS
+        );
       }
     } catch (error) {
-        console.error("Failed to create/check platform user document:", error);
-        // This is not a critical error for non-admins, so we can just log it
-        // and let the login proceed. The user just won't have a platformUser doc yet.
+      console.error("Failed to create/check platform user document:", error);
+      // Non-critical for non-admins; let login proceed.
     }
   };
 
@@ -76,17 +94,27 @@ export default function LoginPage() {
         await createInitialData(loggedInUser);
       } catch (dataError: any) {
         console.error("Error creating initial data:", dataError);
-        toast({
-          variant: "destructive",
-          title: "Error de Configuración",
-          description: dataError.message || "No se pudo guardar tu perfil. Inténtalo de nuevo o contacta a soporte.",
-          duration: 9000,
-        });
-        await auth.signOut(); // Log out user to prevent inconsistent state
-        setIsLoggingIn(false);
-        return;
+        const isSuperAdmin = loggedInUser.email === 'abengolea1@gmail.com';
+        if (isSuperAdmin) {
+          // Super admin: el email basta para identificar en useUserProfile. Permitir acceso.
+          toast({
+            title: "Aviso",
+            description: "No se pudo guardar el perfil en Firestore. Podés acceder igual. Ejecutá el script create-super-admin para corregir.",
+            duration: 6000,
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Error de Configuración",
+            description: dataError.message || "No se pudo guardar tu perfil. Inténtalo de nuevo o contacta a soporte.",
+            duration: 9000,
+          });
+          await auth.signOut();
+          setIsLoggingIn(false);
+          return;
+        }
       }
-      
+
       router.push("/dashboard");
 
     } catch (authError: any) {
@@ -177,7 +205,7 @@ export default function LoginPage() {
             </TooltipProvider>
         </div>
         <CardDescription>
-          Ingresa tu correo para acceder al panel de tu escuela.
+          Ingresa tu correo para acceder al panel de tu náutica.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -229,7 +257,7 @@ export default function LoginPage() {
           <p>
             ¿No tenés cuenta?{" "}
             <Link href="/auth/registro" className="underline">
-              Registrate como jugador
+              Registrate como cliente
             </Link>
           </p>
         </div>

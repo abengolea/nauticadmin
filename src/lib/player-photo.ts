@@ -4,7 +4,7 @@ import type { FirebaseStorage } from "firebase/storage";
 const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
 
 /**
- * Sube la foto del jugador a Storage y devuelve la URL pública.
+ * Sube la foto de la embarcación a Storage y devuelve la URL pública.
  * Ruta: schools/{schoolId}/players/{playerId}/photo.{ext}
  */
 export async function uploadPlayerPhoto(

@@ -15,7 +15,6 @@ type UpdatePayload = {
   updateData: {
     firstName: string;
     lastName: string;
-    birthDate: { seconds: number; nanoseconds: number } | ReturnType<Timestamp["toDate"]>;
     dni: string | null;
     healthInsurance: string | null;
     email: string | null;
@@ -27,6 +26,16 @@ type UpdatePayload = {
     peso_kg: number | null;
     pie_dominante: string | null;
     posicion_preferida: string | null;
+    // Campos náuticos
+    embarcacionNombre?: string | null;
+    embarcacionMatricula?: string | null;
+    embarcacionMedidas?: string | null;
+    ubicacion?: string | null;
+    clienteDesde?: string | null;
+    creditoActivo?: boolean | null;
+    personasAutorizadas?: string[] | null;
+    embarcacionDatos?: string | null;
+    usuarioId?: string | null;
   };
   oldEmail?: string | null;
 };
@@ -79,14 +88,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const birthDate = raw.birthDate
-      ? toFirestoreTimestamp(raw.birthDate)
-      : Timestamp.now();
-
-    const updateData = {
-      ...raw,
-      birthDate,
-    };
+    const updateData = { ...raw };
 
     const playerRef = db.doc(`schools/${schoolId}/players/${playerId}`);
     await playerRef.update(updateData);

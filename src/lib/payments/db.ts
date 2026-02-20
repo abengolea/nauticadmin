@@ -70,6 +70,7 @@ export async function getOrCreatePaymentConfig(
       amount: d.amount ?? 0,
       currency: d.currency ?? 'ARS',
       dueDayOfMonth: d.dueDayOfMonth ?? 10,
+      regularizationDayOfMonth: d.regularizationDayOfMonth,
       moraFromActivationMonth: d.moraFromActivationMonth ?? true,
       prorateDayOfMonth: d.prorateDayOfMonth ?? 15,
       proratePercent: d.proratePercent ?? 50,
@@ -162,8 +163,8 @@ export async function getExpectedAmountForPeriod(
   const playerSnap = await playerRef.get();
   const birthDate = playerSnap.exists && playerSnap.data()?.birthDate
     ? toDate(playerSnap.data()!.birthDate)
-    : new Date();
-  const category = getCategoryLabel(birthDate);
+    : null;
+  const category = birthDate ? getCategoryLabel(birthDate) : 'SUB-18';
 
   if (period === REGISTRATION_PERIOD) return getRegistrationAmountForCategory(config, category);
 
@@ -222,6 +223,46 @@ export async function findApprovedPayment(
   return toPayment(snap.docs[0]);
 }
 
+/**
+ * Obtiene todos los pagos aprobados de una escuela en una sola consulta (o pocas).
+ * Retorna Map<playerId, Set<period>> para lookup O(1).
+ */
+export async function getAllApprovedPaymentsForSchool(
+  db: Firestore,
+  schoolId: string
+): Promise<Map<string, Set<string>>> {
+  const map = new Map<string, Set<string>>();
+  const col = db.collection(COLLECTIONS.payments);
+  const pageSize = 1000;
+
+  let lastDoc: DocumentSnapshot | null = null;
+  while (true) {
+    let q = col
+      .where('schoolId', '==', schoolId)
+      .where('status', '==', 'approved')
+      .orderBy('createdAt', 'asc')
+      .limit(pageSize) as admin.firestore.Query;
+    if (lastDoc) q = q.startAfter(lastDoc);
+
+    const snap = await q.get();
+    for (const doc of snap.docs) {
+      const d = doc.data();
+      const playerId = d.playerId as string;
+      const period = d.period as string;
+      if (!playerId || !period) continue;
+      let set = map.get(playerId);
+      if (!set) {
+        set = new Set();
+        map.set(playerId, set);
+      }
+      set.add(period);
+    }
+    if (snap.empty || snap.docs.length < pageSize) break;
+    lastDoc = snap.docs[snap.docs.length - 1];
+  }
+  return map;
+}
+
 /** Busca pago aprobado de inscripción para un jugador (una sola vez por jugador). */
 export async function findApprovedRegistrationPayment(
   db: Firestore,
@@ -236,6 +277,17 @@ export interface ClothingPendingItem {
   amount: number;
   installmentIndex: number;
   totalInstallments: number;
+}
+
+/** Monto de una cuota de ropa según config (sin consultas a DB). */
+function getClothingAmountForInstallment(config: PaymentConfig, installmentIndex: number): number {
+  const total = config.clothingAmount ?? 0;
+  const installments = config.clothingInstallments ?? 2;
+  if (total <= 0 || installments < 1) return 0;
+  if (installmentIndex < 1 || installmentIndex > installments) return 0;
+  const base = Math.floor(total / installments);
+  const remainder = total - base * installments;
+  return installmentIndex <= remainder ? base + 1 : base;
 }
 
 /** Obtiene las cuotas de ropa pendientes para un jugador según la config de la escuela. */
@@ -254,7 +306,7 @@ export async function getClothingPendingForPlayer(
     const period = `${CLOTHING_PERIOD_PREFIX}${i}`;
     const hasPaid = await findApprovedPayment(db, playerId, period);
     if (!hasPaid) {
-      const amount = await getExpectedAmountForPeriod(db, schoolId, playerId, period, config);
+      const amount = getClothingAmountForInstallment(config, i);
       if (amount > 0) {
         pending.push({ period, amount, installmentIndex: i, totalInstallments: installments });
       }
@@ -266,25 +318,33 @@ export async function getClothingPendingForPlayer(
 /** Obtiene las cuotas de ropa pendientes por jugador para todos los jugadores activos de la escuela. */
 export async function getClothingPendingByPlayerMap(
   db: Firestore,
-  schoolId: string
+  schoolId: string,
+  approvedPaymentsMap?: Map<string, Set<string>>
 ): Promise<Record<string, ClothingPendingItem[]>> {
   const playersWithConfig = await getActivePlayersWithConfig(db, schoolId);
   if (playersWithConfig.length === 0) return {};
   const config = playersWithConfig[0].config;
   if ((config.clothingAmount ?? 0) <= 0) return {};
 
-  const results = await Promise.all(
-    playersWithConfig.map(async ({ player }) => {
-      const pending = await getClothingPendingForPlayer(db, schoolId, player.id, config);
-      return { playerId: player.id, pending } as const;
-    })
-  );
+  const paidMap = approvedPaymentsMap ?? (await getAllApprovedPaymentsForSchool(db, schoolId));
+  const installments = config.clothingInstallments ?? 2;
+  const result: Record<string, ClothingPendingItem[]> = {};
 
-  const map: Record<string, ClothingPendingItem[]> = {};
-  for (const { playerId, pending } of results) {
-    if (pending.length > 0) map[playerId] = pending;
+  for (const { player } of playersWithConfig) {
+    const pending: ClothingPendingItem[] = [];
+    for (let i = 1; i <= installments; i++) {
+      const period = `${CLOTHING_PERIOD_PREFIX}${i}`;
+      const paid = paidMap.get(player.id)?.has(period);
+      if (!paid) {
+        const amount = getClothingAmountForInstallment(config, i);
+        if (amount > 0) {
+          pending.push({ period, amount, installmentIndex: i, totalInstallments: installments });
+        }
+      }
+    }
+    if (pending.length > 0) result[player.id] = pending;
   }
-  return map;
+  return result;
 }
 
 /** Busca pago por provider + providerPaymentId (evitar duplicados) */
@@ -594,16 +654,15 @@ export async function getActivePlayersWithConfig(
 
   const players: { player: Player; config: PaymentConfig }[] = nonArchived.map((d) => {
     const data = d.data();
-    const birthDate = data.birthDate?.toDate?.() ?? new Date(data.birthDate);
     return {
       player: {
         id: d.id,
         firstName: data.firstName ?? '',
         lastName: data.lastName ?? '',
-        birthDate,
         tutorContact: data.tutorContact ?? { name: '', phone: '' },
         status: data.status ?? 'active',
         email: data.email,
+        birthDate: data.birthDate ? toDate(data.birthDate) : undefined,
         createdAt: toDate(data.createdAt),
         createdBy: data.createdBy ?? '',
       } as Player,
@@ -643,18 +702,23 @@ function periodsFromActivationToNow(activatedAt: Date): string[] {
  */
 export async function computeDelinquents(
   db: Firestore,
-  schoolId: string
+  schoolId: string,
+  approvedPaymentsMap?: Map<string, Set<string>>
 ): Promise<DelinquentInfo[]> {
   const playersWithConfig = await getActivePlayersWithConfig(db, schoolId);
+  const paidMap = approvedPaymentsMap ?? (await getAllApprovedPaymentsForSchool(db, schoolId));
   const delinquents: DelinquentInfo[] = [];
   const now = new Date();
 
   for (const { player, config } of playersWithConfig) {
     const activatedAt = player.createdAt instanceof Date ? player.createdAt : new Date(player.createdAt);
     const activationPeriod = periodFromDate(activatedAt);
-    const hasPaidRegistration = await findApprovedRegistrationPayment(db, player.id);
-    const birthDate = player.birthDate instanceof Date ? player.birthDate : new Date(player.birthDate);
-    const category = getCategoryLabel(birthDate);
+    const paidPeriods = paidMap.get(player.id);
+    const hasPaidRegistration = paidPeriods?.has(REGISTRATION_PERIOD) ?? false;
+    const birthDate = player.birthDate != null
+      ? (player.birthDate instanceof Date ? player.birthDate : new Date(player.birthDate))
+      : null;
+    const category = birthDate ? getCategoryLabel(birthDate) : 'SUB-18';
 
     // Inscripción pendiente
     const registrationAmount = getRegistrationAmountForCategory(config, category);
@@ -695,11 +759,12 @@ export async function computeDelinquents(
           return [curr, `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`];
         })();
 
+    const regDay = config.regularizationDayOfMonth ?? config.dueDayOfMonth;
     for (const period of periodsToCheck) {
-      const dueDate = getDueDate(period, config.dueDayOfMonth);
-      if (dueDate > now) continue;
+      const regDate = getDueDate(period, regDay);
+      if (regDate > now) continue;
 
-      const hasApproved = await findApprovedPayment(db, player.id, period);
+      const hasApproved = paidPeriods?.has(period) ?? false;
       if (hasApproved) continue;
 
       const isActivationMonth = period === activationPeriod;
@@ -708,7 +773,7 @@ export async function computeDelinquents(
       const prorated = prorateDay > 0 && isActivationMonth && activationDay > prorateDay;
       const amount = prorated ? Math.round(monthlyAmount * proratePct) : monthlyAmount;
 
-      const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (24 * 60 * 60 * 1000));
+      const daysOverdue = Math.floor((now.getTime() - regDate.getTime()) / (24 * 60 * 60 * 1000));
       delinquents.push({
         playerId: player.id,
         playerName: `${player.firstName} ${player.lastName}`.trim(),
@@ -716,7 +781,7 @@ export async function computeDelinquents(
         tutorContact: player.tutorContact,
         schoolId,
         period,
-        dueDate,
+        dueDate: regDate,
         daysOverdue,
         amount,
         currency: config.currency,
@@ -727,6 +792,86 @@ export async function computeDelinquents(
   }
 
   return delinquents.sort((a, b) => b.daysOverdue - a.daysOverdue);
+}
+
+/**
+ * Obtiene morosos adicionales a partir de pagos no aplicados (observados).
+ * Los pagos con Aplicada=No en el Excel van a unappliedPayments y NO se acreditan al jugador.
+ * Si un jugador tiene un pago no aplicado para un período que debe, debe aparecer como moroso.
+ */
+export async function getDelinquentsFromUnapplied(
+  db: Firestore,
+  schoolId: string,
+  approvedPaymentsMap: Map<string, Set<string>>,
+  existingDelinquentKeys: Set<string> // "playerId|period" para evitar duplicados
+): Promise<DelinquentInfo[]> {
+  const unappliedRef = db.collection('schools').doc(schoolId).collection('unappliedPayments');
+  const snap = await unappliedRef.limit(500).get();
+  const config = await getOrCreatePaymentConfig(db, schoolId);
+  const now = new Date();
+  const dueDay = config.dueDayOfMonth ?? 10;
+  const regDay = config.regularizationDayOfMonth ?? dueDay;
+  const result: DelinquentInfo[] = [];
+
+  for (const doc of snap.docs) {
+    const d = doc.data();
+    const playerId = d.playerId as string | null;
+    const period = d.period as string;
+    const amount = d.amount as number;
+    const currency = (d.currency as string) ?? config.currency;
+    if (!playerId || !period) continue;
+
+    const key = `${playerId}|${period}`;
+    if (existingDelinquentKeys.has(key)) continue;
+
+    const hasApproved = approvedPaymentsMap.get(playerId)?.has(period) ?? false;
+    if (hasApproved) continue;
+
+    const playerRef = db.collection('schools').doc(schoolId).collection('players').doc(playerId);
+    const playerSnap = await playerRef.get();
+    if (!playerSnap.exists) continue;
+    const pData = playerSnap.data()!;
+    if (pData.archived === true) continue;
+    if (!['active', 'suspended'].includes(pData.status ?? 'active')) continue;
+
+    const activatedAt = pData.createdAt ? toDate(pData.createdAt) : new Date();
+    const activationPeriod = periodFromDate(activatedAt);
+
+    if (period === REGISTRATION_PERIOD) {
+      const registrationAmount = config.registrationAmount ?? 0;
+      if (registrationAmount <= 0) continue;
+    } else if (/^\d{4}-\d{2}$/.test(period)) {
+      const regDate = getDueDate(period, regDay);
+      if (regDate > now) continue;
+      if (period < activationPeriod) continue;
+    } else {
+      continue;
+    }
+
+    const dueDate = period === REGISTRATION_PERIOD
+      ? getDueDate(activationPeriod, dueDay)
+      : getDueDate(period, dueDay);
+    const daysOverdue = dueDate <= now
+      ? Math.floor((now.getTime() - dueDate.getTime()) / (24 * 60 * 60 * 1000))
+      : 0;
+
+    result.push({
+      playerId,
+      playerName: `${pData.firstName ?? ''} ${pData.lastName ?? ''}`.trim(),
+      playerEmail: pData.email,
+      tutorContact: pData.tutorContact ?? { name: '', phone: '' },
+      schoolId,
+      period,
+      dueDate,
+      daysOverdue,
+      amount: amount > 0 ? amount : (config.registrationAmount ?? config.amount ?? 0),
+      currency,
+      status: (pData.status as 'active' | 'suspended') ?? 'active',
+      isRegistration: period === REGISTRATION_PERIOD,
+    });
+  }
+
+  return result.sort((a, b) => b.daysOverdue - a.daysOverdue);
 }
 
 /** Actualiza status del jugador (ej. a suspended). Si el documento no existe, no hace nada (evita 500 en webhook). */

@@ -7,7 +7,7 @@
 
 export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'refunded';
 
-export type PaymentProvider = 'mercadopago' | 'dlocal' | 'manual';
+export type PaymentProvider = 'mercadopago' | 'dlocal' | 'manual' | 'excel_import';
 
 /** Estado del jugador respecto a pagos: active, inactive, suspended (por mora >= 30 días). */
 export type PlayerStatus = 'active' | 'inactive' | 'suspended';
@@ -70,6 +70,8 @@ export interface PaymentConfig {
   amount: number;
   currency: string;
   dueDayOfMonth: number; // 1-31: día de vencimiento
+  /** Día del mes para considerar moroso. Si no se cumple esta fecha, no se cuenta como moroso. Default: mismo que dueDayOfMonth. */
+  regularizationDayOfMonth?: number;
   /** Mora desde mes de activación (true) o desde siempre (false). Default true. */
   moraFromActivationMonth?: boolean;
   /** Día del mes: si el jugador se activa después, la cuota del primer mes es prorrateada. 0 = sin prorrata. Default 15. */

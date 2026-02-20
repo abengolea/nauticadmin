@@ -38,6 +38,35 @@ export interface AuditLogEntry {
   createdAt: Date;
 }
 
+/** Solicitud de embarcación desde el pad táctil (sin registro). */
+export interface SolicitudEmbarcacion {
+  id: string;
+  nombreCliente: string;
+  nombreEmbarcacion: string;
+  status: 'pendiente' | 'salió' | 'regresó';
+  createdAt: Date;
+  schoolId: string;
+  salioAt?: Date;
+  regresoAt?: Date;
+  salioOperadorId?: string;
+  salioOperadorNombre?: string;
+  regresoOperadorId?: string;
+  regresoOperadorNombre?: string;
+}
+
+/** Entrada del registro de movimientos (log de acciones). */
+export interface RegistroMovimiento {
+  id: string;
+  tipo: 'solicitud_creada' | 'tomada' | 'regreso';
+  solicitudId: string;
+  nombreCliente: string;
+  nombreEmbarcacion: string;
+  operadorId?: string;
+  operadorNombre?: string;
+  operadorEmail?: string;
+  createdAt: Date;
+}
+
 export interface School {
   id: string;
   name: string;
@@ -71,7 +100,6 @@ export interface Player {
   id: string;
   firstName: string;
   lastName: string;
-  birthDate: Date;
   dni?: string;
   healthInsurance?: string;
   /** Email para que el jugador pueda iniciar sesión en el panel (opcional). */
@@ -111,6 +139,26 @@ export interface Player {
   medicalRecord?: MedicalRecord;
   // No está en el modelo de Firestore, se añade en el frontend.
   escuelaId?: string;
+
+  // --- Campos específicos para clientes náuticos ---
+  /** Nombre de la embarcación */
+  embarcacionNombre?: string;
+  /** Matrícula de la embarcación */
+  embarcacionMatricula?: string;
+  /** Medidas y características de la embarcación */
+  embarcacionMedidas?: string;
+  /** Ubicación (amarra, muelle, etc.) */
+  ubicacion?: string;
+  /** Fecha desde que es cliente (string o Date) */
+  clienteDesde?: string;
+  /** Si tiene crédito activo */
+  creditoActivo?: boolean;
+  /** Personas autorizadas a manejar la embarcación (nombres separados por coma o array) */
+  personasAutorizadas?: string[];
+  /** Datos adicionales de la embarcación */
+  embarcacionDatos?: string;
+  /** ID del cliente en la app externa de pagos (para importar pagos por Excel) */
+  usuarioId?: string;
 }
 
 /** Ficha médica del jugador (PDF). Subida por jugador o staff; aprobada o rechazada por admin/entrenador. */
@@ -136,7 +184,6 @@ export interface PendingPlayer {
   id: string;
   firstName: string;
   lastName: string;
-  birthDate: Date;
   /** Email verificado (obligatorio en registro web). */
   email: string;
   dni?: string;
@@ -156,7 +203,6 @@ export interface EmailVerificationAttempt {
   playerData: {
     firstName: string;
     lastName: string;
-    birthDate: Date;
     schoolId: string;
     tutorPhone: string;
     category?: string;
@@ -395,12 +441,11 @@ export interface PlayerVideo {
   createdBy: string;
 }
 
-// Re-export posts types
-export * from './posts';
-
 // Re-export support types
 export * from './support';
 // Re-export payments types
 export * from './payments';
 // Re-export platform fee types
 export * from './platform-fee';
+// Re-export appointments types
+export * from './appointments';

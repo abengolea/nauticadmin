@@ -28,12 +28,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCollection } from "@/firebase";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Banknote } from "lucide-react";
 import type { Payment, Player } from "@/lib/types";
 
 /** Pago con nombre de jugador enriquecido por la API */
@@ -42,6 +41,8 @@ type PaymentWithPlayerName = Payment & { playerName?: string };
 interface PaymentsTabProps {
   schoolId: string;
   getToken: () => Promise<string | null>;
+  manualOpen?: boolean;
+  onManualOpenChange?: (open: boolean) => void;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -55,6 +56,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   mercadopago: "MercadoPago",
   dlocal: "DLocal",
   manual: "Manual",
+  excel_import: "Excel",
 };
 
 const REGISTRATION_PERIOD = "inscripcion";
@@ -93,7 +95,7 @@ function getYears(): number[] {
   return years;
 }
 
-export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
+export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, onManualOpenChange }: PaymentsTabProps) {
   const [payments, setPayments] = useState<PaymentWithPlayerName[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -102,21 +104,13 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
     status: "",
     provider: "",
   });
-  const [manualOpen, setManualOpen] = useState(false);
+  const [manualOpenLocal, setManualOpenLocal] = useState(false);
+  const manualOpen = manualOpenProp ?? manualOpenLocal;
+  const setManualOpen = onManualOpenChange ?? setManualOpenLocal;
   const [manualPlayerId, setManualPlayerId] = useState("");
-  const [manualPaymentType, setManualPaymentType] = useState<"monthly" | "registration" | "clothing">("monthly");
   const [manualPeriod, setManualPeriod] = useState(currentPeriod());
-  const [manualClothingInstallment, setManualClothingInstallment] = useState("1");
   const [manualAmount, setManualAmount] = useState("15000");
   const [manualSubmitting, setManualSubmitting] = useState(false);
-  const [configRegistrationAmount, setConfigRegistrationAmount] = useState(0);
-  const [configClothingAmount, setConfigClothingAmount] = useState(0);
-  const [configClothingInstallments, setConfigClothingInstallments] = useState(2);
-  const [clothingPendingForPlayer, setClothingPendingForPlayer] = useState<
-    { period: string; amount: number; installmentIndex: number; totalInstallments: number }[]
-  >([]);
-  const [clothingConfigured, setClothingConfigured] = useState(false);
-  const [clothingPendingLoading, setClothingPendingLoading] = useState(false);
   const { toast } = useToast();
 
   const { data: players } = useCollection<Player>(
@@ -125,35 +119,18 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
   );
   const activePlayers = (players ?? []).filter((p) => !p.archived);
 
-  const fetchConfig = useCallback(async () => {
-    const token = await getToken();
-    if (!token || !schoolId) return;
-    try {
-      const res = await fetch(`/api/payments/config?schoolId=${schoolId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setConfigRegistrationAmount(Number(data.registrationAmount) || 0);
-        setConfigClothingAmount(Number(data.clothingAmount) || 0);
-        setConfigClothingInstallments(Math.max(1, Number(data.clothingInstallments) || 2));
-      }
-    } catch {
-      // ignore
-    }
-  }, [schoolId, getToken]);
-
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     const token = await getToken();
     if (!token) return;
-    const params = new URLSearchParams({ schoolId });
+    const params = new URLSearchParams({ schoolId, limit: "500" });
     if (filters.period) params.set("period", filters.period);
     if (filters.status) params.set("status", filters.status);
     if (filters.provider) params.set("provider", filters.provider);
     try {
       const res = await fetch(`/api/payments?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -179,71 +156,14 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
     fetchPayments();
   }, [fetchPayments]);
 
-  useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
-
-  // Al seleccionar jugador + tipo ropa: chequear cuántas cuotas configuradas y cuáles pagadas
-  const fetchClothingPending = useCallback(async () => {
-    if (manualPaymentType !== "clothing" || !manualPlayerId || !schoolId) {
-      setClothingPendingForPlayer([]);
-      setClothingConfigured(false);
-      return;
-    }
-    setClothingPendingLoading(true);
-    const token = await getToken();
-    if (!token) {
-      setClothingPendingForPlayer([]);
-      setClothingPendingLoading(false);
-      return;
-    }
-    try {
-      const res = await fetch(
-        `/api/payments/clothing-pending?schoolId=${encodeURIComponent(schoolId)}&playerId=${encodeURIComponent(manualPlayerId)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setClothingPendingForPlayer(data.clothingPending ?? []);
-        setClothingConfigured(data.clothingConfigured ?? false);
-      } else {
-        setClothingPendingForPlayer([]);
-        setClothingConfigured(false);
-      }
-    } catch {
-      setClothingPendingForPlayer([]);
-      setClothingConfigured(false);
-    } finally {
-      setClothingPendingLoading(false);
-    }
-  }, [manualPaymentType, manualPlayerId, schoolId, getToken]);
-
-  useEffect(() => {
-    fetchClothingPending();
-  }, [fetchClothingPending]);
-
-  // Al cargar cuotas pendientes, seleccionar la primera y su monto
-  useEffect(() => {
-    if (manualPaymentType === "clothing" && clothingPendingForPlayer.length > 0) {
-      const first = clothingPendingForPlayer[0];
-      setManualClothingInstallment(String(first.installmentIndex));
-      setManualAmount(String(first.amount));
-    }
-  }, [manualPaymentType, clothingPendingForPlayer]);
-
   const handleManualPayment = async () => {
     const amount = parseFloat(manualAmount);
-    const period =
-      manualPaymentType === "registration"
-        ? REGISTRATION_PERIOD
-        : manualPaymentType === "clothing"
-          ? `ropa-${manualClothingInstallment}`
-          : manualPeriod;
+    const period = manualPeriod;
     if (!manualPlayerId || Number.isNaN(amount) || amount <= 0) {
-      toast({ variant: "destructive", title: "Completá jugador y monto válido." });
+      toast({ variant: "destructive", title: "Completá cliente y monto válido." });
       return;
     }
-    if (manualPaymentType === "monthly" && !manualPeriod) {
+    if (!manualPeriod) {
       toast({ variant: "destructive", title: "Completá el período para la cuota mensual." });
       return;
     }
@@ -276,9 +196,7 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
       toast({ title: "Pago registrado correctamente." });
       setManualOpen(false);
       setManualPlayerId("");
-      setManualPaymentType("monthly");
       setManualPeriod(currentPeriod());
-      setManualClothingInstallment("1");
       setManualAmount("15000");
       fetchPayments();
     } catch (e) {
@@ -319,32 +237,30 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button
-          onClick={() => setManualOpen(true)}
-          className="bg-red-600 hover:bg-red-700 text-white"
-        >
-          <Banknote className="mr-2 h-4 w-4" />
-          Registrar pago manual
-        </Button>
-      </div>
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border bg-card p-4">
           <p className="text-sm text-muted-foreground">Pagos aprobados en lista</p>
-          <p className="text-2xl font-bold">{approvedInList.length}</p>
+          <p className="text-2xl font-bold">
+            {loading ? "Cargando…" : approvedInList.length}
+          </p>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <p className="text-sm text-muted-foreground">Total en lista</p>
-          <p className="text-2xl font-bold">ARS {totalInList.toLocaleString("es-AR")}</p>
+          <p className="text-2xl font-bold">
+            {loading ? "Cargando…" : `ARS ${totalInList.toLocaleString("es-AR")}`}
+          </p>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <p className="text-sm text-muted-foreground">Mes en curso ({currentMonthLabel})</p>
-          <p className="text-2xl font-bold">{approvedThisMonth.length} pagos</p>
+          <p className="text-2xl font-bold">
+            {loading ? "Cargando…" : `${approvedThisMonth.length} pagos`}
+          </p>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <p className="text-sm text-muted-foreground">Total mes en curso</p>
-          <p className="text-2xl font-bold">ARS {totalThisMonth.toLocaleString("es-AR")}</p>
+          <p className="text-2xl font-bold">
+            {loading ? "Cargando…" : `ARS ${totalThisMonth.toLocaleString("es-AR")}`}
+          </p>
         </div>
       </div>
 
@@ -417,14 +333,17 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
       </div>
 
       {loading ? (
-        <Skeleton className="h-64 w-full" />
+        <div className="flex flex-col items-center justify-center gap-3 py-16 rounded-md border bg-muted/30">
+          <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Cargando pagos…</p>
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-md border min-w-0">
           <Table className="min-w-[640px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap">Período</TableHead>
-                <TableHead className="text-xs sm:text-sm">Jugador</TableHead>
+                <TableHead className="text-xs sm:text-sm">Cliente</TableHead>
                 <TableHead className="text-xs sm:text-sm">Monto</TableHead>
                 <TableHead className="text-xs sm:text-sm">Proveedor</TableHead>
                 <TableHead className="text-xs sm:text-sm">Estado</TableHead>
@@ -490,10 +409,10 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div>
-              <Label htmlFor="manual-player">Jugador</Label>
+              <Label htmlFor="manual-player">Cliente</Label>
               <Select value={manualPlayerId} onValueChange={setManualPlayerId}>
                 <SelectTrigger id="manual-player" className="mt-1">
-                  <SelectValue placeholder="Elegí un jugador" />
+                  <SelectValue placeholder="Elegí un cliente" />
                 </SelectTrigger>
                 <SelectContent>
                   {activePlayers.map((p) => (
@@ -505,101 +424,15 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
               </Select>
             </div>
             <div>
-              <Label>Tipo de pago</Label>
-              <Select
-                value={manualPaymentType}
-                onValueChange={(v: "monthly" | "registration" | "clothing") => {
-                  setManualPaymentType(v);
-                  if (v === "registration") setManualAmount(String(configRegistrationAmount || ""));
-                  if (v === "clothing" && configClothingInstallments > 0) {
-                    const perCuota = Math.floor(configClothingAmount / configClothingInstallments);
-                    const remainder = configClothingAmount - perCuota * configClothingInstallments;
-                    const firstCuota = perCuota + (remainder > 0 ? 1 : 0);
-                    setManualAmount(String(firstCuota));
-                  }
-                }}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Cuota mensual</SelectItem>
-                  <SelectItem value="registration">Inscripción</SelectItem>
-                  <SelectItem value="clothing">Pago de ropa</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="manual-period">Período (YYYY-MM)</Label>
+              <Input
+                id="manual-period"
+                value={manualPeriod}
+                onChange={(e) => setManualPeriod(e.target.value)}
+                placeholder="2026-02"
+                className="mt-1"
+              />
             </div>
-            {manualPaymentType === "clothing" && (
-              <div>
-                <Label htmlFor="manual-clothing">¿Qué cuota del pago de ropa es?</Label>
-                {!manualPlayerId ? (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Elegí un jugador para ver sus cuotas pendientes (según la config de la escuela: {configClothingInstallments} cuota{configClothingInstallments !== 1 ? "s" : ""} por defecto).
-                  </p>
-                ) : clothingPendingLoading ? (
-                  <p className="text-sm text-muted-foreground mt-1">Cargando cuotas pendientes…</p>
-                ) : clothingPendingForPlayer.length === 0 && clothingConfigured ? (
-                  <p className="text-sm text-amber-600 dark:text-amber-500 mt-1">
-                    Este jugador ya tiene todas las cuotas de ropa pagadas ({configClothingInstallments} cuota{configClothingInstallments !== 1 ? "s" : ""} configurada{configClothingInstallments !== 1 ? "s" : ""}).
-                  </p>
-                ) : clothingPendingForPlayer.length === 0 && !clothingConfigured ? (
-                  <>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      La escuela no tiene pago de ropa configurado. Podés registrar igual (2 cuotas por defecto). Configurá en Administración → Pagos → Configuración para que se calcule automáticamente.
-                    </p>
-                    <Select
-                      value={manualClothingInstallment}
-                      onValueChange={setManualClothingInstallment}
-                    >
-                      <SelectTrigger id="manual-clothing" className="mt-1">
-                        <SelectValue placeholder="Elegí la cuota" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Cuota 1</SelectItem>
-                        <SelectItem value="2">Cuota 2</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </>
-                ) : (
-                  <>
-                    <Select
-                      value={manualClothingInstallment}
-                      onValueChange={(v) => {
-                        setManualClothingInstallment(v);
-                        const item = clothingPendingForPlayer.find((p) => String(p.installmentIndex) === v);
-                        if (item) setManualAmount(String(item.amount));
-                      }}
-                    >
-                      <SelectTrigger id="manual-clothing" className="mt-1">
-                        <SelectValue placeholder="Elegí la cuota" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clothingPendingForPlayer.map((item) => (
-                          <SelectItem key={item.period} value={String(item.installmentIndex)}>
-                            Cuota {item.installmentIndex} de {item.totalInstallments} — ARS {item.amount.toLocaleString("es-AR")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Se muestran solo las cuotas pendientes de este jugador ({configClothingInstallments} cuota{configClothingInstallments !== 1 ? "s" : ""} configurada{configClothingInstallments !== 1 ? "s" : ""}).
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-            {manualPaymentType === "monthly" && (
-              <div>
-                <Label htmlFor="manual-period">Período (YYYY-MM)</Label>
-                <Input
-                  id="manual-period"
-                  value={manualPeriod}
-                  onChange={(e) => setManualPeriod(e.target.value)}
-                  placeholder="2026-02"
-                  className="mt-1"
-                />
-              </div>
-            )}
             <div>
               <Label htmlFor="manual-amount">Monto (ARS)</Label>
               <Input
@@ -607,13 +440,7 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
                 type="number"
                 value={manualAmount}
                 onChange={(e) => setManualAmount(e.target.value)}
-                placeholder={
-                  manualPaymentType === "registration"
-                    ? String(configRegistrationAmount || "0")
-                    : manualPaymentType === "clothing"
-                      ? String(configClothingAmount ? Math.floor(configClothingAmount / configClothingInstallments) : "0")
-                      : "15000"
-                }
+                placeholder="15000"
                 className="mt-1"
               />
             </div>
@@ -624,16 +451,7 @@ export function PaymentsTab({ schoolId, getToken }: PaymentsTabProps) {
             </Button>
             <Button
               onClick={handleManualPayment}
-              disabled={
-                manualSubmitting ||
-                !!(
-                  manualPaymentType === "clothing" &&
-                  manualPlayerId &&
-                  clothingPendingForPlayer.length === 0 &&
-                  clothingConfigured &&
-                  !clothingPendingLoading
-                )
-              }
+              disabled={manualSubmitting}
             >
               {manualSubmitting ? "Guardando…" : "Registrar pago"}
             </Button>

@@ -7,7 +7,12 @@
 import { NextResponse } from 'next/server';
 import { getAdminFirestore } from '@/lib/firebase-admin';
 import { verifyIdToken } from '@/lib/auth-server';
-import { computeDelinquents, getClothingPendingByPlayerMap } from '@/lib/payments/db';
+import {
+  computeDelinquents,
+  getClothingPendingByPlayerMap,
+  getAllApprovedPaymentsForSchool,
+  getDelinquentsFromUnapplied,
+} from '@/lib/payments/db';
 
 export async function GET(request: Request) {
   try {
@@ -41,10 +46,22 @@ export async function GET(request: Request) {
       );
     }
 
-    const [delinquents, clothingPendingByPlayer] = await Promise.all([
-      computeDelinquents(db, schoolId),
-      getClothingPendingByPlayerMap(db, schoolId),
+    const approvedPaymentsMap = await getAllApprovedPaymentsForSchool(db, schoolId);
+    const [baseDelinquents, clothingPendingByPlayer] = await Promise.all([
+      computeDelinquents(db, schoolId, approvedPaymentsMap),
+      getClothingPendingByPlayerMap(db, schoolId, approvedPaymentsMap),
     ]);
+
+    const existingKeys = new Set(baseDelinquents.map((d) => `${d.playerId}|${d.period}`));
+    const unappliedDelinquents = await getDelinquentsFromUnapplied(
+      db,
+      schoolId,
+      approvedPaymentsMap,
+      existingKeys
+    );
+    const delinquents = [...baseDelinquents, ...unappliedDelinquents].sort(
+      (a, b) => b.daysOverdue - a.daysOverdue
+    );
 
     return NextResponse.json({
       delinquents: delinquents.map((d) => ({

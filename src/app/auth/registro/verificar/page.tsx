@@ -37,7 +37,6 @@ function VerificarContent() {
     playerData: {
       firstName: string;
       lastName: string;
-      birthDate: { toDate: () => Date };
       schoolId: string;
       tutorPhone: string;
     };
@@ -98,16 +97,9 @@ function VerificarContent() {
         const result = await signInWithEmailLink(auth, emailToUse, fullUrl);
         window.localStorage.removeItem("emailForSignIn");
 
-        const birthDate = data.playerData?.birthDate;
         setAttemptData({
           email,
-          playerData: {
-            ...data.playerData,
-            birthDate:
-              typeof birthDate?.toDate === "function"
-                ? birthDate
-                : { toDate: () => new Date(birthDate) },
-          },
+          playerData: data.playerData,
         });
 
         setStep("password");
@@ -167,17 +159,10 @@ function VerificarContent() {
         `schools/${attemptData.playerData.schoolId}/pendingPlayers`
       );
 
-      const birthDate = attemptData.playerData.birthDate;
-      const birthDateVal =
-        typeof birthDate === "object" && birthDate !== null && "toDate" in birthDate
-          ? (birthDate as { toDate: () => Date }).toDate()
-          : new Date(birthDate);
-
       const emailNorm = attemptData.email.toLowerCase();
       await addDoc(pendingRef, {
         firstName: attemptData.playerData.firstName,
         lastName: attemptData.playerData.lastName,
-        birthDate: Timestamp.fromDate(birthDateVal),
         email: emailNorm,
         tutorContact: {
           name: "Responsable",
@@ -301,7 +286,7 @@ function VerificarContent() {
         </div>
         <CardTitle className="text-center">¡Listo!</CardTitle>
         <CardDescription className="text-center">
-          Tu solicitud fue enviada. Un administrador de la escuela la revisará y cuando te aprueben
+          Tu solicitud fue enviada. Un administrador de la náutica la revisará y cuando te aprueben
           podrás iniciar sesión con tu email y contraseña.
         </CardDescription>
       </CardHeader>

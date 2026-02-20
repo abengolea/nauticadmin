@@ -54,7 +54,10 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
   const fetchDelinquents = useCallback(async () => {
     setLoading(true);
     const token = await getToken();
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch(`/api/payments/delinquents?schoolId=${schoolId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -165,7 +168,7 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
           <Table className="min-w-[640px]">
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs sm:text-sm">Jugador</TableHead>
+                <TableHead className="text-xs sm:text-sm">Cliente</TableHead>
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap">Período</TableHead>
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap">Días mora</TableHead>
                 <TableHead className="text-xs sm:text-sm">Monto</TableHead>

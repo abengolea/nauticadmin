@@ -29,17 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { CalendarIcon, Loader2 } from "lucide-react";
-import { cn, getMissingProfileFieldLabels } from "@/lib/utils";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { Loader2 } from "lucide-react";
+import { getMissingProfileFieldLabels } from "@/lib/utils";
 import { useUser } from "@/firebase";
 import { PlayerPhotoField } from "./PlayerPhotoField";
 import { Timestamp } from "firebase/firestore";
@@ -51,21 +43,22 @@ const playerSchema = z.object({
   // Datos personales
   firstName: z.string().min(1, "El nombre es requerido."),
   lastName: z.string().min(1, "El apellido es requerido."),
-  birthDate: z.date({ required_error: "La fecha de nacimiento es requerida." }),
   dni: z.string().optional(),
-  healthInsurance: z.string().optional(),
   email: z.string().email("Debe ser un email válido.").optional().or(z.literal("")),
-  tutorName: z.string().min(1, "El nombre del tutor es requerido."),
-  tutorPhone: z.string().min(1, "El teléfono del tutor es requerido."),
+  tutorPhone: z.string().optional(),
   status: z.enum(["active", "inactive", "suspended"]),
   observations: z.string().optional(),
   photoUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
-  // Datos físicos y deportivos
-  altura_cm: z.union([z.number().min(80, "Mín. 80 cm").max(220, "Máx. 220 cm"), z.undefined()]).optional(),
-  peso_kg: z.union([z.number().min(15, "Mín. 15 kg").max(150, "Máx. 150 kg"), z.undefined()]).optional(),
-  pie_dominante: z.enum(["derecho", "izquierdo", "ambidiestro"]).optional(),
-  posicion_preferida: z.enum(["delantero", "mediocampo", "defensor", "arquero"]).optional(),
-  genero: z.enum(["masculino", "femenino"]).optional(),
+  // Datos náuticos
+  embarcacionNombre: z.string().optional(),
+  embarcacionMatricula: z.string().optional(),
+  embarcacionMedidas: z.string().optional(),
+  ubicacion: z.string().optional(),
+  clienteDesde: z.string().optional(),
+  creditoActivo: z.boolean().optional(),
+  personasAutorizadas: z.string().optional(), // Coma-separado
+  embarcacionDatos: z.string().optional(),
+  usuarioId: z.string().optional(),
 });
 
 interface EditPlayerDialogProps {
@@ -89,59 +82,50 @@ export function EditPlayerDialog({
   const { user } = useUser();
   const { toast } = useToast();
 
-  const birthDate = player.birthDate instanceof Date
-    ? player.birthDate
-    : player.birthDate
-    ? new Date(player.birthDate as unknown as string | number)
-    : new Date();
-
   const form = useForm<z.infer<typeof playerSchema>>({
     resolver: zodResolver(playerSchema),
     defaultValues: {
       firstName: player.firstName ?? "",
       lastName: player.lastName ?? "",
-      birthDate,
       dni: player.dni ?? "",
-      healthInsurance: player.healthInsurance ?? "",
       email: player.email ?? "",
-      tutorName: player.tutorContact?.name ?? "",
       tutorPhone: player.tutorContact?.phone ?? "",
       status: player.status ?? "active",
       observations: player.observations ?? "",
       photoUrl: player.photoUrl ?? "",
-      altura_cm: player.altura_cm ?? undefined,
-      peso_kg: player.peso_kg ?? undefined,
-      pie_dominante: player.pie_dominante ?? undefined,
-      posicion_preferida: player.posicion_preferida ?? undefined,
-      genero: player.genero ?? undefined,
+      embarcacionNombre: player.embarcacionNombre ?? "",
+      embarcacionMatricula: player.embarcacionMatricula ?? "",
+      embarcacionMedidas: player.embarcacionMedidas ?? "",
+      ubicacion: player.ubicacion ?? "",
+      clienteDesde: player.clienteDesde ?? "",
+      creditoActivo: player.creditoActivo ?? undefined,
+      personasAutorizadas: Array.isArray(player.personasAutorizadas) ? player.personasAutorizadas.join(", ") : (player.personasAutorizadas as string) ?? "",
+      embarcacionDatos: player.embarcacionDatos ?? "",
+      usuarioId: player.usuarioId ?? "",
     },
   });
 
   // Reset form when player changes or dialog opens
   useEffect(() => {
     if (isOpen && player) {
-      const bd = player.birthDate instanceof Date
-        ? player.birthDate
-        : player.birthDate
-        ? new Date(player.birthDate as unknown as string | number)
-        : new Date();
       form.reset({
         firstName: player.firstName ?? "",
         lastName: player.lastName ?? "",
-        birthDate: bd,
         dni: player.dni ?? "",
-        healthInsurance: player.healthInsurance ?? "",
         email: player.email ?? "",
-        tutorName: player.tutorContact?.name ?? "",
         tutorPhone: player.tutorContact?.phone ?? "",
         status: player.status ?? "active",
         observations: player.observations ?? "",
         photoUrl: player.photoUrl ?? "",
-        altura_cm: player.altura_cm ?? undefined,
-        peso_kg: player.peso_kg ?? undefined,
-        pie_dominante: player.pie_dominante ?? undefined,
-        posicion_preferida: player.posicion_preferida ?? undefined,
-        genero: player.genero ?? undefined,
+        embarcacionNombre: player.embarcacionNombre ?? "",
+        embarcacionMatricula: player.embarcacionMatricula ?? "",
+        embarcacionMedidas: player.embarcacionMedidas ?? "",
+        ubicacion: player.ubicacion ?? "",
+        clienteDesde: player.clienteDesde ?? "",
+        creditoActivo: player.creditoActivo ?? undefined,
+        personasAutorizadas: Array.isArray(player.personasAutorizadas) ? player.personasAutorizadas.join(", ") : (player.personasAutorizadas as string) ?? "",
+        embarcacionDatos: player.embarcacionDatos ?? "",
+        usuarioId: player.usuarioId ?? "",
       });
     }
   }, [isOpen, player, form]);
@@ -149,25 +133,31 @@ export function EditPlayerDialog({
   const { isSubmitting } = form.formState;
 
   async function onSubmit(values: z.infer<typeof playerSchema>) {
+    const personasArr = values.personasAutorizadas?.trim()
+      ? values.personasAutorizadas.split(",").map((s) => s.trim()).filter(Boolean)
+      : undefined;
+
     const updateData = {
       firstName: values.firstName,
       lastName: values.lastName,
-      birthDate: Timestamp.fromDate(values.birthDate),
       dni: values.dni || null,
-      healthInsurance: values.healthInsurance || null,
       email: values.email?.trim() ? values.email.trim().toLowerCase() : null,
       tutorContact: {
-        name: values.tutorName,
-        phone: values.tutorPhone,
+        name: `${values.firstName} ${values.lastName}`.trim() || "Sin datos",
+        phone: values.tutorPhone ?? "",
       },
       status: values.status,
       photoUrl: values.photoUrl || null,
       observations: values.observations || null,
-      altura_cm: values.altura_cm ?? null,
-      peso_kg: values.peso_kg ?? null,
-      pie_dominante: values.pie_dominante ?? null,
-      posicion_preferida: values.posicion_preferida ?? null,
-      genero: (values.genero && values.genero.trim()) ? values.genero : null,
+      embarcacionNombre: values.embarcacionNombre?.trim() || null,
+      embarcacionMatricula: values.embarcacionMatricula?.trim() || null,
+      embarcacionMedidas: values.embarcacionMedidas?.trim() || null,
+      ubicacion: values.ubicacion?.trim() || null,
+      clienteDesde: values.clienteDesde?.trim() || null,
+      creditoActivo: values.creditoActivo ?? null,
+      personasAutorizadas: personasArr ?? null,
+      embarcacionDatos: values.embarcacionDatos?.trim() || null,
+      usuarioId: values.usuarioId?.trim() || null,
     };
 
     const showSuccess = () => {
@@ -177,8 +167,6 @@ export function EditPlayerDialog({
         const missing = getMissingProfileFieldLabels({
           firstName: values.firstName,
           lastName: values.lastName,
-          birthDate: values.birthDate,
-          tutorName: values.tutorName,
           tutorPhone: values.tutorPhone,
           email: values.email,
           photoUrl: values.photoUrl,
@@ -186,12 +174,12 @@ export function EditPlayerDialog({
         if (missing.length > 0) {
           toast({
             title: "Guardado correctamente",
-            description: `Se guardaron tus datos. Para desbloquear evaluaciones y videos completá: ${missing.join(", ")}.`,
+            description: `Se guardaron tus datos. Completá: ${missing.join(", ")}.`,
           });
         } else {
           toast({
             title: "Perfil completo",
-            description: "Todos los datos están guardados. Ya podés acceder a evaluaciones, videos y más.",
+            description: "Todos los datos están guardados.",
           });
         }
       } else {
@@ -214,7 +202,6 @@ export function EditPlayerDialog({
 
     try {
       const token = await user.getIdToken();
-      const birthDate = updateData.birthDate as Timestamp;
       const res = await fetch("/api/players/update", {
         method: "POST",
         headers: {
@@ -225,10 +212,7 @@ export function EditPlayerDialog({
           schoolId,
           playerId: player.id,
           oldEmail: player.email ?? null,
-          updateData: {
-            ...updateData,
-            birthDate: { seconds: birthDate.seconds, nanoseconds: birthDate.nanoseconds },
-          },
+          updateData,
         }),
       });
       if (!res.ok) {
@@ -255,9 +239,9 @@ export function EditPlayerDialog({
     >
       <DialogContent className="sm:max-w-2xl max-h-[90vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle>Editar perfil del jugador</DialogTitle>
+          <DialogTitle>Editar perfil del cliente</DialogTitle>
           <DialogDescription>
-            <strong>Datos personales:</strong> nombre, apellido, fecha de nacimiento, DNI, tutor, teléfono, obra social, email, estado, foto, observaciones. <strong>Datos físicos:</strong> altura, peso, pie predominante, posición.
+            <strong>Datos personales:</strong> nombre, apellido, DNI, contacto, teléfono (opcional), email (opcional), estado, foto, observaciones. <strong>Embarcación:</strong> nombre, matrícula, ubicación, etc.
           </DialogDescription>
         </DialogHeader>
 
@@ -266,7 +250,7 @@ export function EditPlayerDialog({
             <Tabs defaultValue="personal" className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <TabsList className="grid w-full grid-cols-2 mb-4 flex-shrink-0">
                 <TabsTrigger value="personal">Datos personales</TabsTrigger>
-                <TabsTrigger value="fisicos">Datos físicos</TabsTrigger>
+                <TabsTrigger value="nautica">Embarcación</TabsTrigger>
               </TabsList>
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-2 -mr-2">
               <TabsContent value="personal" className="mt-0 space-y-6">
@@ -299,76 +283,6 @@ export function EditPlayerDialog({
                   />
                   <FormField
                     control={form.control}
-                    name="birthDate"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Fecha de Nacimiento</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? (
-                                  format(field.value, "PPP", { locale: es })
-                                ) : (
-                                  <span>Elige una fecha</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              captionLayout="dropdown"
-                              fromYear={2000}
-                              toYear={new Date().getFullYear()}
-                              disabled={(date) =>
-                                date > new Date() || date < new Date("2000-01-01")
-                              }
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="genero"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Género / Categoría</FormLabel>
-                        <Select
-                          onValueChange={(v) => field.onChange(v === "__none__" ? undefined : v)}
-                          value={field.value ?? "__none__"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="__none__">No especificado</SelectItem>
-                            <SelectItem value="masculino">Masculino</SelectItem>
-                            <SelectItem value="femenino">Femenino</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>Categorías femenino y masculino usan los mismos años (SUB-5 a SUB-18).</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
                     name="dni"
                     render={({ field }) => (
                       <FormItem>
@@ -382,38 +296,12 @@ export function EditPlayerDialog({
                   />
                   <FormField
                     control={form.control}
-                    name="tutorName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nombre del Tutor</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Jorge Messi" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
                     name="tutorPhone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Teléfono del Tutor</FormLabel>
+                        <FormLabel>Teléfono de contacto (Opcional)</FormLabel>
                         <FormControl>
                           <Input placeholder="+54 9 ..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="healthInsurance"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Obra Social (Opcional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nombre de la obra social" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -424,11 +312,11 @@ export function EditPlayerDialog({
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email (acceso al panel)</FormLabel>
+                        <FormLabel>Email (Opcional)</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="jugador@ejemplo.com" {...field} />
+                          <Input type="email" placeholder="cliente@ejemplo.com" {...field} />
                         </FormControl>
-                        <FormDescription>Opcional. Si lo completas, el jugador podrá iniciar sesión y ver su perfil.</FormDescription>
+                        <FormDescription>Opcional. Si lo completas, el cliente podrá iniciar sesión y ver su perfil.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -465,7 +353,7 @@ export function EditPlayerDialog({
                     name="photoUrl"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Foto del jugador</FormLabel>
+                        <FormLabel>Foto de la embarcación</FormLabel>
                         <FormControl>
                           <PlayerPhotoField
                             value={field.value ?? ""}
@@ -476,7 +364,7 @@ export function EditPlayerDialog({
                           />
                         </FormControl>
                         <FormDescription>
-                          Sacá una foto con la cámara o subí una imagen. Es necesario para que el jugador pueda ver su perfil completo.
+                          Sacá una foto de la embarcación o subí una imagen desde tu dispositivo.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -497,101 +385,146 @@ export function EditPlayerDialog({
                   />
                 </div>
               </TabsContent>
-              <TabsContent value="fisicos" className="mt-0 space-y-6">
+              <TabsContent value="nautica" className="mt-0 space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
-                    name="altura_cm"
+                    name="embarcacionNombre"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Altura (cm)</FormLabel>
+                        <FormLabel>Nombre de la embarcación</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            min={80}
-                            max={220}
-                            placeholder="Ej: 165"
-                            value={field.value ?? ""}
-                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                          />
+                          <Input placeholder="Ej: Rey Cargo 620" {...field} />
                         </FormControl>
-                        <FormDescription>En centímetros. Rango típico 80–220 cm.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <FormField
                     control={form.control}
-                    name="peso_kg"
+                    name="embarcacionMatricula"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Peso (kg)</FormLabel>
+                        <FormLabel>Matrícula</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            min={15}
-                            max={150}
-                            step="0.1"
-                            placeholder="Ej: 55"
-                            value={field.value ?? ""}
-                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                          />
+                          <Input placeholder="Ej: 099223" {...field} />
                         </FormControl>
-                        <FormDescription>En kilogramos. Rango típico 15–150 kg.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <FormField
                     control={form.control}
-                    name="pie_dominante"
+                    name="embarcacionMedidas"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Pie predominante</FormLabel>
+                        <FormLabel>Medidas</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ej: 6.20m x 2.50m" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="ubicacion"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ubicación (amarra, muelle)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ej: Muelle 3 - Amarra 15" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="clienteDesde"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cliente desde</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ej: 2020-01" {...field} />
+                        </FormControl>
+                        <FormDescription>Fecha o período desde que es cliente.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {!isPlayerEditing && (
+                    <FormField
+                      control={form.control}
+                      name="usuarioId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Id Usuario (app de pagos)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ej: 14115606" {...field} />
+                          </FormControl>
+                          <FormDescription>ID del cliente en la app de pagos (para importar Excel).</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  <FormField
+                    control={form.control}
+                    name="creditoActivo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Crédito activo</FormLabel>
                         <Select
-                          onValueChange={(v) => field.onChange(v === "__none__" ? undefined : v)}
-                          value={field.value ?? "__none__"}
+                          onValueChange={(v) =>
+                            field.onChange(v === "__none__" ? undefined : v === "true")
+                          }
+                          value={
+                            field.value === undefined
+                              ? "__none__"
+                              : field.value
+                                ? "true"
+                                : "false"
+                          }
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Opcional" />
+                              <SelectValue placeholder="Seleccionar" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="__none__">No especificado</SelectItem>
-                            <SelectItem value="derecho">Derecho</SelectItem>
-                            <SelectItem value="izquierdo">Izquierdo</SelectItem>
-                            <SelectItem value="ambidiestro">Ambidiestro</SelectItem>
+                            <SelectItem value="true">Sí</SelectItem>
+                            <SelectItem value="false">No</SelectItem>
                           </SelectContent>
                         </Select>
-                        <FormDescription>Lateralidad del jugador.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <FormField
                     control={form.control}
-                    name="posicion_preferida"
+                    name="personasAutorizadas"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Posición preferida</FormLabel>
-                        <Select
-                          onValueChange={(v) => field.onChange(v === "__none__" ? undefined : v)}
-                          value={field.value ?? "__none__"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Opcional" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="__none__">No especificado</SelectItem>
-                            <SelectItem value="delantero">Delantero</SelectItem>
-                            <SelectItem value="mediocampo">Mediocampo</SelectItem>
-                            <SelectItem value="defensor">Defensor</SelectItem>
-                            <SelectItem value="arquero">Arquero</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Personas autorizadas</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nombres separados por coma" {...field} />
+                        </FormControl>
+                        <FormDescription>Personas autorizadas a manejar la embarcación.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="embarcacionDatos"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Datos adicionales de la embarcación</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Cualquier dato adicional..." {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

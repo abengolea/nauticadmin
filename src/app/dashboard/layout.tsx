@@ -44,7 +44,8 @@ export default function DashboardLayout({
     const profilePath = `/dashboard/players/${profile.playerId}`;
     const isOnProfilePage = pathname === profilePath || pathname?.startsWith(profilePath + "/");
     const isOnPaymentsPage = pathname === "/dashboard/payments";
-    if (!isOnProfilePage && !isOnPaymentsPage) {
+    const isOnAppointmentsPage = pathname === "/dashboard/appointments";
+    if (!isOnProfilePage && !isOnPaymentsPage && !isOnAppointmentsPage) {
       router.replace(`${profilePath}?schoolId=${profile.activeSchoolId}`);
     }
   }, [isReady, profile, player, pathname, router]);

@@ -13,7 +13,7 @@ import {
 import { useStorage } from "@/firebase/provider";
 import { uploadPlayerPhoto } from "@/lib/player-photo";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Upload, Loader2, User, X } from "lucide-react";
+import { Camera, Upload, Loader2, Ship, X } from "lucide-react";
 
 interface PlayerPhotoFieldProps {
   value: string;
@@ -116,7 +116,7 @@ export function PlayerPhotoField({
               return URL.createObjectURL(file);
             });
             setCameraOpen(false);
-            toast({ title: "Foto guardada", description: "La foto se subirá al crear el jugador." });
+            toast({ title: "Foto guardada", description: "La foto se subirá al crear el cliente." });
             resolve();
             return;
           }
@@ -181,25 +181,17 @@ export function PlayerPhotoField({
     }
   };
 
-  const initials = playerName
-    .trim()
-    .split(/\s+/)
-    .map((s) => s[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2) || "?";
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start gap-4">
         <Avatar className="h-24 w-24 border-2 border-muted">
-          <AvatarImage src={pendingPreviewUrl || value || undefined} alt="Foto del jugador" />
+          <AvatarImage src={pendingPreviewUrl || value || undefined} alt="Foto de la embarcación" />
           <AvatarFallback className="text-2xl">
-            {initials || <User className="h-10 w-10 text-muted-foreground" />}
+            <Ship className="h-10 w-10 text-muted-foreground" />
           </AvatarFallback>
         </Avatar>
         <div className="flex flex-col gap-2">
-          <p className="text-sm font-medium">Foto del jugador</p>
+          <p className="text-sm font-medium">Foto de la embarcación</p>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -246,7 +238,7 @@ export function PlayerPhotoField({
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Sacá una foto con la cámara o subí una foto desde tu dispositivo (máx. 2MB).
+            Sacá una foto de la embarcación o subí una imagen desde tu dispositivo (máx. 2MB).
           </p>
         </div>
       </div>

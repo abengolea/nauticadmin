@@ -80,16 +80,15 @@ export function calculateIMC(weightKg: number, heightCm: number): number {
 }
 
 /** Indica si el jugador tiene perfil completo (datos mínimos + foto + email) para poder ver evaluaciones, videos, etc. */
-export function isPlayerProfileComplete(player: { firstName?: string; lastName?: string; birthDate?: unknown; tutorContact?: { name?: string; phone?: string } | null; email?: string | null; photoUrl?: string | null }): boolean {
+export function isPlayerProfileComplete(player: { firstName?: string; lastName?: string; tutorContact?: { name?: string; phone?: string } | null; email?: string | null; photoUrl?: string | null }): boolean {
   const hasName = Boolean(player.firstName?.trim() && player.lastName?.trim());
-  const hasBirthDate = Boolean(player.birthDate != null && player.birthDate !== "");
   const tutor = player.tutorContact;
-  const hasTutor = Boolean(tutor && typeof tutor === "object" && (tutor.name?.trim() ?? "") !== "" && (tutor.phone?.trim() ?? "") !== "");
+  const hasTutor = Boolean(tutor && typeof tutor === "object" && (tutor.name?.trim() ?? "") !== "");
   const email = (player.email ?? "").trim();
   const hasEmail = email.length > 0 && email.includes("@");
   const photo = (player.photoUrl ?? "").trim();
   const hasPhoto = photo.length > 0 && (photo.startsWith("http://") || photo.startsWith("https://"));
-  return Boolean(hasName && hasBirthDate && hasTutor && hasEmail && hasPhoto);
+  return Boolean(hasName && hasTutor && hasEmail && hasPhoto);
 }
 
 /** Indica si la ficha médica del jugador está cargada y aprobada por admin/entrenador. */
@@ -107,19 +106,16 @@ export function isMedicalRecordRejected(player: { medicalRecord?: { rejectedAt?:
 const PROFILE_FIELD_LABELS: Record<string, string> = {
   firstName: "Nombre",
   lastName: "Apellido",
-  birthDate: "Fecha de nacimiento",
   tutorName: "Nombre del tutor",
   tutorPhone: "Teléfono del tutor",
   email: "Email",
-  photoUrl: "Foto",
+  photoUrl: "Foto de la embarcación",
 };
 
 /** Devuelve la lista de nombres de campos que faltan para considerar el perfil completo (para mostrar al jugador). */
 export function getMissingProfileFieldLabels(values: {
   firstName?: string;
   lastName?: string;
-  birthDate?: unknown;
-  tutorName?: string;
   tutorPhone?: string;
   email?: string;
   photoUrl?: string;
@@ -129,8 +125,6 @@ export function getMissingProfileFieldLabels(values: {
     if (!values.firstName?.trim()) missing.push(PROFILE_FIELD_LABELS.firstName);
     if (!values.lastName?.trim()) missing.push(PROFILE_FIELD_LABELS.lastName);
   }
-  if (values.birthDate == null || values.birthDate === "") missing.push(PROFILE_FIELD_LABELS.birthDate);
-  if (!values.tutorName?.trim()) missing.push(PROFILE_FIELD_LABELS.tutorName);
   if (!values.tutorPhone?.trim()) missing.push(PROFILE_FIELD_LABELS.tutorPhone);
   const email = (values.email ?? "").trim();
   if (email.length === 0 || !email.includes("@")) missing.push(PROFILE_FIELD_LABELS.email);

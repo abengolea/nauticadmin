@@ -94,7 +94,6 @@ export function AccessRequestsList() {
         const newPlayerRef = await addDoc(playersRef, {
           firstName,
           lastName,
-          birthDate: Timestamp.fromDate(new Date("2010-01-01")),
           email: emailNorm,
           tutorContact: { name: "Por completar", phone: "" },
           status: "active",

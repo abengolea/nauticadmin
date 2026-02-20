@@ -3,17 +3,19 @@
 import { useUserProfile, useFirebase } from "@/firebase";
 import { getAuth } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaymentsTab } from "@/components/payments/PaymentsTab";
 import { DelinquentsTab } from "@/components/payments/DelinquentsTab";
+import { UnappliedTab } from "@/components/payments/UnappliedTab";
 import { PaymentConfigTab } from "@/components/payments/PaymentConfigTab";
 import { PlayerPaymentsView } from "@/components/payments/PlayerPaymentsView";
 import { SchoolAdminMensualidadView } from "@/components/payments/SchoolAdminMensualidadView";
 import { useToast } from "@/hooks/use-toast";
-import { Banknote, AlertTriangle, Settings, FlaskConical, Building2 } from "lucide-react";
+import { Banknote, AlertTriangle, Settings, FlaskConical, Building2, FileX } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function PaymentsPage() {
   const { profile, isReady, isAdmin, isPlayer } = useUserProfile();
@@ -27,11 +29,12 @@ export default function PaymentsPage() {
   const paymentResult = searchParams.get("payment");
   const schoolFeeResult = searchParams.get("schoolFee");
   const defaultTab = useMemo(() => {
-    if (tabFromUrl === "config" || tabFromUrl === "delinquents" || tabFromUrl === "mensualidad") return tabFromUrl;
+    if (tabFromUrl === "config" || tabFromUrl === "delinquents" || tabFromUrl === "unapplied" || tabFromUrl === "mensualidad") return tabFromUrl;
     return "payments";
   }, [tabFromUrl]);
 
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const [manualOpen, setManualOpen] = useState(false);
 
   useEffect(() => {
     setActiveTab(defaultTab);
@@ -83,12 +86,12 @@ export default function PaymentsPage() {
     }
   }, [schoolFeeResult, toast]);
 
-  const getToken = async () => {
+  const getToken = useCallback(async () => {
     const auth = getAuth(app);
     const user = auth.currentUser;
     if (!user) return null;
     return user.getIdToken();
-  };
+  }, [app]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -136,7 +139,7 @@ export default function PaymentsPage() {
                 Mensualidad a la plataforma
               </h1>
               <p className="text-muted-foreground text-sm sm:text-base">
-                Cuota mensual que tu escuela paga a Escuela River
+                Cuota mensual que tu NAUTICA le paga a Notificas SRL
               </p>
             </>
           ) : (
@@ -149,13 +152,22 @@ export default function PaymentsPage() {
           )}
         </div>
         {!isMensualidadTab && (
-          <Link
-            href="/dashboard/payments/test"
-            className="inline-flex items-center text-xs sm:text-sm text-muted-foreground hover:underline shrink-0"
-          >
-            <FlaskConical className="mr-1 h-4 w-4" />
-            Pruebas de pagos
-          </Link>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button
+              onClick={() => setManualOpen(true)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Banknote className="mr-2 h-4 w-4" />
+              Registrar pago manual
+            </Button>
+            <Link
+              href="/dashboard/payments/test"
+              className="inline-flex items-center text-xs sm:text-sm text-muted-foreground hover:underline"
+            >
+              <FlaskConical className="mr-1 h-4 w-4" />
+              Pruebas de pagos
+            </Link>
+          </div>
         )}
       </div>
 
@@ -163,11 +175,16 @@ export default function PaymentsPage() {
         <SchoolAdminMensualidadView schoolId={schoolId} getToken={getToken} refreshTrigger={schoolFeeResult} />
       ) : (
         <Tabs value={activeTab} onValueChange={onTabChange} key={tabFromUrl ?? "payments"}>
-          <TabsList className="w-full grid grid-cols-3 gap-1 p-1 h-auto md:h-10 bg-card">
+          <TabsList className="w-full grid grid-cols-4 gap-1 p-1 h-auto md:h-10 bg-card">
             <TabsTrigger value="payments" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
               <Banknote className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
               <span className="hidden sm:inline">Pagos ingresados</span>
               <span className="sm:hidden truncate">Pagos</span>
+            </TabsTrigger>
+            <TabsTrigger value="unapplied" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
+              <FileX className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">No aplicados</span>
+              <span className="sm:hidden truncate">No apl.</span>
             </TabsTrigger>
             <TabsTrigger value="delinquents" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
               <AlertTriangle className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
@@ -179,8 +196,11 @@ export default function PaymentsPage() {
               <span className="sm:hidden truncate">Config</span>
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="payments">
-            <PaymentsTab schoolId={schoolId} getToken={getToken} />
+          <TabsContent value="payments" forceMount className="data-[state=inactive]:hidden">
+            <PaymentsTab schoolId={schoolId} getToken={getToken} manualOpen={manualOpen} onManualOpenChange={setManualOpen} />
+          </TabsContent>
+          <TabsContent value="unapplied">
+            <UnappliedTab schoolId={schoolId} getToken={getToken} />
           </TabsContent>
           <TabsContent value="delinquents">
             <DelinquentsTab schoolId={schoolId} getToken={getToken} />

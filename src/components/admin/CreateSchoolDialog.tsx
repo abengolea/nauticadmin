@@ -24,12 +24,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Loader2, PlusCircle, UserPlus } from "lucide-react";
-import { useFirestore, useUserProfile } from "@/firebase";
-import { collection, doc, writeBatch, Timestamp } from "firebase/firestore";
-import { writeAuditLog } from "@/lib/audit";
-import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { initializeApp, deleteApp } from "firebase/app";
-import { getFirebaseConfig } from "@/firebase/config";
+import { useUserProfile } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "../ui/separator";
 
@@ -51,7 +46,6 @@ const schoolSchema = z
 
 export function CreateSchoolDialog() {
   const [open, setOpen] = useState(false);
-  const firestore = useFirestore();
   const { user } = useUserProfile();
   const { toast } = useToast();
 
@@ -72,90 +66,61 @@ export function CreateSchoolDialog() {
   const { isSubmitting } = form.formState;
 
   async function onSubmit(values: z.infer<typeof schoolSchema>) {
-    const tempAppName = `temp-user-creation-${Date.now()}`;
-    const tempApp = initializeApp(getFirebaseConfig(), tempAppName);
-    const tempAuth = getAuth(tempApp);
-    
+    const token = await user?.getIdToken?.().catch(() => null);
+    if (!token) {
+      toast({
+        variant: "destructive",
+        title: "Error de sesión",
+        description: "No se pudo verificar tu sesión. Cierra sesión y vuelve a entrar.",
+      });
+      return;
+    }
+
     try {
-      // 1. Create the user in the temporary, isolated auth instance
-      const userCredential = await createUserWithEmailAndPassword(tempAuth, values.adminEmail, values.adminPassword);
-      const newUser = userCredential.user;
-      await updateProfile(newUser, { displayName: values.adminDisplayName });
-
-      // 2. Now that user is created, commit all related docs to Firestore in a single batch.
-      const batch = writeBatch(firestore);
-
-      // Doc 1: The new school
-      const newSchoolRef = doc(collection(firestore, 'schools'));
-      const schoolData = {
+      const res = await fetch("/api/admin/create-school", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
           name: values.name,
           city: values.city,
           province: values.province,
-          address: values.address,
-          status: 'active' as const,
-          createdAt: Timestamp.now(),
-      };
-      batch.set(newSchoolRef, schoolData);
-      
-      // Doc 2: The user's role within that school
-      const schoolUserRef = doc(firestore, 'schools', newSchoolRef.id, 'users', newUser.uid);
-      const schoolUserData = {
-          displayName: values.adminDisplayName,
-          email: values.adminEmail,
-          role: 'school_admin' as const,
-      };
-      batch.set(schoolUserRef, schoolUserData);
+          address: values.address || undefined,
+          adminDisplayName: values.adminDisplayName,
+          adminEmail: values.adminEmail,
+          adminPassword: values.adminPassword,
+        }),
+      });
 
-      // Doc 3: The user's global profile document
-      const platformUserRef = doc(firestore, 'platformUsers', newUser.uid);
-       const platformUserData = {
-          email: values.adminEmail,
-          super_admin: false,
-          createdAt: Timestamp.now()
-       };
-      batch.set(platformUserRef, platformUserData);
+      const data = await res.json().catch(() => ({}));
 
-      await batch.commit();
-
-      if (user?.uid && user?.email) {
-        await writeAuditLog(firestore, user.email, user.uid, {
-          action: "school.create",
-          resourceType: "school",
-          resourceId: newSchoolRef.id,
-          details: values.name,
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: data.error || "No se pudo crear la náutica.",
+          duration: 8000,
         });
+        return;
       }
 
       toast({
-          title: "¡Éxito!",
-          description: `Se creó la escuela "${values.name}" y se asignó a ${values.adminEmail} como administrador.`,
+        title: "¡Éxito!",
+        description: data.message || `Se creó la náutica "${values.name}" y se asignó a ${values.adminEmail} como administrador.`,
       });
       form.reset();
       setOpen(false);
-
-    } catch (error: any) {
-        let title = "Error";
-        let description = "Ocurrió un error inesperado.";
-        if (error.code) { // Likely an Auth error
-            title = "Error de Autenticación";
-            if (error.code === 'auth/email-already-in-use') {
-                description = "El email del administrador ya está registrado. Si un intento anterior falló, elimina el usuario desde la consola de Firebase (Autenticación) y vuelve a intentarlo.";
-            } else if (error.code === 'auth/weak-password') {
-                description = "La contraseña proporcionada es demasiado débil (mínimo 6 caracteres).";
-            }
-        } else {
-            title = "Error de Base de Datos";
-            description = "No se pudo crear la escuela o asignar el rol. Por favor, revisa tus permisos e inténtalo de nuevo."
-        }
-        toast({
-            variant: "destructive",
-            title: title,
-            description: description,
-            duration: 9000,
-        });
-    } finally {
-        // 3. Clean up the temporary app regardless of success or failure
-        await deleteApp(tempApp);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      console.error("[CreateSchoolDialog] Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err?.message || "Error de conexión. Revisa tu internet e inténtalo de nuevo.",
+        duration: 8000,
+      });
     }
   }
 
@@ -164,28 +129,28 @@ export function CreateSchoolDialog() {
       <DialogTrigger asChild>
         <Button>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Crear Nueva Escuela
+          Crear Nueva Náutica
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Crear Nueva Escuela</DialogTitle>
+          <DialogTitle>Crear Nueva Náutica</DialogTitle>
           <DialogDescription>
-            Completa los datos para registrar una nueva sede y su administrador.
+            Completa los datos para registrar una nueva náutica y su administrador.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
             <div className="space-y-2">
-                <h3 className="font-semibold text-foreground">Datos de la Escuela</h3>
+                <h3 className="font-semibold text-foreground">Datos de la Náutica</h3>
                 <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Nombre de la Sede</FormLabel>
+                    <FormLabel>Nombre de la Náutica</FormLabel>
                     <FormControl>
-                        <Input placeholder="Ej: Escuela de River - Córdoba" {...field} />
+                        <Input placeholder="Ej: Club Náutico San Isidro" {...field} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>

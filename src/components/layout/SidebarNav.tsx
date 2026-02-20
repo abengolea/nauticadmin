@@ -7,21 +7,19 @@ import {
   Settings,
   Building,
   Shield,
-  UserCheck,
   Video,
-  ClipboardCheck,
-  Activity,
   Mail,
   MessageCircle,
   Headphones,
   Banknote,
-  FileText,
-  FileHeart,
   Sliders,
   History,
   UserX,
   Building2,
-  Newspaper,
+  CalendarClock,
+  Ship,
+  FileSpreadsheet,
+  Receipt,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -36,35 +34,27 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
-import { RiverPlateLogo } from "../icons/RiverPlateLogo";
-import { useUserProfile, useCollection, useDoc, useFirebase } from "@/firebase";
+import { NauticAdminLogo } from "../icons/NauticAdminLogo";
+import { useUserProfile, useDoc, useFirebase } from "@/firebase";
 import { isPlayerProfileComplete } from "@/lib/utils";
 import type { Player } from "@/lib/types";
-import { isMedicalRecordApproved } from "@/lib/utils";
 import { getAuth } from "firebase/auth";
-// Orden por importancia: núcleo operativo → seguimiento → comunicación → administración
+// Orden por importancia: núcleo operativo → comunicación → administración
 const schoolUserMenuItems = [
   { href: "/dashboard", label: "Panel Principal", icon: Home },
-  { href: "/dashboard/players", label: "Jugadores", icon: Users },
-  { href: "/dashboard/attendance", label: "Asistencia", icon: ClipboardCheck },
-  { href: "/dashboard/medical-records", label: "Fichas médicas", icon: FileHeart },
-  { href: "/dashboard/registrations", label: "Solicitudes", icon: UserCheck },
-  { href: "/dashboard/physical-assessments-config", label: "Evaluaciones Físicas", icon: Activity },
-  { href: "/dashboard/record-video", label: "Videoteca", icon: Video },
+  { href: "/dashboard/players", label: "Clientes", icon: Users },
+  { href: "/dashboard/solicitudes", label: "Solicitudes embarcaciones", icon: Ship },
   { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
-  { href: "/dashboard/notas", label: "Notas", icon: Newspaper },
 ];
 
 const superAdminMenuItems = [
-    { href: "/dashboard", label: "Escuelas", icon: Building },
+    { href: "/dashboard", label: "Náuticas", icon: Building },
     { href: "/dashboard/admin/mensualidades", label: "Mensualidades", icon: Banknote },
-    { href: "/dashboard/admin/physical-template", label: "Evaluaciones físicas (plantilla)", icon: Activity },
     { href: "/dashboard/support/operator", label: "Tickets de Soporte", icon: Headphones },
     { href: "/dashboard/admin/config", label: "Configuración global", icon: Sliders },
     { href: "/dashboard/admin/test-email", label: "Probar Trigger Email", icon: Mail },
     { href: "/dashboard/admin/audit", label: "Auditoría", icon: History },
     { href: "/dashboard/admin/delete-test-users", label: "Borrar usuarios de prueba", icon: UserX },
-    { href: "/dashboard/notas", label: "Notas", icon: Newspaper },
 ];
 
 
@@ -101,35 +91,19 @@ export function SidebarNav() {
   const closeMobileSidebar = React.useCallback(() => {
     if (isMobile) setOpenMobile(false);
   }, [isMobile, setOpenMobile]);
-  // Solo staff (school_admin o coach) puede listar pendingPlayers; nunca listar si es jugador.
-  const isStaff = profile?.role === "school_admin" || profile?.role === "coach";
-  const canListSchoolCollections = isReady && activeSchoolId && isStaff;
-
-  const { data: allPlayers } = useCollection<Player>(
-    canListSchoolCollections ? `schools/${activeSchoolId}/players` : "",
-    {}
-  );
-  const medicalRecordsPendingCount = React.useMemo(() => {
-    if (!allPlayers?.length) return 0;
-    return allPlayers.filter(
-      (p) => !p.archived && (!p.medicalRecord?.url || !isMedicalRecordApproved(p))
-    ).length;
-  }, [allPlayers]);
-
   let menuItems;
 
   if (isSuperAdmin) {
     menuItems = superAdminMenuItems;
   } else if (profile?.role === 'player' && profile.activeSchoolId && profile.playerId) {
-    // Jugador: si perfil incompleto "Mi perfil" + "Pagos"; si completo, panel, perfil, pagos y soporte
+    // Cliente: si perfil incompleto "Mi perfil" + "Pagos"; si completo, panel, perfil, pagos y soporte
     const profileHref = `/dashboard/players/${profile.playerId}?schoolId=${profile.activeSchoolId}`;
     if (!playerProfileComplete) {
       const tab = (t: string) => `${profileHref}&tab=${t}`;
       menuItems = [
         { href: profileHref, label: "Mi perfil", icon: Users },
+        { href: "/dashboard/appointments", label: "Sacar turno", icon: CalendarClock },
         { href: tab("attendance"), label: "Asistencia", icon: ClipboardCheck },
-        { href: tab("evaluations"), label: "Evaluaciones deportivas", icon: FileText },
-        { href: tab("physical"), label: "Evaluaciones físicas", icon: Activity },
         { href: tab("videoteca"), label: "Videoteca", icon: Video },
         { href: "/dashboard/payments", label: "Mis pagos", icon: Banknote, badgeOverdue: true },
       ];
@@ -138,6 +112,7 @@ export function SidebarNav() {
       menuItems = [
         { href: "/dashboard", label: "Panel Principal", icon: Home },
         { href: profileHref, label: "Mi perfil", icon: Users },
+        { href: "/dashboard/appointments", label: "Sacar turno", icon: CalendarClock },
         { href: tab("videoteca"), label: "Videoteca", icon: Video },
         { href: "/dashboard/payments", label: "Mis pagos", icon: Banknote, badgeOverdue: true },
         { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
@@ -146,27 +121,27 @@ export function SidebarNav() {
   } else {
     // Start with the base items for any school user (coach / school_admin)
     menuItems = [...schoolUserMenuItems];
-    // Add Pagos, Mensajes y Gestionar Escuela solo para school_admin, en orden de importancia
+    // Add Pagos, Mensajes y Gestionar Náutica solo para school_admin, en orden de importancia
     if (profile?.role === 'school_admin' && profile.activeSchoolId) {
       const pagos = { href: "/dashboard/payments", label: "Pagos", icon: Banknote };
       const mensualidades = { href: "/dashboard/payments?tab=mensualidad", label: "Mensualidades", icon: Building2 };
+      const conciliacion = { href: "/dashboard/reconciliation", label: "Conciliación", icon: FileSpreadsheet };
+      const gastos = { href: "/dashboard/expenses", label: "Gastos", icon: Receipt };
       const mensajes = { href: "/dashboard/messages", label: "Mensajes", icon: Mail };
-      const gestionarEscuela = {
+      const gestionarNautica = {
         href: `/dashboard/schools/${profile.activeSchoolId}`,
-        label: "Gestionar Escuela",
+        label: "Gestionar Náutica",
         icon: Shield
       };
-      const notas = { href: "/dashboard/notas", label: "Notas", icon: Newspaper };
-      const afterAttendance = 3;
-      const baseWithoutNotas = menuItems.filter((i) => i.href !== "/dashboard/notas");
       menuItems = [
-        ...baseWithoutNotas.slice(0, afterAttendance),
+        ...menuItems.slice(0, 2), // Panel Principal, Clientes
         pagos,
         mensualidades,
-        ...baseWithoutNotas.slice(afterAttendance),
+        conciliacion,
+        gastos,
+        ...menuItems.slice(2),   // Centro de Soporte
         mensajes,
-        gestionarEscuela,
-        notas
+        gestionarNautica
       ];
     }
   }
@@ -180,12 +155,8 @@ export function SidebarNav() {
     <>
       <SidebarHeader>
         <Link href="/dashboard" className="flex items-center gap-2 p-2" onClick={closeMobileSidebar}>
-          <RiverPlateLogo className="h-8 w-8" />
-          <span className="text-xl font-bold font-headline uppercase">
-            <span className="text-red-600">ESCUELAS</span>{" "}
-            <span className="text-black dark:text-white">RIVER</span>{" "}
-            <span className="text-red-600">SN</span>
-          </span>
+          <NauticAdminLogo className="h-8 w-8" />
+          <span className="text-xl font-bold font-headline">NauticAdmin</span>
         </Link>
       </SidebarHeader>
       <SidebarContent className="p-2">
@@ -212,11 +183,6 @@ export function SidebarNav() {
                     >
                     <item.icon />
                     <span>{item.label}</span>
-                    {item.href === "/dashboard/medical-records" && medicalRecordsPendingCount > 0 && (
-                      <Badge variant="secondary" className="ml-auto h-5 min-w-5 rounded-full px-1.5 text-xs" title="Fichas pendientes">
-                        {medicalRecordsPendingCount > 99 ? "99+" : medicalRecordsPendingCount}
-                      </Badge>
-                    )}
                     {"badgeOverdue" in item && item.badgeOverdue && hasPaymentOverdue && (
                       <Badge variant="destructive" className="ml-auto h-5 min-w-5 rounded-full px-1.5 text-xs" title="Cuota vencida">
                         !

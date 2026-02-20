@@ -17,7 +17,6 @@ import { useFirestore, useUserProfile } from "@/firebase";
 import { useCollection } from "@/firebase";
 import type { Player } from "@/lib/types";
 import type { Attendance } from "@/lib/types";
-import { getCategoryAge } from "@/lib/utils";
 import {
   getTrainingByDate,
   getAttendanceForTraining,
@@ -27,19 +26,15 @@ import { useToast } from "@/hooks/use-toast";
 import { CalendarIcon, Loader2, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-function groupPlayersByAge(players: Player[]): Record<number, Player[]> {
-  const byAge: Record<number, Player[]> = {};
+function groupPlayersByName(players: Player[]): Record<string, Player[]> {
+  const byGroup: Record<string, Player[]> = { "": [] };
   for (const p of players) {
-    const age = p.birthDate ? getCategoryAge(p.birthDate) : 0;
-    if (!byAge[age]) byAge[age] = [];
-    byAge[age].push(p);
+    byGroup[""].push(p);
   }
-  for (const arr of Object.values(byAge)) {
-    arr.sort((a, b) =>
-      `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`)
-    );
-  }
-  return byAge;
+  byGroup[""].sort((a, b) =>
+    `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`)
+  );
+  return byGroup;
 }
 
 type Props = {
@@ -144,10 +139,8 @@ export function AttendanceSheet({ schoolId }: Props) {
     }
   };
 
-  const byAge = groupPlayersByAge(activePlayers);
-  const ages = Object.keys(byAge)
-    .map(Number)
-    .sort((a, b) => a - b);
+  const byGroup = groupPlayersByName(activePlayers);
+  const groups = Object.keys(byGroup);
 
   if (playersLoading) {
     return (
@@ -208,14 +201,14 @@ export function AttendanceSheet({ schoolId }: Props) {
         </Card>
       ) : (
         <div className="space-y-6">
-          {ages.map((age) => (
-            <Card key={age}>
+          {groups.map((groupKey) => (
+            <Card key={groupKey || "all"}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Sub-{age}</CardTitle>
+                <CardTitle className="text-lg">Clientes</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-3">
-                  {byAge[age].map((player) => {
+                  {byGroup[groupKey].map((player) => {
                     const status = getStatus(player.id);
                     const isAbsent = status === "ausente";
                     return (

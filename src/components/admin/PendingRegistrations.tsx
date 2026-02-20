@@ -40,7 +40,6 @@ import type { PendingPlayer } from "@/lib/types";
 import { Skeleton } from "../ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Loader2, User, X } from "lucide-react";
-import { calculateAge } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -95,7 +94,6 @@ export function PendingRegistrations() {
     const newPlayerData = {
       firstName: pendingPlayer.firstName,
       lastName: pendingPlayer.lastName,
-      birthDate: pendingPlayer.birthDate,
       ...(emailNorm && { email: emailNorm }),
       dni: pendingPlayer.dni || "",
       healthInsurance: "",
@@ -243,7 +241,6 @@ export function PendingRegistrations() {
         batch.set(newPlayerRef, {
           firstName: player.firstName,
           lastName: player.lastName,
-          birthDate: player.birthDate,
           ...(emailNorm && { email: emailNorm }),
           dni: player.dni || "",
           healthInsurance: "",
@@ -392,7 +389,6 @@ export function PendingRegistrations() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-grow space-y-2 text-sm">
-                <p><strong>Edad:</strong> {calculateAge(player.birthDate)} años</p>
                 {(player as { email?: string }).email && (
                   <p><strong>Email:</strong> {(player as { email?: string }).email}</p>
                 )}

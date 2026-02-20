@@ -40,12 +40,32 @@ export async function verifySuperAdmin(authHeader: string | null): Promise<{ uid
   const auth = await verifyIdToken(authHeader);
   if (!auth) return null;
 
-  const { getAdminFirestore } = await import('./firebase-admin');
-  const db = getAdminFirestore();
-  const platformSnap = await db.collection('platformUsers').doc(auth.uid).get();
-  const data = platformSnap.data() as { super_admin?: boolean } | undefined;
-  const isSuperAdmin = data?.super_admin === true || auth.email === 'abengolea1@gmail.com';
+  // Fallback: email hardcodeado para super admin (útil si platformUsers no existe aún)
+  const isHardcodedSuperAdmin = auth.email === 'abengolea1@gmail.com';
 
-  if (!isSuperAdmin) return null;
-  return auth;
+  try {
+    const { getAdminFirestore } = await import('./firebase-admin');
+    const db = getAdminFirestore();
+    const platformSnap = await db.collection('platformUsers').doc(auth.uid).get();
+    const data = platformSnap.data() as { super_admin?: boolean } | undefined;
+    const isSuperAdmin = data?.super_admin === true || isHardcodedSuperAdmin;
+
+    if (!isSuperAdmin) return null;
+    return auth;
+  } catch (e: unknown) {
+    const err = e as { code?: number; message?: string };
+    // Error 5 NOT_FOUND: Firestore no habilitado o base de datos no existe
+    if (err?.code === 5 || err?.message?.includes('NOT_FOUND')) {
+      if (isHardcodedSuperAdmin) {
+        return auth; // Permitir al super admin hardcodeado aunque falle Firestore
+      }
+      console.error(
+        '[auth-server] Firestore NOT_FOUND. Verificá que Firestore esté habilitado en Firebase Console y que exista la base de datos (default).'
+      );
+      throw new Error(
+        'Firestore no está configurado correctamente. Habilitá Firestore en Firebase Console → Firestore Database.'
+      );
+    }
+    throw e;
+  }
 }

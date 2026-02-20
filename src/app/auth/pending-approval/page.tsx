@@ -83,7 +83,7 @@ export default function PendingApprovalPage() {
       await addDoc(collection(firestore, "accessRequests"), {
         uid: user.uid,
         email: user.email.trim().toLowerCase(),
-        displayName: user.displayName || user.email.split("@")[0] || "Jugador",
+        displayName: user.displayName || user.email.split("@")[0] || "Cliente",
         type: "player",
         status: "pending",
         createdAt: Timestamp.now(),
@@ -91,7 +91,7 @@ export default function PendingApprovalPage() {
       setRequestSent(true);
       toast({
         title: "Solicitud enviada",
-        description: "Un entrenador verá tu solicitud en Solicitudes y te dará acceso cuando la apruebe.",
+        description: "Un administrador verá tu solicitud en Solicitudes y te dará acceso cuando la apruebe.",
       });
     } catch (err) {
       toast({
@@ -113,7 +113,7 @@ export default function PendingApprovalPage() {
         </CardTitle>
         <CardDescription>
           {isAccountDisabled
-            ? "Tu cuenta de jugador está desactivada. No podés ingresar al panel. Contactá a la escuela para reactivarla."
+            ? "Tu cuenta de cliente está desactivada. No podés ingresar al panel. Contactá al administrador para reactivarla."
             : "Tu cuenta está activa, pero no tienes permisos para acceder."}
         </CardDescription>
       </CardHeader>
@@ -131,22 +131,22 @@ export default function PendingApprovalPage() {
               <Clock className="h-12 w-12 text-amber-600 dark:text-amber-400" />
             </div>
             <p className="text-sm text-muted-foreground">
-              Tu solicitud de registro como jugador está <strong>pendiente de aprobación</strong>. Un administrador de la escuela la revisará pronto. Cuando te aprueben, podrás entrar al panel.
+              Tu solicitud de registro como cliente está <strong>pendiente de aprobación</strong>. Un administrador la revisará pronto. Cuando te aprueben, podrás entrar al panel.
             </p>
           </>
         ) : (
           <>
             <p className="text-muted-foreground">
-              Si eres <strong>jugador</strong>, podés enviar una solicitud. Un entrenador la verá en Solicitudes y te dará acceso al aprobarla.
+              Si sos <strong>cliente</strong> (dueño de embarcaciones), podés enviar una solicitud. Un administrador la verá en Solicitudes y te dará acceso al aprobarla.
             </p>
             {requestSent ? (
               <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-                Solicitud enviada. Cuando un entrenador la apruebe, podrás entrar. Usá &quot;Reintentar&quot; después.
+                Solicitud enviada. Cuando un administrador la apruebe, podrás entrar. Usá &quot;Reintentar&quot; después.
               </p>
             ) : (
               <Button onClick={handleRequestAccess} disabled={sending} className="w-full" variant="secondary">
                 <Send className="mr-2 h-4 w-4" />
-                {sending ? "Enviando…" : "Solicitar acceso como jugador"}
+                {sending ? "Enviando…" : "Solicitar acceso como cliente"}
               </Button>
             )}
           </>

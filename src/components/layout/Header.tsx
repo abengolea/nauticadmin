@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Bell, LogOut, Cake, UserCheck } from "lucide-react";
+import { Search, Bell, LogOut, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,8 +16,6 @@ import { useAuth, useUser, useUserProfile, useCollection } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import Link from "next/link";
-import { isBirthdayToday } from "@/lib/utils";
-import type { Player } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 
 export function Header() {
@@ -28,10 +26,6 @@ export function Header() {
   // Solo staff (school_admin o coach) puede listar jugadores y pendingPlayers; nunca listar si es jugador.
   const isStaff = profile?.role === "school_admin" || profile?.role === "coach";
   const canListSchoolCollections = isReady && activeSchoolId && isStaff;
-  const { data: players } = useCollection<Player>(
-    canListSchoolCollections ? `schools/${activeSchoolId}/players` : "",
-    { orderBy: ["lastName", "asc"] }
-  );
   const { data: pendingPlayers } = useCollection(
     canListSchoolCollections ? `schools/${activeSchoolId}/pendingPlayers` : "",
     {}
@@ -40,9 +34,6 @@ export function Header() {
     isReady ? "accessRequests" : "",
     { where: ["status", "==", "pending"] }
   );
-  const playersList = (players ?? []).filter((p) => !p.archived);
-  const birthdaysToday = playersList.filter((p) => isBirthdayToday(p.birthDate));
-  const birthdayCount = birthdaysToday.length;
   const solicitudesCount = (pendingPlayers?.length ?? 0) + (accessRequests?.length ?? 0);
 
   const handleLogout = async () => {
@@ -62,7 +53,7 @@ export function Header() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar jugadores..."
+                placeholder="Buscar clientes..."
                 className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3"
               />
             </div>
@@ -73,12 +64,12 @@ export function Header() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="rounded-full relative">
             <Bell className="h-5 w-5" />
-            {(birthdayCount > 0 || solicitudesCount > 0) && (
+            {solicitudesCount > 0 && (
               <Badge
                 variant="destructive"
                 className="absolute -top-0.5 -right-0.5 h-5 min-w-5 rounded-full px-1 text-xs"
               >
-                {birthdayCount + solicitudesCount > 99 ? "99+" : birthdayCount + solicitudesCount}
+                {solicitudesCount > 99 ? "99+" : solicitudesCount}
               </Badge>
             )}
             <span className="sr-only">Notificaciones y novedades</span>
@@ -94,7 +85,7 @@ export function Header() {
             <p className="px-2 py-3 text-sm text-muted-foreground">
               Selecciona una escuela para ver novedades.
             </p>
-          ) : birthdayCount === 0 && solicitudesCount === 0 ? (
+          ) : solicitudesCount === 0 ? (
             <p className="px-2 py-3 text-sm text-muted-foreground">
               No hay novedades.
             </p>
@@ -113,19 +104,6 @@ export function Header() {
                   </Link>
                 </DropdownMenuItem>
               )}
-              {birthdaysToday.map((player) => (
-                <DropdownMenuItem key={player.id} asChild>
-                  <Link
-                    href={`/dashboard/players/${player.id}?schoolId=${activeSchoolId}`}
-                    className="flex items-center gap-2 py-2"
-                  >
-                    <Cake className="h-4 w-4 shrink-0 text-amber-500" />
-                    <span>
-                      ¡Hoy cumple años: <strong>{player.firstName} {player.lastName}</strong>!
-                    </span>
-                  </Link>
-                </DropdownMenuItem>
-              ))}
             </>
           )}
         </DropdownMenuContent>

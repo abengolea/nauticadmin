@@ -70,13 +70,13 @@ export function SuperAdminDashboard() {
             }
             toast({
                 title: "Estado actualizado",
-                description: `La escuela ha sido ${newStatus === 'active' ? 'activada' : 'suspendida'}.`,
+                description: `La náutica ha sido ${newStatus === 'active' ? 'activada' : 'suspendida'}.`,
             });
         } catch (error) {
             toast({
                 variant: "destructive",
                 title: "Error al actualizar",
-                description: "No se pudo cambiar el estado de la escuela.",
+                description: "No se pudo cambiar el estado de la náutica.",
             });
         } finally {
             setUpdatingSchoolId(null);
@@ -88,7 +88,7 @@ export function SuperAdminDashboard() {
             <div className="flex items-center justify-between space-y-2">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight font-headline">Panel de Super Administrador</h1>
-                    <p className="text-muted-foreground">Gestiona todas las escuelas y usuarios de la plataforma.</p>
+                    <p className="text-muted-foreground">Gestiona todas las náuticas y usuarios de la plataforma.</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                     <CreateSchoolDialog />
@@ -98,7 +98,7 @@ export function SuperAdminDashboard() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Escuelas Totales</CardTitle>
+                        <CardTitle className="text-sm font-medium">Náuticas Totales</CardTitle>
                         <Building className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -138,7 +138,7 @@ export function SuperAdminDashboard() {
                 <TabsList className="w-full grid grid-cols-3 gap-1 p-1 h-auto md:h-10 bg-card">
                     <TabsTrigger value="schools" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
                         <Building className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-                        <span className="truncate">Escuelas</span>
+                        <span className="truncate">Náuticas</span>
                     </TabsTrigger>
                     <TabsTrigger value="users" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
                         <Users className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
@@ -154,10 +154,10 @@ export function SuperAdminDashboard() {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                                 <Building className="h-5 w-5" />
-                                Listado de Escuelas
+                                Listado de Náuticas
                             </CardTitle>
                             <CardDescription>
-                                {schoolsLoading ? 'Cargando listado de escuelas...' : `Haz click en una para gestionarla.`}
+                                {schoolsLoading ? 'Cargando listado de náuticas...' : `Haz click en una para gestionarla.`}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="p-0 sm:p-6">
@@ -165,7 +165,7 @@ export function SuperAdminDashboard() {
                                 <Table className="min-w-[560px]">
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="text-xs sm:text-sm">Nombre de la Escuela</TableHead>
+                                            <TableHead className="text-xs sm:text-sm">Nombre de la Náutica</TableHead>
                                             <TableHead className="text-xs sm:text-sm whitespace-nowrap">Ubicación</TableHead>
                                             <TableHead className="text-xs sm:text-sm">Estado</TableHead>
                                             <TableHead className="text-xs sm:text-sm whitespace-nowrap">Fecha de Creación</TableHead>

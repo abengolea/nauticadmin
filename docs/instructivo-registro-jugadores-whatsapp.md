@@ -42,7 +42,6 @@ Para acceder a *todas las funcionalidades*, completá tu perfil:
 
 📝 Datos personales:
 • Nombre y apellido
-• Fecha de nacimiento
 • Email (acceso al panel)
 • Foto (podés sacarla con la cámara o subirla)
 
