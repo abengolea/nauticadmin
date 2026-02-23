@@ -12,12 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { Player } from "@/lib/types";
+import { getPlayerEmbarcaciones } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCollection, useUserProfile } from "@/firebase";
 import { Skeleton } from "../ui/skeleton";
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { FileDown, CreditCard, CheckCircle, Loader2, Search, Mail } from "lucide-react";
+import { FileDown, CreditCard, CheckCircle, Loader2, Search, Mail, FileX, FileCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
@@ -40,11 +41,14 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   const schoolId = propSchoolId || userActiveSchoolId;
   const canListPlayers = profile?.role !== "player";
   const canSeePaymentStatus = isAdmin && !!schoolId;
+  const canToggleStatus = (isAdmin || isCoach) && !!schoolId;
 
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [inviting, setInviting] = useState(false);
+  const [updatingFactura, setUpdatingFactura] = useState(false);
+  const [statusUpdatingByPlayerId, setStatusUpdatingByPlayerId] = useState<Set<string>>(new Set());
   const [paymentStatus, setPaymentStatus] = useState<{
     delinquents: (DelinquentInfo & { dueDate: string })[];
     clothingPendingByPlayer: Record<string, ClothingPendingItem[]>;
@@ -80,6 +84,46 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     fetchPaymentStatus();
   }, [fetchPaymentStatus]);
 
+  const handleToggleStatus = useCallback(
+    async (playerId: string, currentStatus: string) => {
+      if (!user || !schoolId || !canToggleStatus) return;
+      setStatusUpdatingByPlayerId((prev) => new Set(prev).add(playerId));
+      try {
+        const token = await user.getIdToken();
+        const newStatus = currentStatus === "active" ? "inactive" : "active";
+        const res = await fetch("/api/players/status", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ schoolId, playerId, status: newStatus }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error ?? "Error al cambiar estado");
+        toast({
+          title: newStatus === "active" ? "Cliente activado" : "Cliente desactivado",
+          description: newStatus === "active"
+            ? "El cliente ya puede ingresar al panel."
+            : "El cliente ya no puede ingresar al panel.",
+        });
+      } catch (e) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: e instanceof Error ? e.message : "No se pudo cambiar el estado.",
+        });
+      } finally {
+        setStatusUpdatingByPlayerId((prev) => {
+          const next = new Set(prev);
+          next.delete(playerId);
+          return next;
+        });
+      }
+    },
+    [user, schoolId, canToggleStatus, toast]
+  );
+
   const posicionLabel: Record<string, string> = {
     arquero: "Arquero",
     delantero: "Delantero",
@@ -111,9 +155,9 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return sortedAndFilteredPlayers;
     return sortedAndFilteredPlayers.filter((p) => {
+      const embarcaciones = getPlayerEmbarcaciones(p);
+      const embarcacionText = embarcaciones.map((e) => [e.nombre, e.matricula].filter(Boolean).join(" ")).join(" ").toLowerCase();
       const fullName = `${p.firstName ?? ""} ${p.lastName ?? ""}`.toLowerCase();
-      const embarcacion = (p.embarcacionNombre ?? "").toLowerCase();
-      const matricula = (p.embarcacionMatricula ?? "").toLowerCase();
       const ubicacion = (p.ubicacion ?? "").toLowerCase();
       const dni = (p.dni ?? "").toLowerCase();
       const email = (p.email ?? "").toLowerCase();
@@ -121,8 +165,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
       const observations = (p.observations ?? "").toLowerCase();
       return (
         fullName.includes(q) ||
-        embarcacion.includes(q) ||
-        matricula.includes(q) ||
+        embarcacionText.includes(q) ||
         ubicacion.includes(q) ||
         dni.includes(q) ||
         email.includes(q) ||
@@ -133,7 +176,12 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   }, [sortedAndFilteredPlayers, searchQuery]);
 
   const playersWithEmail = useMemo(
-    () => filteredBySearch.filter((p) => (p.email ?? "").trim().includes("@")),
+    () =>
+      filteredBySearch.filter(
+        (p) =>
+          (p.email ?? "").trim().includes("@") &&
+          !(p as { accessInviteSentAt?: unknown }).accessInviteSentAt
+      ),
     [filteredBySearch]
   );
 
@@ -148,12 +196,59 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
 
   const allWithEmailSelected =
     playersWithEmail.length > 0 && playersWithEmail.every((p) => selectedIds.has(p.id));
+  const allFilteredSelected =
+    filteredBySearch.length > 0 && filteredBySearch.every((p) => selectedIds.has(p.id));
 
   const toggleSelectAllWithEmail = () => {
     if (allWithEmailSelected) {
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(playersWithEmail.map((p) => p.id)));
+    }
+  };
+
+  const toggleSelectAllFiltered = () => {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredBySearch.map((p) => p.id)));
+    }
+  };
+
+  const handleUpdateRequiereFactura = async (requiereFactura: boolean) => {
+    if (!schoolId || selectedIds.size === 0 || !user) return;
+    setUpdatingFactura(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/players/update-requiere-factura", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          schoolId,
+          playerIds: Array.from(selectedIds),
+          requiereFactura,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? data.detail ?? "Error al actualizar");
+      }
+      setSelectedIds(new Set());
+      toast({
+        title: data.message ?? "Listo",
+      });
+      router.refresh();
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudo actualizar.",
+      });
+    } finally {
+      setUpdatingFactura(false);
     }
   };
 
@@ -219,11 +314,15 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
       const s = String(v);
       return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const rows = filteredBySearch.map((player) => [
+    const rows = filteredBySearch.map((player) => {
+      const emb = getPlayerEmbarcaciones(player);
+      const nombresEmb = emb.map((e) => e.nombre).filter(Boolean).join("; ");
+      const matriculasEmb = emb.map((e) => e.matricula).filter(Boolean).join("; ");
+      return [
       escape(player.firstName),
       escape(player.lastName),
-      escape(player.embarcacionNombre),
-      escape(player.embarcacionMatricula),
+      escape(nombresEmb || (player as { embarcacionNombre?: string }).embarcacionNombre),
+      escape(matriculasEmb || (player as { embarcacionMatricula?: string }).embarcacionMatricula),
       escape(player.ubicacion),
       escape(player.genero === "masculino" ? "Masculino" : player.genero === "femenino" ? "Femenino" : ""),
       escape(player.dni),
@@ -234,7 +333,8 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
       escape(player.posicion_preferida ? posicionLabel[player.posicion_preferida] ?? player.posicion_preferida : ""),
       escape(player.status === "active" ? "Activo" : player.status === "suspended" ? "Mora" : "Inactivo"),
       escape(player.observations),
-    ]);
+    ];
+    });
     const csv = [cols.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -245,7 +345,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     URL.revokeObjectURL(url);
   };
 
-  const hasInviteColumn = canInviteAccess && playersWithEmail.length > 0;
+  const hasInviteColumn = canInviteAccess;
   const colCount = 6 + (hasInviteColumn ? 1 : 0) + (canSeePaymentStatus ? 1 : 0);
 
   // Mostrar loading cuando: perfil no listo, datos cargando, o staff sin náutica seleccionada
@@ -301,6 +401,34 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                 Enviar invitaciones ({selectedIds.size})
               </Button>
             )}
+            {canSeePaymentStatus && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUpdateRequiereFactura(false)}
+                  disabled={selectedIds.size === 0 || updatingFactura}
+                  className="shrink-0"
+                >
+                  {updatingFactura ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileX className="h-4 w-4 mr-2" />
+                  )}
+                  No facturar ({selectedIds.size})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUpdateRequiereFactura(true)}
+                  disabled={selectedIds.size === 0 || updatingFactura}
+                  className="shrink-0"
+                >
+                  <FileCheck className="h-4 w-4 mr-2" />
+                  Facturar ({selectedIds.size})
+                </Button>
+              </>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -321,9 +449,22 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
               {hasInviteColumn && (
                 <TableHead className="w-10 px-2">
                   <Checkbox
-                    checked={allWithEmailSelected ? true : selectedIds.size > 0 ? "indeterminate" : false}
-                    onCheckedChange={toggleSelectAllWithEmail}
-                    aria-label="Seleccionar todos con email"
+                    checked={
+                      canSeePaymentStatus
+                        ? allFilteredSelected
+                          ? true
+                          : selectedIds.size > 0
+                            ? "indeterminate"
+                            : false
+                        : allWithEmailSelected
+                          ? true
+                          : selectedIds.size > 0
+                            ? "indeterminate"
+                            : false
+                    }
+                    onCheckedChange={canSeePaymentStatus ? toggleSelectAllFiltered : toggleSelectAllWithEmail}
+                    disabled={canSeePaymentStatus ? filteredBySearch.length === 0 : playersWithEmail.length === 0}
+                    aria-label={canSeePaymentStatus ? "Seleccionar todos" : "Seleccionar todos con email"}
                   />
                 </TableHead>
               )}
@@ -362,7 +503,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                   <Checkbox
                     checked={selectedIds.has(player.id)}
                     onCheckedChange={() => toggleSelect(player.id)}
-                    disabled={!(player.email ?? "").trim().includes("@")}
+                    disabled={!canSeePaymentStatus && !(player.email ?? "").trim().includes("@")}
                     aria-label={player.email ? `Seleccionar ${player.firstName} ${player.lastName}` : "Sin email"}
                   />
                 </TableCell>
@@ -374,40 +515,64 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                     <AvatarFallback className="text-xs">{(player.firstName?.[0] || '')}{(player.lastName?.[0] || '')}</AvatarFallback>
                   </Avatar>
                   <span className="truncate text-sm sm:text-base">{player.firstName} {player.lastName}</span>
+                  {canSeePaymentStatus && player.requiereFactura === false && (
+                    <Badge variant="secondary" className="text-[10px] shrink-0">No factura</Badge>
+                  )}
                 </div>
               </TableCell>
-              <TableCell className="text-xs sm:text-sm py-2 sm:py-3 truncate max-w-[140px]" title={player.embarcacionNombre ?? undefined}>
-                {player.embarcacionNombre || '-'}
+              <TableCell className="text-xs sm:text-sm py-2 sm:py-3 truncate max-w-[140px]" title={getPlayerEmbarcaciones(player).map((e) => e.nombre).filter(Boolean).join(", ") || undefined}>
+                {getPlayerEmbarcaciones(player).map((e) => e.nombre).filter(Boolean).join(", ") || (player as { embarcacionNombre?: string }).embarcacionNombre || '-'}
               </TableCell>
               <TableCell className="text-xs sm:text-sm py-2 sm:py-3 whitespace-nowrap pr-1">
-                {player.embarcacionMatricula || '-'}
+                {getPlayerEmbarcaciones(player).map((e) => e.matricula).filter(Boolean).join(", ") || (player as { embarcacionMatricula?: string }).embarcacionMatricula || '-'}
               </TableCell>
               <TableCell className="text-xs sm:text-sm py-2 sm:py-3 min-w-[180px] whitespace-normal pl-1">
                 {player.ubicacion || '-'}
               </TableCell>
-              <TableCell className="py-2 sm:py-3">
-                <Badge
-                  variant={
-                    player.status === "suspended"
-                      ? "destructive"
-                      : player.status === "active"
-                      ? "secondary"
-                      : "secondary"
-                  }
-                  className={`capitalize text-[10px] sm:text-xs whitespace-nowrap ${
-                    player.status === "active"
-                      ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400"
+              <TableCell className="py-2 sm:py-3" onClick={(e) => e.stopPropagation()}>
+                {canToggleStatus && (player.status === "active" || player.status === "inactive") ? (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleStatus(player.id, player.status ?? "active")}
+                    disabled={statusUpdatingByPlayerId.has(player.id)}
+                    className="inline-flex items-center"
+                  >
+                    <Badge
+                      variant="secondary"
+                      className={`capitalize text-[10px] sm:text-xs whitespace-nowrap cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        player.status === "active"
+                          ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400"
+                          : "border-red-600/50 bg-red-500/10 text-red-700 dark:text-red-400"
+                      }`}
+                    >
+                      {statusUpdatingByPlayerId.has(player.id) ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-0.5 inline" />
+                      ) : null}
+                      {player.status === "active" ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </button>
+                ) : (
+                  <Badge
+                    variant={
+                      player.status === "suspended"
+                        ? "destructive"
+                        : "secondary"
+                    }
+                    className={`capitalize text-[10px] sm:text-xs whitespace-nowrap ${
+                      player.status === "active"
+                        ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400"
+                        : player.status === "suspended"
+                        ? "border-amber-600/50 bg-amber-500/10 text-amber-800 dark:text-amber-400"
+                        : "border-red-600/50 bg-red-500/10 text-red-700 dark:text-red-400"
+                    }`}
+                  >
+                    {player.status === "active"
+                      ? "Activo"
                       : player.status === "suspended"
-                      ? "border-amber-600/50 bg-amber-500/10 text-amber-800 dark:text-amber-400"
-                      : ""
-                  }`}
-                >
-                  {player.status === "active"
-                    ? "Activo"
-                    : player.status === "suspended"
-                    ? "Mora"
-                    : "Inactivo"}
-                </Badge>
+                      ? "Mora"
+                      : "Inactivo"}
+                  </Badge>
+                )}
               </TableCell>
               {canSeePaymentStatus && (
                 <TableCell className="py-2 sm:py-3" onClick={(e) => e.stopPropagation()}>

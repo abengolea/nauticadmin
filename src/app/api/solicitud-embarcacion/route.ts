@@ -164,20 +164,30 @@ export async function GET(request: Request) {
 
     if (enriquecer && items.length > 0) {
       const playersSnap = await db.collection('schools').doc(schoolId).collection('players').get();
-      const players = playersSnap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as { firstName?: string; lastName?: string; embarcacionNombre?: string; embarcacionMatricula?: string; ubicacion?: string; photoUrl?: string }),
-      }));
+      const players = playersSnap.docs.map((d) => {
+        const data = d.data() as {
+          firstName?: string;
+          lastName?: string;
+          embarcacionNombre?: string;
+          embarcacionMatricula?: string;
+          embarcaciones?: Array<{ nombre?: string; matricula?: string }>;
+          ubicacion?: string;
+          photoUrl?: string;
+        };
+        const embs = data.embarcaciones?.length
+          ? data.embarcaciones.flatMap((e) => [(e.nombre ?? '').trim(), (e.matricula ?? '').trim()].filter(Boolean))
+          : [(data.embarcacionNombre ?? '').trim(), (data.embarcacionMatricula ?? '').trim()].filter(Boolean);
+        return { id: d.id, ...data, _embarcacionesNorm: embs };
+      });
       const norm = (s: string) => (s ?? '').trim().toLowerCase();
       items = items.map((item) => {
         const nombreNorm = norm(item.nombreCliente);
         const embNorm = norm(item.nombreEmbarcacion);
         const player = players.find((p) => {
           const pNombre = norm(`${(p.firstName ?? '').trim()} ${(p.lastName ?? '').trim()}`);
-          const pEmb = norm(p.embarcacionNombre ?? '');
-          const pMat = norm(p.embarcacionMatricula ?? '');
+          const pEmbs = (p as { _embarcacionesNorm?: string[] })._embarcacionesNorm ?? [];
           const nombreMatch = pNombre === nombreNorm || (nombreNorm && pNombre.includes(nombreNorm)) || (pNombre && nombreNorm.includes(pNombre));
-          const embMatch = !embNorm || (pEmb && (pEmb === embNorm || embNorm.includes(pEmb) || pEmb.includes(embNorm))) || (pMat && (pMat === embNorm || embNorm.includes(pMat) || pMat.includes(embNorm)));
+          const embMatch = !embNorm || pEmbs.some((pe) => pe && (norm(pe) === embNorm || embNorm.includes(norm(pe)) || norm(pe).includes(embNorm)));
           return nombreMatch && embMatch;
         });
         return {

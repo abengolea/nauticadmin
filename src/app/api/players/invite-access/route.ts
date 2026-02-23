@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { getAdminFirestore, getAdminAuth } from "@/lib/firebase-admin";
 import { verifyIdToken } from "@/lib/auth-server";
+import { Timestamp } from "firebase-admin/firestore";
 import {
   buildEmailHtmlServer,
   LOGO_ATTACHMENT_SERVER,
@@ -88,7 +89,12 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const playerData = playerSnap.data() as { email?: string; firstName?: string; lastName?: string };
+      const playerData = playerSnap.data() as {
+        email?: string;
+        firstName?: string;
+        lastName?: string;
+        accessInviteSentAt?: { toDate?: () => Date };
+      };
       const emailRaw = playerData?.email?.trim?.();
       const emailNorm = emailRaw?.toLowerCase();
 
@@ -98,6 +104,16 @@ export async function POST(request: Request) {
           email: emailRaw ?? "",
           status: "skipped",
           detail: "Sin email cargado",
+        });
+        continue;
+      }
+
+      if (playerData.accessInviteSentAt) {
+        results.push({
+          playerId,
+          email: emailNorm,
+          status: "skipped",
+          detail: "Ya se envió invitación",
         });
         continue;
       }
@@ -156,6 +172,13 @@ export async function POST(request: Request) {
             attachments: [LOGO_ATTACHMENT_SERVER],
           },
         });
+
+        await db
+          .collection("schools")
+          .doc(schoolId)
+          .collection("players")
+          .doc(playerId)
+          .update({ accessInviteSentAt: Timestamp.now() });
 
         results.push({ playerId, email: emailNorm, status: "sent" });
       } catch (err) {

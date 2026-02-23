@@ -14,7 +14,7 @@ import { PaymentConfigTab } from "@/components/payments/PaymentConfigTab";
 import { PlayerPaymentsView } from "@/components/payments/PlayerPaymentsView";
 import { SchoolAdminMensualidadView } from "@/components/payments/SchoolAdminMensualidadView";
 import { useToast } from "@/hooks/use-toast";
-import { Banknote, AlertTriangle, Settings, FlaskConical, Building2, FileX } from "lucide-react";
+import { Banknote, AlertTriangle, Settings, FlaskConical, Building2, FileX, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function PaymentsPage() {
@@ -29,7 +29,7 @@ export default function PaymentsPage() {
   const paymentResult = searchParams.get("payment");
   const schoolFeeResult = searchParams.get("schoolFee");
   const defaultTab = useMemo(() => {
-    if (tabFromUrl === "config" || tabFromUrl === "delinquents" || tabFromUrl === "unapplied" || tabFromUrl === "mensualidad") return tabFromUrl;
+    if (tabFromUrl === "config" || tabFromUrl === "delinquents" || tabFromUrl === "unapplied" || tabFromUrl === "mensualidad" || tabFromUrl === "duplicates") return tabFromUrl;
     return "payments";
   }, [tabFromUrl]);
 
@@ -37,10 +37,18 @@ export default function PaymentsPage() {
   const [manualOpen, setManualOpen] = useState(false);
 
   useEffect(() => {
+    if (defaultTab === "duplicates" && schoolId) {
+      window.location.href = `/dashboard/payments/duplicates?schoolId=${schoolId}`;
+      return;
+    }
     setActiveTab(defaultTab);
-  }, [defaultTab]);
+  }, [defaultTab, schoolId]);
 
   const onTabChange = (value: string) => {
+    if (value === "duplicates") {
+      window.location.href = `/dashboard/payments/duplicates?schoolId=${schoolId}`;
+      return;
+    }
     setActiveTab(value);
     const url = new URL(window.location.href);
     if (value === "payments") url.searchParams.delete("tab");
@@ -175,11 +183,16 @@ export default function PaymentsPage() {
         <SchoolAdminMensualidadView schoolId={schoolId} getToken={getToken} refreshTrigger={schoolFeeResult} />
       ) : (
         <Tabs value={activeTab} onValueChange={onTabChange} key={tabFromUrl ?? "payments"}>
-          <TabsList className="w-full grid grid-cols-4 gap-1 p-1 h-auto md:h-10 bg-card">
+          <TabsList className="w-full grid grid-cols-5 gap-1 p-1 h-auto md:h-10 bg-card">
             <TabsTrigger value="payments" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
               <Banknote className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
               <span className="hidden sm:inline">Pagos ingresados</span>
               <span className="sm:hidden truncate">Pagos</span>
+            </TabsTrigger>
+            <TabsTrigger value="duplicates" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
+              <Copy className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Duplicados</span>
+              <span className="sm:hidden truncate">Dupl.</span>
             </TabsTrigger>
             <TabsTrigger value="unapplied" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
               <FileX className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />

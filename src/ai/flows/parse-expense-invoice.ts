@@ -24,6 +24,7 @@ import {
 } from '@/lib/expenses/normalize';
 
 const RawAIOutputSchema = z.object({
+  concept: z.string().optional(),
   supplier: z.object({
     name: z.string().optional(),
     cuit: z.string().optional(),
@@ -32,14 +33,14 @@ const RawAIOutputSchema = z.object({
   invoice: z.object({
     type: z.string().optional(),
     letter: z.string().optional(),
-    pos: z.string().optional(),
-    number: z.string().optional(),
+    pos: z.union([z.string(), z.number()]).optional(),
+    number: z.union([z.string(), z.number()]).optional(),
     issueDate: z.string().optional(),
     cae: z.string().optional(),
     caeDue: z.string().optional(),
   }),
   amounts: z.object({
-    currency: z.enum(['ARS', 'USD']).optional(),
+    currency: z.union([z.enum(['ARS', 'USD']), z.string()]).optional(),
     net: z.union([z.number(), z.string()]).optional(),
     iva: z.union([z.number(), z.string()]).optional(),
     total: z.union([z.number(), z.string()]),
@@ -78,6 +79,13 @@ const RawAIOutputSchema = z.object({
     .optional(),
 });
 
+function normalizeCurrency(value: string | undefined): 'ARS' | 'USD' {
+  if (!value || typeof value !== 'string') return 'ARS';
+  const upper = value.trim().toUpperCase();
+  if (upper === 'USD' || upper === 'U$S' || upper === 'US$' || upper === 'DOL' || upper === 'DÓLARES' || upper === 'DOLARES') return 'USD';
+  return 'ARS';
+}
+
 function normalizeAIOutput(raw: z.infer<typeof RawAIOutputSchema>): AIExtractedExpense {
   const net = normalizeNumber(raw.amounts.net);
   const iva = normalizeNumber(raw.amounts.iva);
@@ -101,7 +109,13 @@ function normalizeAIOutput(raw: z.infer<typeof RawAIOutputSchema>): AIExtractedE
     ? normalizeAndValidateCuit(raw.supplier.cuit)
     : undefined;
 
+  const conceptFromItems =
+    raw.items && raw.items.length > 0
+      ? raw.items.map((i) => i.description).join('; ')
+      : undefined;
+
   return {
+    concept: raw.concept?.trim() || conceptFromItems,
     supplier: {
       name: raw.supplier?.name?.trim() || undefined,
       cuit: cuitResult?.raw ?? raw.supplier?.cuit?.trim(),
@@ -110,14 +124,14 @@ function normalizeAIOutput(raw: z.infer<typeof RawAIOutputSchema>): AIExtractedE
     invoice: {
       type: raw.invoice?.type?.trim(),
       letter: raw.invoice?.letter?.trim(),
-      pos: raw.invoice?.pos?.trim(),
-      number: raw.invoice?.number?.trim(),
+      pos: raw.invoice?.pos != null ? String(raw.invoice.pos).trim() : undefined,
+      number: raw.invoice?.number != null ? String(raw.invoice.number).trim() : undefined,
       issueDate: normalizeDate(raw.invoice?.issueDate ?? '') ?? raw.invoice?.issueDate?.trim(),
       cae: raw.invoice?.cae?.trim(),
       caeDue: normalizeDate(raw.invoice?.caeDue ?? '') ?? raw.invoice?.caeDue?.trim(),
     },
     amounts: {
-      currency: raw.amounts.currency === 'USD' ? 'USD' : 'ARS',
+      currency: normalizeCurrency(raw.amounts.currency),
       net: net as number | undefined,
       iva: iva as number | undefined,
       total,
@@ -143,9 +157,9 @@ export interface ParseExpenseResult {
 }
 
 /**
- * Parsea una imagen de factura/ticket y devuelve datos estructurados.
- * @param imageBase64 - Imagen en base64 (data URL o raw)
- * @param mimeType - image/jpeg, image/png, etc.
+ * Parsea una imagen o PDF de factura/ticket y devuelve datos estructurados.
+ * @param imageBase64 - Imagen o PDF en base64 (data URL o raw)
+ * @param mimeType - image/jpeg, image/png, application/pdf, etc.
  */
 export async function parseExpenseFromImage(
   imageBase64: string,
@@ -168,6 +182,8 @@ export async function parseExpenseFromImage(
   const promptText = `
 Eres un asistente que extrae datos de facturas y tickets de compra (Argentina).
 
+IMPORTANTE: Solo considerá el texto impreso de la factura. Las anotaciones manuscritas, tachaduras, notas o sellos agregados por personas NO deben influir en los datos extraídos. Ignoralas por completo.
+
 Analizá la imagen y devolvé un JSON con esta estructura exacta (sin markdown, solo JSON):
 
 {
@@ -176,6 +192,7 @@ Analizá la imagen y devolvé un JSON con esta estructura exacta (sin markdown, 
     "cuit": "CUIT con formato XX-XXXXXXXX-X",
     "ivaCondition": "Condición IVA si aparece (ej: IVA Responsable Inscripto)"
   },
+  "concept": "Descripción breve del gasto o productos/servicios comprados (ej: Combustible, Reparación motor, etc.)",
   "invoice": {
     "type": "A, B, C, etc.",
     "letter": "A, B, C si aplica",
@@ -186,7 +203,7 @@ Analizá la imagen y devolvé un JSON con esta estructura exacta (sin markdown, 
     "caeDue": "Vencimiento CAE si aparece"
   },
   "amounts": {
-    "currency": "ARS o USD",
+    "currency": "ARS o USD según la factura",
     "net": número neto (sin IVA),
     "iva": monto IVA,
     "total": número total a pagar,
@@ -201,9 +218,11 @@ Analizá la imagen y devolvé un JSON con esta estructura exacta (sin markdown, 
 }
 
 Reglas:
+- Extraé SOLO datos impresos (texto de la factura/ticket original). Ignorá anotaciones manuscritas, tachaduras, notas al margen, firmas, sellos adicionales o cualquier cosa escrita a mano. No uses esos datos para el JSON.
 - Si es ticket sin IVA, net y iva pueden omitirse; total es obligatorio.
 - Fechas en dd/mm/yyyy.
-- Números como número (no string), sin puntos de miles.
+- Números: en Argentina el punto separa miles (6.880 = 6880) y la coma decimales (68,8 = 68.8). Devolvé el valor numérico correcto: si la factura dice $6.880, devolvé 6880; si dice $68,80, devolvé 68.8.
+- Moneda (currency): ES CRÍTICO detectar si es pesos o dólares. Buscá indicadores como: "US$", "USD", "U$S", "Dólares", "Dólares USA", "DOL" → currency: "USD". Si dice "ARS", "Pesos", "$" (sin US), "Pesos Argentinos" o no hay indicación de dólares → currency: "ARS".
 - Si no encontrás un dato, omitilo (no pongas null).
 - items es opcional; si la factura no tiene ítems detallados, omitilo.
 - breakdown es opcional.
@@ -227,7 +246,9 @@ Reglas:
 
   const text = response.text?.trim();
   if (!text) {
-    throw new Error('La IA no devolvió texto. La imagen puede estar borrosa o vacía.');
+    throw new Error(
+      'La IA no devolvió texto. El archivo puede estar borroso, vacío o en un formato no soportado.'
+    );
   }
 
   // Extraer JSON del texto (puede venir envuelto en ```json)

@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Pencil } from "lucide-react";
 import { EditCoachFeedbackDialog } from "@/components/players/EditCoachFeedbackDialog";
 import type { Player } from "@/lib/types";
+import { getPlayerEmbarcaciones } from "@/lib/utils";
+import { useDoc } from "@/firebase";
+import type { BoatPricingConfig } from "@/lib/types/boat-pricing";
+import { getDefaultBoatPricingItems } from "@/lib/types/boat-pricing";
 
 const POSICION_LABELS: Record<string, string> = {
   delantero: "Delantero",
@@ -27,20 +31,28 @@ interface SummaryTabProps {
   canEditCoachFeedback?: boolean;
   schoolId?: string;
   playerId?: string;
+  /** Si se pasa, se muestra botón "Editar embarcación" que abre el diálogo de edición en la pestaña Embarcación */
+  onEditEmbarcacion?: () => void;
 }
 
-export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, schoolId, playerId }: SummaryTabProps) {
+export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, schoolId, playerId, onEditEmbarcacion }: SummaryTabProps) {
     const [editFeedbackOpen, setEditFeedbackOpen] = useState(false);
+    const embarcaciones = getPlayerEmbarcaciones(player);
+    const { data: boatPricing } = useDoc<BoatPricingConfig & { id: string }>(
+      schoolId ? `schools/${schoolId}/boatPricingConfig/default` : ""
+    );
+    const pricingItems = boatPricing?.items?.length ? boatPricing.items : getDefaultBoatPricingItems();
+    const pricingMap = new Map(pricingItems.map((i) => [i.id, i]));
+    const serviciosAdicionales = (player as { serviciosAdicionales?: { id: string; claseId: string }[] }).serviciosAdicionales ?? [];
     const hasDeportivo = player.posicion_preferida || player.pie_dominante || player.altura_cm || player.peso_kg;
     const hasNautico =
-      player.embarcacionNombre ||
-      player.embarcacionMatricula ||
-      player.embarcacionMedidas ||
+      embarcaciones.length > 0 ||
+      serviciosAdicionales.length > 0 ||
       player.ubicacion ||
       player.clienteDesde ||
       player.creditoActivo != null ||
-      (player.personasAutorizadas && player.personasAutorizadas.length > 0) ||
-      player.embarcacionDatos;
+      (player.personasAutorizadas && player.personasAutorizadas.length > 0);
+    const showEmbarcacionCard = hasNautico || onEditEmbarcacion;
 
     const displayFeedback =
       (player.coachFeedback?.trim() || lastCoachComment?.trim() || player.observations?.trim()) ||
@@ -87,32 +99,77 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                     </Table>
                 </CardContent>
             </Card>
-            {hasNautico && (
+            {showEmbarcacionCard && (
             <Card>
-                <CardHeader>
-                    <CardTitle className="font-headline">Información de la embarcación</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="font-headline">
+                      {embarcaciones.length > 1 ? "Embarcaciones" : "Información de la embarcación"}
+                    </CardTitle>
+                    {onEditEmbarcacion && (
+                      <Button variant="outline" size="sm" onClick={onEditEmbarcacion}>
+                        <Pencil className="h-4 w-4 mr-1" />
+                        Editar embarcación
+                      </Button>
+                    )}
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableBody>
-                            {player.embarcacionNombre && (
-                                <TableRow>
-                                    <TableCell className="font-medium text-muted-foreground">Nombre embarcación</TableCell>
-                                    <TableCell className="text-right">{player.embarcacionNombre}</TableCell>
-                                </TableRow>
+                            {embarcaciones.length === 0 && onEditEmbarcacion && (
+                              <TableRow>
+                                <TableCell colSpan={2} className="text-sm text-muted-foreground italic py-4">
+                                  No hay embarcaciones cargadas. Hacé clic en &quot;Editar embarcación&quot; para agregar una o más.
+                                </TableCell>
+                              </TableRow>
                             )}
-                            {player.embarcacionMatricula && (
-                                <TableRow>
+                            {embarcaciones.map((emb, idx) => (
+                              <React.Fragment key={emb.id}>
+                                {embarcaciones.length > 1 && (
+                                  <TableRow key={`emb-${idx}-sep`}>
+                                    <TableCell colSpan={2} className="font-medium bg-muted/50">
+                                      Embarcación {idx + 1}
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                                {emb.nombre && (
+                                  <TableRow key={`emb-${idx}-nombre`}>
+                                    <TableCell className="font-medium text-muted-foreground">Nombre</TableCell>
+                                    <TableCell className="text-right">{emb.nombre}</TableCell>
+                                  </TableRow>
+                                )}
+                                {emb.matricula && (
+                                  <TableRow key={`emb-${idx}-mat`}>
                                     <TableCell className="font-medium text-muted-foreground">Matrícula</TableCell>
-                                    <TableCell className="text-right">{player.embarcacionMatricula}</TableCell>
-                                </TableRow>
-                            )}
-                            {player.embarcacionMedidas && (
-                                <TableRow>
+                                    <TableCell className="text-right">{emb.matricula}</TableCell>
+                                  </TableRow>
+                                )}
+                                {emb.medidas && (
+                                  <TableRow key={`emb-${idx}-med`}>
                                     <TableCell className="font-medium text-muted-foreground">Medidas</TableCell>
-                                    <TableCell className="text-right">{player.embarcacionMedidas}</TableCell>
-                                </TableRow>
-                            )}
+                                    <TableCell className="text-right">{emb.medidas}</TableCell>
+                                  </TableRow>
+                                )}
+                                {emb.claseId && (
+                                  <TableRow key={`emb-${idx}-clase`}>
+                                    <TableCell className="font-medium text-muted-foreground">Clase (canon)</TableCell>
+                                    <TableCell className="text-right">
+                                      {pricingMap.get(emb.claseId)?.label ?? emb.claseId}
+                                      {pricingMap.get(emb.claseId)?.price != null && (
+                                        <span className="text-muted-foreground ml-1">
+                                          (${pricingMap.get(emb.claseId)!.price!.toLocaleString("es-AR")}/mes)
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                                {emb.datos && (
+                                  <TableRow key={`emb-${idx}-datos`}>
+                                    <TableCell className="font-medium text-muted-foreground">Datos adicionales</TableCell>
+                                    <TableCell className="text-right">{emb.datos}</TableCell>
+                                  </TableRow>
+                                )}
+                              </React.Fragment>
+                            ))}
                             {player.ubicacion && (
                                 <TableRow>
                                     <TableCell className="font-medium text-muted-foreground">Ubicación (amarra/muelle)</TableCell>
@@ -131,6 +188,26 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                                     <TableCell className="text-right">{player.creditoActivo ? "Sí" : "No"}</TableCell>
                                 </TableRow>
                             )}
+                            {serviciosAdicionales.length > 0 && (
+                                <>
+                                  <TableRow>
+                                    <TableCell colSpan={2} className="font-medium bg-muted/50 pt-4">
+                                      Servicios adicionales
+                                    </TableCell>
+                                  </TableRow>
+                                  {serviciosAdicionales.map((s) => {
+                                    const item = pricingMap.get(s.claseId);
+                                    return (
+                                      <TableRow key={s.id}>
+                                        <TableCell className="font-medium text-muted-foreground">{item?.label ?? s.claseId}</TableCell>
+                                        <TableCell className="text-right">
+                                          {item?.price != null ? `$${item.price.toLocaleString("es-AR")}/mes` : "-"}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </>
+                            )}
                             {player.personasAutorizadas && player.personasAutorizadas.length > 0 && (
                                 <TableRow>
                                     <TableCell className="font-medium text-muted-foreground">Personas autorizadas</TableCell>
@@ -139,12 +216,6 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                                           ? player.personasAutorizadas.join(", ")
                                           : String(player.personasAutorizadas)}
                                     </TableCell>
-                                </TableRow>
-                            )}
-                            {player.embarcacionDatos && (
-                                <TableRow>
-                                    <TableCell className="font-medium text-muted-foreground">Datos adicionales</TableCell>
-                                    <TableCell className="text-right">{player.embarcacionDatos}</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>

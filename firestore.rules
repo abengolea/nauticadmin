@@ -354,6 +354,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Configuración de precios de embarcaciones por náutica
+    match /schools/{schoolId}/boatPricingConfig/{configId} {
+      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      allow delete: if false;
+    }
+
     // Configuración de turnos por náutica (admin configura; clientes leen si está habilitado)
     match /schools/{schoolId}/appointmentConfig/{configId} {
       allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId)
@@ -457,7 +464,16 @@ service cloud.firestore {
     match /schools/{schoolId}/recPayerAliases/{docId} {
       allow read, write: if false;
     }
+    match /schools/{schoolId}/recPendingPayerAliases/{docId} {
+      allow read, write: if false;
+    }
     match /schools/{schoolId}/recImportBatches/{docId} {
+      allow read, write: if false;
+    }
+    match /schools/{schoolId}/recExcelRelations/{docId} {
+      allow read, write: if false;
+    }
+    match /schools/{schoolId}/recExcelAudit/{docId} {
       allow read, write: if false;
     }
 

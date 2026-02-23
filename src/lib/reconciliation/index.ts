@@ -14,5 +14,6 @@ export const REC_COLLECTIONS = {
   payments: 'recPayments',
   matches: 'recMatches',
   payerAliases: 'recPayerAliases',
+  pendingPayerAliases: 'recPendingPayerAliases',
   importBatches: 'recImportBatches',
 } as const;

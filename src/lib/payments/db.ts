@@ -53,6 +53,12 @@ function toPayment(docSnap: DocumentSnapshot): Payment {
     createdAt: toDate(d.createdAt),
     metadata: d.metadata,
     paymentType: d.paymentType ?? (isRegistrationPeriod(period) ? 'registration' : isClothingPeriod(period) ? 'clothing' : 'monthly'),
+    method: d.method,
+    reference: d.reference,
+    fingerprintHash: d.fingerprintHash,
+    duplicateStatus: d.duplicateStatus,
+    duplicateCaseId: d.duplicateCaseId,
+    updatedAt: d.updatedAt ? toDate(d.updatedAt) : undefined,
   };
 }
 
@@ -423,6 +429,34 @@ export async function createPaymentIntent(
     createdAt: toDate(d.createdAt),
     updatedAt: toDate(d.updatedAt),
   };
+}
+
+/** Obtiene requiereFactura de jugadores. Default true si no está definido. */
+export async function getPlayerRequiereFacturaMap(
+  db: Firestore,
+  schoolId: string,
+  playerIds: string[]
+): Promise<Map<string, boolean>> {
+  const unique = [...new Set(playerIds)];
+  const map = new Map<string, boolean>();
+  if (unique.length === 0) return map;
+  const playersRef = db.collection('schools').doc(schoolId).collection('players');
+  const batchSize = 10;
+  for (let i = 0; i < unique.length; i += batchSize) {
+    const batch = unique.slice(i, i + batchSize);
+    const snaps = await Promise.all(batch.map((id) => playersRef.doc(id).get()));
+    snaps.forEach((snap, idx) => {
+      const id = batch[idx];
+      if (snap.exists) {
+        const d = snap.data()!;
+        const rf = d.requiereFactura;
+        map.set(id, rf === false ? false : true);
+      } else {
+        map.set(id, true);
+      }
+    });
+  }
+  return map;
 }
 
 /** Obtiene nombres de jugadores por IDs (schools/{schoolId}/players). Si el ID no es un doc, intenta resolverlo como UID de Firebase Auth (email → playerLogins → jugador). */

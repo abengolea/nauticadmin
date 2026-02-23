@@ -24,6 +24,14 @@ node_modules
 # misc
 .DS_Store
 *.pem
+# facturas PDF generadas localmente
+/facturas/
+
+# certificados AFIP (nunca commitear)
+/certs/*
+!certs/.gitkeep
+/afip/*
+!afip/.gitkeep
 
 # debug
 npm-debug.log*

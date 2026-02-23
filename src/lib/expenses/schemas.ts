@@ -120,6 +120,7 @@ export const expenseSchema = z.object({
 
 /** Schema para la respuesta JSON de la IA (parse-expense) */
 export const aiExtractedExpenseSchema = z.object({
+  concept: z.string().optional(),
   supplier: z.object({
     name: z.string().optional(),
     cuit: z.string().optional(),

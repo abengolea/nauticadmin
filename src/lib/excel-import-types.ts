@@ -6,6 +6,7 @@
 /** Campos posibles del sistema de clientes náuticos */
 export const EXCEL_FIELD_MAP = {
   apellidoNombres: 'Apellido Nombres / Razón Social',
+  email: 'Email / Correo',
   telefono: 'Teléfono',
   datosEmbarcacion: 'Datos embarcación',
   nombreEmbarcacion: 'Nombre embarcación',

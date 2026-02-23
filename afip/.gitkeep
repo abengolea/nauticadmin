@@ -1,0 +1,4 @@
+# Colocar aquí los certificados AFIP:
+# Homologación: certificado_homo.crt, privada_homo.key, chain.pem
+# Producción: certificado_prod.crt, privada_prod.key, chain_prod.pem
+# Configurar en .env.local: AFIP_CERT_PATH, AFIP_KEY_PATH, AFIP_CHAIN_PATH

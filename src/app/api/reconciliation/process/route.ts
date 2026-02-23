@@ -16,6 +16,7 @@ import {
   makePaymentId,
   parseClientsExcel,
   parsePaymentsExcel,
+  tokenSetRatio,
 } from '@/lib/reconciliation';
 import type { RecClient, RecPayment, RecMatch, PayerAlias } from '@/lib/reconciliation/types';
 
@@ -115,10 +116,34 @@ export async function POST(request: Request) {
     await batch1.commit();
 
     const aliasesSnap = await aliasesRef.get();
-    const aliases = new Map<string, PayerAlias>();
-    for (const d of aliasesSnap.docs) {
-      const data = d.data() as PayerAlias;
-      aliases.set(data.normalized_payer_name, data);
+    const aliases = new Map<string, PayerAlias & { _resolved_client_id?: string }>();
+    const aliasDataList = aliasesSnap.docs.map((d) => d.data() as PayerAlias);
+
+    const playersSnap = await db.collection(`schools/${schoolId}/players`).get();
+
+    for (const data of aliasDataList) {
+      let enriched = { ...data } as PayerAlias & { _resolved_client_id?: string };
+      if (data.player_id && !data.client_id) {
+        const playerDoc = playersSnap.docs.find((d) => d.id === data.player_id);
+        if (playerDoc) {
+          const d = playerDoc.data() as { firstName?: string; lastName?: string; tutorContact?: { name?: string } };
+          const fullName = (d.tutorContact?.name ?? `${d.lastName ?? ''} ${d.firstName ?? ''}`.trim()).trim();
+          const { normalized: playerNorm } = normalizeAndTokenize(fullName);
+          const clientMatch = clients.find((c) => c.full_name_norm === playerNorm);
+          if (clientMatch) {
+            enriched._resolved_client_id = clientMatch.client_id;
+          } else {
+            const { tokens: playerTokens } = normalizeAndTokenize(fullName);
+            let best: { client: RecClient; score: number } | null = null;
+            for (const c of clients) {
+              const score = tokenSetRatio(playerTokens, c.tokens);
+              if (score >= 85 && (!best || score > best.score)) best = { client: c, score };
+            }
+            if (best) enriched._resolved_client_id = best.client.client_id;
+          }
+        }
+      }
+      aliases.set(data.normalized_payer_name, enriched);
     }
 
     let autoCount = 0;

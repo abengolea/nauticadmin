@@ -47,6 +47,7 @@ export default function PlayerProfilePage() {
   const router = useRouter();
   const isViewingAsPlayer = profile?.role === "player" && String(profile?.playerId ?? "") === String(id);
   const [isEditPlayerOpen, setEditPlayerOpen] = useState(false);
+  const [editInitialTab, setEditInitialTab] = useState<"personal" | "nautica">("personal");
   const [archiving, setArchiving] = useState(false);
   const [unarchiving, setUnarchiving] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
@@ -231,6 +232,7 @@ export default function PlayerProfilePage() {
       isOpen={isEditPlayerOpen}
       onOpenChange={setEditPlayerOpen}
       isPlayerEditing={isViewingAsPlayer}
+      initialTab={editInitialTab}
     />
     <div className="flex flex-col gap-8">
       <header className="flex flex-col md:flex-row gap-6">
@@ -277,7 +279,7 @@ export default function PlayerProfilePage() {
           </div>
         </div>
         <div className="flex flex-wrap items-start gap-2">
-          <Button variant="outline" onClick={() => setEditPlayerOpen(true)}>
+          <Button variant="outline" onClick={() => { setEditInitialTab("personal"); setEditPlayerOpen(true); }}>
             Editar Perfil
           </Button>
         </div>
@@ -319,7 +321,7 @@ export default function PlayerProfilePage() {
           <AlertDescription className="mt-1">
             Completá <strong>todos</strong> los datos de tu perfil: nombre, apellido, contacto, email y <strong>foto de la embarcación</strong>. Podés sacar una foto o subir una desde tu dispositivo en &quot;Editar Perfil&quot;.
           </AlertDescription>
-          <Button className="mt-4" size="lg" onClick={() => setEditPlayerOpen(true)}>
+          <Button className="mt-4" size="lg" onClick={() => { setEditInitialTab("personal"); setEditPlayerOpen(true); }}>
             Completar perfil
           </Button>
         </Alert>
@@ -332,6 +334,7 @@ export default function PlayerProfilePage() {
           canEditCoachFeedback={false}
           schoolId={schoolId ?? undefined}
           playerId={id}
+          onEditEmbarcacion={() => { setEditInitialTab("nautica"); setEditPlayerOpen(true); }}
         />
         <div className="mt-4">
           <PlayerPaymentStatusCard

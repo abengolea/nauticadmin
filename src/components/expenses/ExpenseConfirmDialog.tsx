@@ -11,7 +11,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { getAuth } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
+import { ExternalLink } from 'lucide-react';
 import type { AIExtractedExpense } from '@/lib/expenses/schemas';
 
 interface ExpenseConfirmDialogProps {
@@ -20,7 +29,10 @@ interface ExpenseConfirmDialogProps {
   expenseId: string;
   schoolId: string;
   extracted: AIExtractedExpense | null;
+  storagePath?: string | null;
   duplicateCandidates?: string[];
+  mode?: 'confirm' | 'edit';
+  initialStatus?: string;
   onConfirmed: () => void;
 }
 
@@ -30,16 +42,53 @@ export function ExpenseConfirmDialog({
   expenseId,
   schoolId,
   extracted,
+  storagePath,
   duplicateCandidates = [],
+  mode = 'confirm',
+  initialStatus,
   onConfirmed,
 }: ExpenseConfirmDialogProps) {
+  const { toast } = useToast();
   const [form, setForm] = useState<AIExtractedExpense | null>(extracted);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setForm(extracted);
   }, [extracted]);
+
+  useEffect(() => {
+    if (!open || !storagePath || !schoolId || !expenseId) {
+      setInvoiceUrl(null);
+      return;
+    }
+    let cancelled = false;
+    const fetchUrl = async () => {
+      const user = getAuth().currentUser;
+      if (!user) return;
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch(
+          `/api/expenses/${expenseId}/invoice-url?schoolId=${encodeURIComponent(schoolId)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          setInvoiceUrl(data.url ?? null);
+        } else {
+          setInvoiceUrl(null);
+        }
+      } catch {
+        if (!cancelled) setInvoiceUrl(null);
+      }
+    };
+    fetchUrl();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, storagePath, schoolId, expenseId]);
 
   const handleConfirm = async () => {
     if (!form) return;
@@ -64,6 +113,8 @@ export function ExpenseConfirmDialog({
             invoice: form.invoice,
             amounts: form.amounts,
             items: form.items,
+            notes: form.concept?.trim() || undefined,
+            ...(mode === 'edit' && initialStatus && { status: initialStatus }),
           },
         }),
       });
@@ -72,6 +123,10 @@ export function ExpenseConfirmDialog({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Error al confirmar');
       }
+      toast({
+        title: mode === 'edit' ? 'Gasto actualizado' : 'Gasto registrado',
+        description: 'La factura se guardó correctamente.',
+      });
       onConfirmed();
       onClose();
     } catch (err) {
@@ -85,7 +140,7 @@ export function ExpenseConfirmDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Confirmar datos extraídos</DialogTitle>
+          <DialogTitle>{mode === 'edit' ? 'Editar gasto' : 'Confirmar datos extraídos'}</DialogTitle>
         </DialogHeader>
 
         {!form ? (
@@ -101,6 +156,32 @@ export function ExpenseConfirmDialog({
         )}
 
         <div className="grid gap-4 py-4">
+          {invoiceUrl && (
+            <div className="flex items-center gap-2">
+              <a
+                href={invoiceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Ver factura (foto/PDF)
+              </a>
+            </div>
+          )}
+          <div className="grid gap-2">
+            <Label>Concepto</Label>
+            <Input
+              value={form.concept ?? ''}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  concept: e.target.value,
+                })
+              }
+              placeholder="Descripción del gasto"
+            />
+          </div>
           <div className="grid gap-2">
             <Label>Proveedor</Label>
             <Input
@@ -170,21 +251,46 @@ export function ExpenseConfirmDialog({
                 />
               </div>
             </div>
-            <div className="grid gap-2">
-              <Label>Total</Label>
-              <Input
-                type="number"
-                value={form.amounts?.total ?? 0}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    amounts: {
-                      ...form.amounts,
-                      total: parseFloat(e.target.value) || 0,
-                    },
-                  })
-                }
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-2">
+                <Label>Moneda</Label>
+                <Select
+                  value={form.amounts?.currency ?? 'ARS'}
+                  onValueChange={(v: 'ARS' | 'USD') =>
+                    setForm({
+                      ...form,
+                      amounts: {
+                        ...form.amounts,
+                        currency: v,
+                      },
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ARS">ARS (Pesos)</SelectItem>
+                    <SelectItem value="USD">USD (Dólares)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Total</Label>
+                <Input
+                  type="number"
+                  value={form.amounts?.total ?? 0}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      amounts: {
+                        ...form.amounts,
+                        total: parseFloat(e.target.value) || 0,
+                      },
+                    })
+                  }
+                />
+              </div>
             </div>
         </div>
         </>
@@ -197,7 +303,7 @@ export function ExpenseConfirmDialog({
             Cancelar
           </Button>
           <Button onClick={handleConfirm} disabled={!form || loading}>
-            {loading ? 'Confirmando...' : 'Confirmar gasto'}
+            {loading ? 'Guardando...' : mode === 'edit' ? 'Guardar cambios' : 'Confirmar gasto'}
           </Button>
         </DialogFooter>
       </DialogContent>

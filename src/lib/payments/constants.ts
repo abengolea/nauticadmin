@@ -5,6 +5,9 @@ export const COLLECTIONS = {
   paymentIntents: 'paymentIntents',
   emailEvents: 'emailEvents',
   schoolFeePayments: 'schoolFeePayments',
+  duplicateCases: 'duplicateCases',
+  invoiceOrders: 'invoiceOrders',
+  customerCredits: 'customerCredits',
 } as const;
 
 /** Documento de config global de mensualidades: platformConfig/platformFeeConfig */

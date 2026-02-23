@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { getMissingProfileFieldLabels } from "@/lib/utils";
 import { useUser } from "@/firebase";
 import { PlayerPhotoField } from "./PlayerPhotoField";
@@ -38,6 +39,24 @@ import { Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Player } from "@/lib/types";
+import { getPlayerEmbarcaciones } from "@/lib/utils";
+import { useDoc } from "@/firebase";
+import type { BoatPricingConfig } from "@/lib/types/boat-pricing";
+import { getDefaultBoatPricingItems, splitPricingItems } from "@/lib/types/boat-pricing";
+
+const embarcacionSchema = z.object({
+  id: z.string(),
+  nombre: z.string().optional(),
+  matricula: z.string().optional(),
+  medidas: z.string().optional(),
+  datos: z.string().optional(),
+  claseId: z.string().optional(),
+});
+
+const servicioAdicionalSchema = z.object({
+  id: z.string(),
+  claseId: z.string(),
+});
 
 const playerSchema = z.object({
   // Datos personales
@@ -49,15 +68,14 @@ const playerSchema = z.object({
   status: z.enum(["active", "inactive", "suspended"]),
   observations: z.string().optional(),
   photoUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
-  // Datos náuticos
-  embarcacionNombre: z.string().optional(),
-  embarcacionMatricula: z.string().optional(),
-  embarcacionMedidas: z.string().optional(),
+  // Datos náuticos - embarcaciones (una o más)
+  embarcaciones: z.array(embarcacionSchema).default([]),
+  serviciosAdicionales: z.array(servicioAdicionalSchema).default([]),
   ubicacion: z.string().optional(),
   clienteDesde: z.string().optional(),
   creditoActivo: z.boolean().optional(),
-  personasAutorizadas: z.string().optional(), // Coma-separado
-  embarcacionDatos: z.string().optional(),
+  requiereFactura: z.boolean().optional(),
+  personasAutorizadas: z.string().optional(),
   usuarioId: z.string().optional(),
 });
 
@@ -69,6 +87,8 @@ interface EditPlayerDialogProps {
   onSuccess?: () => void;
   /** Si es true, el jugador edita su propio perfil: no puede cambiar el campo Estado. */
   isPlayerEditing?: boolean;
+  /** Pestaña inicial al abrir (por defecto "personal"). */
+  initialTab?: "personal" | "nautica";
 }
 
 export function EditPlayerDialog({
@@ -78,9 +98,15 @@ export function EditPlayerDialog({
   onOpenChange,
   onSuccess,
   isPlayerEditing = false,
+  initialTab = "personal",
 }: EditPlayerDialogProps) {
   const { user } = useUser();
   const { toast } = useToast();
+
+  const embarcacionesIniciales = getPlayerEmbarcaciones(player).map((e, i) => ({
+    ...e,
+    id: e.id === "legacy" ? `legacy-${i}` : e.id,
+  }));
 
   const form = useForm<z.infer<typeof playerSchema>>({
     resolver: zodResolver(playerSchema),
@@ -93,21 +119,50 @@ export function EditPlayerDialog({
       status: player.status ?? "active",
       observations: player.observations ?? "",
       photoUrl: player.photoUrl ?? "",
-      embarcacionNombre: player.embarcacionNombre ?? "",
-      embarcacionMatricula: player.embarcacionMatricula ?? "",
-      embarcacionMedidas: player.embarcacionMedidas ?? "",
+      embarcaciones: embarcacionesIniciales.length > 0 ? embarcacionesIniciales : [{ id: crypto.randomUUID(), nombre: "", matricula: "", medidas: "", datos: "", claseId: "" }],
+      serviciosAdicionales: (player as { serviciosAdicionales?: { id: string; claseId: string }[] }).serviciosAdicionales ?? [],
       ubicacion: player.ubicacion ?? "",
       clienteDesde: player.clienteDesde ?? "",
       creditoActivo: player.creditoActivo ?? undefined,
+      requiereFactura: player.requiereFactura !== false,
       personasAutorizadas: Array.isArray(player.personasAutorizadas) ? player.personasAutorizadas.join(", ") : (player.personasAutorizadas as string) ?? "",
-      embarcacionDatos: player.embarcacionDatos ?? "",
       usuarioId: player.usuarioId ?? "",
     },
   });
 
+  const [activeTab, setActiveTab] = useState<"personal" | "nautica">(initialTab);
+
+  useEffect(() => {
+    if (isOpen) setActiveTab(initialTab);
+  }, [isOpen, initialTab]);
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "embarcaciones",
+  });
+  const {
+    fields: servicioFields,
+    append: appendServicio,
+    remove: removeServicio,
+  } = useFieldArray({
+    control: form.control,
+    name: "serviciosAdicionales",
+  });
+
+  const { data: boatPricing } = useDoc<BoatPricingConfig & { id: string }>(
+    `schools/${schoolId}/boatPricingConfig/default`
+  );
+  const pricingItems =
+    boatPricing?.items?.length ? boatPricing.items : getDefaultBoatPricingItems();
+  const { embarcaciones: embarcacionItems, servicios: servicioItems } = splitPricingItems(pricingItems);
+
   // Reset form when player changes or dialog opens
   useEffect(() => {
     if (isOpen && player) {
+      const emb = getPlayerEmbarcaciones(player).map((e, i) => ({
+        ...e,
+        id: e.id === "legacy" ? `legacy-${i}` : e.id,
+      }));
       form.reset({
         firstName: player.firstName ?? "",
         lastName: player.lastName ?? "",
@@ -117,14 +172,13 @@ export function EditPlayerDialog({
         status: player.status ?? "active",
         observations: player.observations ?? "",
         photoUrl: player.photoUrl ?? "",
-        embarcacionNombre: player.embarcacionNombre ?? "",
-        embarcacionMatricula: player.embarcacionMatricula ?? "",
-        embarcacionMedidas: player.embarcacionMedidas ?? "",
+        embarcaciones: emb.length > 0 ? emb : [{ id: crypto.randomUUID(), nombre: "", matricula: "", medidas: "", datos: "", claseId: "" }],
+        serviciosAdicionales: (player as { serviciosAdicionales?: { id: string; claseId: string }[] }).serviciosAdicionales ?? [],
         ubicacion: player.ubicacion ?? "",
         clienteDesde: player.clienteDesde ?? "",
         creditoActivo: player.creditoActivo ?? undefined,
+        requiereFactura: player.requiereFactura !== false,
         personasAutorizadas: Array.isArray(player.personasAutorizadas) ? player.personasAutorizadas.join(", ") : (player.personasAutorizadas as string) ?? "",
-        embarcacionDatos: player.embarcacionDatos ?? "",
         usuarioId: player.usuarioId ?? "",
       });
     }
@@ -137,7 +191,18 @@ export function EditPlayerDialog({
       ? values.personasAutorizadas.split(",").map((s) => s.trim()).filter(Boolean)
       : undefined;
 
-    const updateData = {
+    const embarcaciones = values.embarcaciones
+      ?.filter((e) => (e.claseId?.trim() || e.nombre?.trim() || e.matricula?.trim() || e.medidas?.trim()))
+      .map((e) => ({
+        id: e.id,
+        nombre: e.nombre?.trim() || undefined,
+        matricula: e.matricula?.trim() || undefined,
+        medidas: e.medidas?.trim() || undefined,
+        datos: e.datos?.trim() || undefined,
+        claseId: e.claseId?.trim() || undefined,
+      })) ?? [];
+
+    const updateData: Record<string, unknown> = {
       firstName: values.firstName,
       lastName: values.lastName,
       dni: values.dni || null,
@@ -149,16 +214,23 @@ export function EditPlayerDialog({
       status: values.status,
       photoUrl: values.photoUrl || null,
       observations: values.observations || null,
-      embarcacionNombre: values.embarcacionNombre?.trim() || null,
-      embarcacionMatricula: values.embarcacionMatricula?.trim() || null,
-      embarcacionMedidas: values.embarcacionMedidas?.trim() || null,
+      embarcaciones: embarcaciones.length > 0 ? embarcaciones : null,
+      serviciosAdicionales: (values.serviciosAdicionales ?? []).filter((s) => s.claseId?.trim()).length > 0
+        ? (values.serviciosAdicionales ?? []).filter((s) => s.claseId?.trim()).map((s) => ({ id: s.id, claseId: s.claseId!.trim() }))
+        : null,
       ubicacion: values.ubicacion?.trim() || null,
       clienteDesde: values.clienteDesde?.trim() || null,
       creditoActivo: values.creditoActivo ?? null,
+      requiereFactura: values.requiereFactura ?? true,
       personasAutorizadas: personasArr ?? null,
-      embarcacionDatos: values.embarcacionDatos?.trim() || null,
       usuarioId: values.usuarioId?.trim() || null,
     };
+    if (embarcaciones.length > 0) {
+      updateData.embarcacionNombre = null;
+      updateData.embarcacionMatricula = null;
+      updateData.embarcacionMedidas = null;
+      updateData.embarcacionDatos = null;
+    }
 
     const showSuccess = () => {
       onOpenChange(false);
@@ -247,7 +319,7 @@ export function EditPlayerDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            <Tabs defaultValue="personal" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "personal" | "nautica")} className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <TabsList className="grid w-full grid-cols-2 mb-4 flex-shrink-0">
                 <TabsTrigger value="personal">Datos personales</TabsTrigger>
                 <TabsTrigger value="nautica">Embarcación</TabsTrigger>
@@ -386,46 +458,172 @@ export function EditPlayerDialog({
                 </div>
               </TabsContent>
               <TabsContent value="nautica" className="mt-0 space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="embarcacionNombre"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nombre de la embarcación</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ej: Rey Cargo 620" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="embarcacionMatricula"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Matrícula</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ej: 099223" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="embarcacionMedidas"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Medidas</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ej: 6.20m x 2.50m" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Cargá cada embarcación con su clase (tipo) para que el sistema sepa cuánto cobrar.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => append({ id: crypto.randomUUID(), nombre: "", matricula: "", medidas: "", datos: "", claseId: "" })}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Agregar embarcación
+                    </Button>
+                  </div>
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="rounded-lg border p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Embarcación {index + 1}</span>
+                        {fields.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => remove(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name={`embarcaciones.${index}.claseId`}
+                          render={({ field: f }) => (
+                            <FormItem>
+                              <FormLabel>Clase (tipo de embarcación) *</FormLabel>
+                              <Select onValueChange={f.onChange} value={f.value ?? ""}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar clase..." />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {embarcacionItems.map((item) => (
+                                    <SelectItem key={item.id} value={item.id}>
+                                      {item.group} – {item.label} (${(item.price ?? 0).toLocaleString("es-AR")})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>Define el canon mensual a cobrar.</FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`embarcaciones.${index}.nombre`}
+                          render={({ field: f }) => (
+                            <FormItem>
+                              <FormLabel>Nombre</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: Rey Cargo 620" {...f} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`embarcaciones.${index}.matricula`}
+                          render={({ field: f }) => (
+                            <FormItem>
+                              <FormLabel>Matrícula</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: 099223" {...f} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`embarcaciones.${index}.medidas`}
+                          render={({ field: f }) => (
+                            <FormItem>
+                              <FormLabel>Medidas</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: 6.20m x 2.50m" {...f} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`embarcaciones.${index}.datos`}
+                          render={({ field: f }) => (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel>Datos adicionales</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Cualquier dato adicional..." {...f} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {servicioItems.length > 0 && (
+                    <div className="rounded-lg border p-4 space-y-4 pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                          Servicios adicionales (lavado, marinería, kayaks, guarda bote auxiliar, etc.)
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => appendServicio({ id: crypto.randomUUID(), claseId: "" })}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Agregar servicio
+                        </Button>
+                      </div>
+                      {servicioFields.map((field, index) => (
+                        <div key={field.id} className="flex items-center gap-2">
+                          <FormField
+                            control={form.control}
+                            name={`serviciosAdicionales.${index}.claseId`}
+                            render={({ field: f }) => (
+                              <FormItem className="flex-1">
+                                <Select onValueChange={f.onChange} value={f.value ?? ""}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccionar servicio..." />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {servicioItems.map((item) => (
+                                      <SelectItem key={item.id} value={item.id}>
+                                        {item.group} – {item.label} (${(item.price ?? 0).toLocaleString("es-AR")})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive shrink-0"
+                            onClick={() => removeServicio(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="grid md:grid-cols-2 gap-6 pt-2 border-t">
                   <FormField
                     control={form.control}
                     name="ubicacion"
@@ -469,6 +667,26 @@ export function EditPlayerDialog({
                       )}
                     />
                   )}
+                  <FormField
+                    control={form.control}
+                    name="requiereFactura"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel>Requiere factura</FormLabel>
+                          <FormDescription>
+                            Si está activo, se facturarán los pagos de este cliente. Desactivar si no necesita factura.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value ?? true}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="creditoActivo"
@@ -516,19 +734,7 @@ export function EditPlayerDialog({
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="embarcacionDatos"
-                    render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                        <FormLabel>Datos adicionales de la embarcación</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Cualquier dato adicional..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  </div>
                 </div>
               </TabsContent>
             </div>

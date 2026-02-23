@@ -7,7 +7,12 @@
 
 export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'refunded';
 
-export type PaymentProvider = 'mercadopago' | 'dlocal' | 'manual' | 'excel_import';
+export type PaymentProvider = 'mercadopago' | 'dlocal' | 'stripe' | 'transfer' | 'manual' | 'excel_import';
+
+export type PaymentMethod = 'card' | 'transfer' | 'cash' | 'unknown';
+
+/** Estado de duplicado: none, suspected (en caso abierto), confirmed/ignored (resuelto). */
+export type DuplicateStatus = 'none' | 'suspected' | 'confirmed' | 'ignored';
 
 /** Estado del jugador respecto a pagos: active, inactive, suspended (por mora >= 30 días). */
 export type PlayerStatus = 'active' | 'inactive' | 'suspended';
@@ -32,6 +37,17 @@ export interface Payment {
   metadata?: Record<string, unknown>;
   /** Si no viene, se infiere: period === "inscripcion" => registration, sino monthly */
   paymentType?: PaymentType;
+  /** Método de pago (card, transfer, cash). */
+  method?: PaymentMethod;
+  /** Referencia externa (nro operación, comprobante). */
+  reference?: string | null;
+  /** Hash para detección de duplicados contables. */
+  fingerprintHash?: string;
+  /** Estado respecto a duplicados. */
+  duplicateStatus?: DuplicateStatus;
+  /** ID del caso de duplicado si está suspected/confirmed. */
+  duplicateCaseId?: string | null;
+  updatedAt?: Date;
 }
 
 export interface PaymentIntent {

@@ -16,6 +16,7 @@ const CLIENT_COL_NAMES = [
 const PAYMENT_COLS = {
   dato1: ['dato opcional 1', 'apellido', 'dato 1'],
   dato2: ['dato opcional 2', 'nombre', 'dato 2'],
+  pagador: ['pagador', 'titular', 'razon social', 'razón social', 'titular tarjeta', 'col g', 'col 7'],
   idUsuario: ['id usuario', 'idusuario', 'id_usuario'],
   nroTarjeta: ['nro tarjeta', 'tarjeta', 'nrotarjeta'],
   importe: ['importe', 'monto', 'amount'],
@@ -90,12 +91,14 @@ export function parsePaymentsExcel(
 
   const colDato1 = findColumnIndex(headers, PAYMENT_COLS.dato1);
   const colDato2 = findColumnIndex(headers, PAYMENT_COLS.dato2);
+  const colPagador = findColumnIndex(headers, PAYMENT_COLS.pagador);
   const colIdUsuario = findColumnIndex(headers, PAYMENT_COLS.idUsuario);
   const colImporte = findColumnIndex(headers, PAYMENT_COLS.importe);
   const colAplicada = findColumnIndex(headers, PAYMENT_COLS.aplicada);
 
-  if (colDato1 < 0 && colDato2 < 0) {
-    return { payments: [], error: 'No se encontró columna Dato Opcional 1 o 2' };
+  const hasPayerCols = colDato1 >= 0 || colDato2 >= 0 || colPagador >= 0;
+  if (!hasPayerCols) {
+    return { payments: [], error: 'No se encontró columna de pagador (Dato Opcional 1/2 o Pagador)' };
   }
   if (colImporte < 0) {
     return { payments: [], error: 'No se encontró columna Importe' };
@@ -107,8 +110,15 @@ export function parsePaymentsExcel(
   const payments: ParsedPaymentRow[] = [];
   for (let i = 0; i < dataRows.length; i++) {
     const row = dataRows[i] ?? [];
-    const dato1 = colDato1 >= 0 ? String(row[colDato1] ?? '').trim() : '';
-    const dato2 = colDato2 >= 0 ? String(row[colDato2] ?? '').trim() : '';
+    let dato1 = colDato1 >= 0 ? String(row[colDato1] ?? '').trim() : '';
+    let dato2 = colDato2 >= 0 ? String(row[colDato2] ?? '').trim() : '';
+    if (colPagador >= 0) {
+      const pagadorVal = String(row[colPagador] ?? '').trim();
+      if (pagadorVal) {
+        dato1 = pagadorVal;
+        dato2 = '';
+      }
+    }
     const idUsuario = colIdUsuario >= 0 ? String(row[colIdUsuario] ?? '').trim() : '';
     const nroTarjeta = colNroTarjeta >= 0 ? String(row[colNroTarjeta] ?? '').trim() : '';
     const importe = parseAmount(row[colImporte]);

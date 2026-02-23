@@ -6,7 +6,7 @@ import { useDoc, useUserProfile } from "@/firebase";
 import type { School } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, Shield, Users, Clock, FileSpreadsheet } from "lucide-react";
+import { ChevronLeft, Shield, Users, Clock, FileSpreadsheet, Banknote } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SchoolUsersList } from "@/components/admin/SchoolUsersList";
 import { useEffect } from "react";
@@ -18,6 +18,7 @@ import { ImportClientsFromExcel } from "@/components/clients/ImportClientsFromEx
 import { ImportClienteDesde } from "@/components/clients/ImportClienteDesde";
 import { ImportPaymentsFromExcel } from "@/components/payments/ImportPaymentsFromExcel";
 import { ImportUsuarioId } from "@/components/clients/ImportUsuarioId";
+import { BoatPricingConfigForm } from "@/components/boat-pricing/BoatPricingConfigForm";
 
 export default function SchoolAdminPage() {
   const params = useParams();
@@ -84,7 +85,7 @@ export default function SchoolAdminPage() {
         </Card>
       ) : (
         <Tabs defaultValue="users" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 gap-1 p-1 h-auto md:h-10 bg-card">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1 p-1 h-auto md:h-10 bg-card">
                 <TabsTrigger value="users" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
                     <Shield className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
                     <span className="truncate">Responsables</span>
@@ -92,6 +93,10 @@ export default function SchoolAdminPage() {
                 <TabsTrigger value="players" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
                     <Users className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
                     <span className="truncate">Clientes</span>
+                </TabsTrigger>
+                <TabsTrigger value="precios" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
+                    <Banknote className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+                    <span className="truncate">Precios</span>
                 </TabsTrigger>
                 <TabsTrigger value="importar" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
                     <FileSpreadsheet className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
@@ -104,6 +109,9 @@ export default function SchoolAdminPage() {
             </TabsList>
             <TabsContent value="users">
                 <SchoolUsersList schoolId={schoolId} />
+            </TabsContent>
+            <TabsContent value="precios" className="space-y-4">
+                <BoatPricingConfigForm schoolId={schoolId} />
             </TabsContent>
             <TabsContent value="players">
                  <Card>

@@ -45,22 +45,28 @@ export async function POST(request: Request) {
       const expenseRef = db.collection('schools').doc(schoolId).collection('expenses').doc();
       const expenseId = expenseRef.id;
 
-      const ext = file.name.split('.').pop() || 'jpg';
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const isPdf = file.type === 'application/pdf' || ext === 'pdf';
       const basePath = `schools/${schoolId}/expenses/${expenseId}`;
       const storagePath = `${basePath}/original.${ext}`;
-      const thumbnailPath = `${basePath}/thumb.${ext}`;
+      const thumbnailPath = isPdf
+        ? storagePath
+        : `${basePath}/thumb.${ext}`;
 
       const fileBuffer = Buffer.from(await file.arrayBuffer());
+      const contentType = file.type || (isPdf ? 'application/pdf' : 'image/jpeg');
       const originalFile = bucket.file(storagePath);
       await originalFile.save(fileBuffer, {
-        metadata: { contentType: file.type || 'image/jpeg' },
+        metadata: { contentType },
       });
 
-      // Thumbnail: por simplicidad guardamos la misma imagen (en producción usar sharp/jimp para redimensionar)
-      const thumbFile = bucket.file(thumbnailPath);
-      await thumbFile.save(fileBuffer, {
-        metadata: { contentType: file.type || 'image/jpeg' },
-      });
+      // Thumbnail: para imágenes guardamos copia (en producción usar sharp para redimensionar); para PDF usamos el mismo archivo
+      if (!isPdf) {
+        const thumbFile = bucket.file(thumbnailPath);
+        await thumbFile.save(fileBuffer, {
+          metadata: { contentType },
+        });
+      }
 
       const now = new Date().toISOString();
       const draft: Omit<Expense, 'id'> & { id: string } = {
@@ -85,7 +91,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: 'Se requiere un archivo de imagen (file)' },
+      { error: 'Se requiere un archivo (imagen JPG/PNG/WebP o PDF)' },
       { status: 400 }
     );
   } catch (err) {

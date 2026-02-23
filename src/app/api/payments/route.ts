@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server';
 import { listPaymentsSchema } from '@/lib/payments/schemas';
 import { getAdminFirestore } from '@/lib/firebase-admin';
-import { listPayments, getPlayerNames, getArchivedPlayerIds } from '@/lib/payments/db';
+import { listPayments, getPlayerNames, getArchivedPlayerIds, getPlayerRequiereFacturaMap } from '@/lib/payments/db';
 import { verifyIdToken } from '@/lib/auth-server';
 
 export async function GET(request: Request) {
@@ -65,9 +65,15 @@ export async function GET(request: Request) {
       playerIdsBySchool.set(school, set);
     }
     const allNames = new Map<string, string>();
+    const requiereFacturaMap = new Map<string, boolean>();
     for (const [schoolId, playerIds] of playerIdsBySchool) {
-      const names = await getPlayerNames(db, schoolId, [...playerIds]);
+      const ids = [...playerIds];
+      const [names, rfMap] = await Promise.all([
+        getPlayerNames(db, schoolId, ids),
+        getPlayerRequiereFacturaMap(db, schoolId, ids),
+      ]);
       names.forEach((name, id) => allNames.set(id, name));
+      rfMap.forEach((v, id) => requiereFacturaMap.set(id, v));
     }
 
     // Fallback manual para playerIds conocidos cuando la resolución automática no encuentra
@@ -85,6 +91,7 @@ export async function GET(request: Request) {
       payments: payments.map((p) => ({
         ...p,
         playerName: resolveName(p.playerId),
+        requiereFactura: requiereFacturaMap.get(p.playerId) !== false,
         paidAt: p.paidAt?.toISOString(),
         createdAt: p.createdAt.toISOString(),
       })),

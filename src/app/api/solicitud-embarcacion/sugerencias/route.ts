@@ -37,7 +37,14 @@ export async function GET(request: Request) {
       .get();
 
     const players = playersSnap.docs
-      .map((d) => d.data() as { firstName?: string; lastName?: string; embarcacionNombre?: string; embarcacionMatricula?: string; archived?: boolean })
+      .map((d) => d.data() as {
+        firstName?: string;
+        lastName?: string;
+        embarcacionNombre?: string;
+        embarcacionMatricula?: string;
+        embarcaciones?: Array<{ nombre?: string; matricula?: string }>;
+        archived?: boolean;
+      })
       .filter((p) => !p.archived && (p.firstName || p.lastName));
 
     if (tipo === 'nombre') {
@@ -58,10 +65,12 @@ export async function GET(request: Request) {
     for (const p of players) {
       const nombreFull = `${(p.firstName ?? '').trim()} ${(p.lastName ?? '').trim()}`.trim();
       if (nombreCliente && nombreFull.toLowerCase() !== nombreCliente.toLowerCase()) continue;
-      const emb = (p.embarcacionNombre ?? '').trim();
-      const mat = (p.embarcacionMatricula ?? '').trim();
-      if (emb && (!qMatch || emb.toLowerCase().includes(q))) embarcaciones.add(emb);
-      if (mat && (!qMatch || mat.toLowerCase().includes(q))) embarcaciones.add(mat);
+      const embs = p.embarcaciones?.length
+        ? p.embarcaciones.map((e) => [(e.nombre ?? '').trim(), (e.matricula ?? '').trim()]).flat()
+        : [(p.embarcacionNombre ?? '').trim(), (p.embarcacionMatricula ?? '').trim()];
+      for (const v of embs) {
+        if (v && (!qMatch || v.toLowerCase().includes(q))) embarcaciones.add(v);
+      }
     }
     const sugerencias = Array.from(embarcaciones).sort().slice(0, 15);
     return NextResponse.json({ sugerencias });

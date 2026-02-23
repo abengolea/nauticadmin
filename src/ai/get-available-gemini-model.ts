@@ -14,13 +14,13 @@ function getApiKey(): string | null {
 
 const MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-/** Orden de preferencia de modelos (el primero disponible se usa). */
+/** Orden de preferencia: flash-lite primero (más rápido), luego flash, luego pro. */
 const PREFERRED_MODEL_IDS = [
-  'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
-  'gemini-2.5-pro',
-  'gemini-2.0-flash',
   'gemini-2.0-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-2.5-pro',
   'gemini-1.5-flash',
   'gemini-1.5-flash-001',
   'gemini-1.5-pro',
@@ -35,12 +35,21 @@ interface ListModelsResponse {
 }
 
 /** Modelo por defecto cuando la API de listado falla pero la key existe */
-const DEFAULT_MODEL = 'gemini-1.5-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+
+/** Cache del modelo (evita fetch a listado en cada request). TTL 5 min. */
+let cachedModel: string | null = null;
+let cacheExpiry = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 /**
  * Devuelve el ID de modelo (sin prefijo "models/") a usar, o null si no hay key o no hay modelos.
  */
 export async function getAvailableGeminiModel(): Promise<string | null> {
+  const override = process.env.GEMINI_EXPENSE_MODEL?.trim();
+  if (override) return override;
+
+  if (cachedModel && Date.now() < cacheExpiry) return cachedModel;
   const apiKey = getApiKey();
   if (!apiKey) return null;
 
@@ -55,6 +64,8 @@ export async function getAvailableGeminiModel(): Promise<string | null> {
         res.status,
         await res.text().catch(() => '')
       );
+      cachedModel = DEFAULT_MODEL;
+      cacheExpiry = Date.now() + CACHE_TTL_MS;
       return DEFAULT_MODEL;
     }
 
@@ -71,7 +82,11 @@ export async function getAvailableGeminiModel(): Promise<string | null> {
       const found = models.find(
         (m) => toId(m.name) === id && supportsGenerate(m)
       );
-      if (found) return toId(found.name);
+      if (found) {
+        cachedModel = toId(found.name);
+        cacheExpiry = Date.now() + CACHE_TTL_MS;
+        return cachedModel;
+      }
     }
 
     // Si no, cualquier Gemini que soporte generateContent
@@ -80,13 +95,21 @@ export async function getAvailableGeminiModel(): Promise<string | null> {
         supportsGenerate(m) &&
         (toId(m.name).startsWith('gemini-') || toId(m.name).startsWith('gemini/'))
     );
-    if (gemini) return toId(gemini.name);
+    if (gemini) {
+      cachedModel = toId(gemini.name);
+      cacheExpiry = Date.now() + CACHE_TTL_MS;
+      return cachedModel;
+    }
 
     // Lista vacía o sin match: usar modelo por defecto
-    return DEFAULT_MODEL;
+    cachedModel = DEFAULT_MODEL;
+    cacheExpiry = Date.now() + CACHE_TTL_MS;
+    return cachedModel;
   } catch (err) {
     console.warn('[getAvailableGeminiModel] Error:', err);
-    return DEFAULT_MODEL;
+    cachedModel = DEFAULT_MODEL;
+    cacheExpiry = Date.now() + CACHE_TTL_MS;
+    return cachedModel;
   }
 }
 

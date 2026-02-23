@@ -145,6 +145,9 @@ export async function POST(request: Request) {
         .filter(Boolean)
         .join(' | ') || undefined;
 
+      const emailRaw = (data.email as string)?.trim?.();
+      const emailNorm = emailRaw?.includes?.('@') ? emailRaw.toLowerCase() : undefined;
+
       const playerData: Record<string, unknown> = {
         firstName,
         lastName,
@@ -155,6 +158,7 @@ export async function POST(request: Request) {
         status: 'active',
         createdAt: Timestamp.now(),
         createdBy: uid,
+        ...(emailNorm && { email: emailNorm }),
         ...(observationsStr && { observations: observationsStr }),
         ...(data.nombreEmbarcacion && { embarcacionNombre: data.nombreEmbarcacion }),
         ...(data.matricula && { embarcacionMatricula: data.matricula }),

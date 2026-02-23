@@ -132,3 +132,40 @@ export function getMissingProfileFieldLabels(values: {
   if (photo.length === 0 || (!photo.startsWith("http://") && !photo.startsWith("https://"))) missing.push(PROFILE_FIELD_LABELS.photoUrl);
   return missing;
 }
+
+/** Tipo Embarcacion para el helper. */
+export interface EmbarcacionForDisplay {
+  id: string;
+  nombre?: string;
+  matricula?: string;
+  medidas?: string;
+  datos?: string;
+  claseId?: string;
+}
+
+/** Obtiene las embarcaciones del cliente: usa embarcaciones[] si existe, sino migra desde campos legacy. */
+export function getPlayerEmbarcaciones(player: {
+  embarcaciones?: EmbarcacionForDisplay[];
+  embarcacionNombre?: string;
+  embarcacionMatricula?: string;
+  embarcacionMedidas?: string;
+  embarcacionDatos?: string;
+}): EmbarcacionForDisplay[] {
+  if (player.embarcaciones && player.embarcaciones.length > 0) {
+    return player.embarcaciones;
+  }
+  const nom = (player.embarcacionNombre ?? "").trim();
+  const mat = (player.embarcacionMatricula ?? "").trim();
+  const med = (player.embarcacionMedidas ?? "").trim();
+  const dat = (player.embarcacionDatos ?? "").trim();
+  if (nom || mat || med || dat) {
+    return [{
+      id: "legacy",
+      nombre: nom || undefined,
+      matricula: mat || undefined,
+      medidas: med || undefined,
+      datos: dat || undefined,
+    }];
+  }
+  return [];
+}

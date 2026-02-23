@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,15 +29,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { useCollection } from "@/firebase";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Payment, Player } from "@/lib/types";
 
 /** Pago con nombre de jugador enriquecido por la API */
-type PaymentWithPlayerName = Payment & { playerName?: string };
+type PaymentWithPlayerName = Payment & { playerName?: string; requiereFactura?: boolean };
 
 interface PaymentsTabProps {
   schoolId: string;
@@ -111,6 +113,9 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
   const [manualPeriod, setManualPeriod] = useState(currentPeriod());
   const [manualAmount, setManualAmount] = useState("15000");
   const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [facturando, setFacturando] = useState(false);
+  const [modoSimulacion, setModoSimulacion] = useState(true);
   const { toast } = useToast();
 
   const { data: players } = useCollection<Player>(
@@ -155,6 +160,112 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(approvedFacturable.map((p) => p.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleFacturar = async () => {
+    if (selectedIds.size === 0) {
+      toast({ variant: "destructive", title: "Seleccioná al menos un pago para facturar." });
+      return;
+    }
+    setFacturando(true);
+    const token = await getToken();
+    if (!token) {
+      toast({ variant: "destructive", title: "No se pudo obtener sesión." });
+      setFacturando(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/facturas/emit-batch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          schoolId,
+          paymentIds: Array.from(selectedIds),
+          simulation: modoSimulacion,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Error al facturar");
+      }
+      const okCount = data.processed ?? 0;
+      const failCount = data.failed ?? 0;
+      const okResults = (data.results ?? []).filter((r: { ok: boolean }) => r.ok);
+      const filenames = okResults.map((r: { filename?: string }) => r.filename).filter(Boolean) as string[];
+      const failMsgs = (data.results ?? [])
+        .filter((r: { ok: boolean; error?: string }) => !r.ok && r.error)
+        .map((r: { error: string }) => r.error);
+      if (okCount > 0 && filenames.length > 0) {
+        toast({
+          title: modoSimulacion ? `Simulación: ${okCount} factura(s) generada(s)` : `${okCount} factura(s) emitida(s) a AFIP`,
+          description: failCount > 0 ? `${failCount} fallaron.` : "Hacé clic en 'Descargar' para abrir los PDF.",
+          action: (
+            <ToastAction
+              altText="Descargar"
+              onClick={async () => {
+                const t = await getToken();
+                if (!t) return;
+                for (const fn of filenames) {
+                  const r = await fetch(`/api/facturas/${fn}`, { headers: { Authorization: `Bearer ${t}` } });
+                  const blob = await r.blob();
+                  const a = document.createElement("a");
+                  a.href = URL.createObjectURL(blob);
+                  a.download = fn;
+                  a.click();
+                  URL.revokeObjectURL(a.href);
+                }
+              }}
+            >
+              Descargar
+            </ToastAction>
+          ),
+        });
+      } else if (okCount > 0 && filenames.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Error: las facturas no se guardaron",
+          description: "El servidor reportó éxito pero no se generaron archivos. Revisá la consola del servidor.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "No se generó ninguna factura",
+          description: failMsgs[0] ?? "Revisá la consola del servidor para más detalles.",
+        });
+      }
+      if (failMsgs.length > 0) {
+        failMsgs.slice(0, 3).forEach((msg: string) => toast({ variant: "destructive", title: "Error", description: msg }));
+      }
+      setSelectedIds(new Set());
+      fetchPayments();
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: e instanceof Error ? e.message : "Error al facturar",
+      });
+    } finally {
+      setFacturando(false);
+    }
+  };
 
   const handleManualPayment = async () => {
     const amount = parseFloat(manualAmount);
@@ -218,6 +329,7 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
     return ts >= currentMonthStart && ts <= currentMonthEnd;
   };
   const approvedInList = payments.filter((p) => p.status === "approved");
+  const approvedFacturable = approvedInList.filter((p) => (p as PaymentWithPlayerName).requiereFactura !== false);
   const totalInList = approvedInList.reduce((s, p) => s + p.amount, 0);
   const approvedThisMonth = approvedInList.filter(isInCurrentMonth);
   const totalThisMonth = approvedThisMonth.reduce((s, p) => s + p.amount, 0);
@@ -330,6 +442,30 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
             ))}
           </SelectContent>
         </Select>
+        {approvedFacturable.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:border-l sm:pl-4">
+            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+              <Checkbox
+                checked={modoSimulacion}
+                onCheckedChange={(c) => setModoSimulacion(c === true)}
+              />
+              <span className="text-muted-foreground text-xs sm:text-sm">Simulación</span>
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleFacturar}
+              disabled={facturando || selectedIds.size === 0}
+            >
+              {facturando ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <FileText className="h-4 w-4 mr-2" />
+              )}
+              Facturar ({selectedIds.size})
+            </Button>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -342,6 +478,12 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
           <Table className="min-w-[640px]">
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10 px-2">
+                  <Checkbox
+                    checked={selectedIds.size === approvedFacturable.length && approvedFacturable.length > 0}
+                    onCheckedChange={(c) => toggleSelectAll(c === true)}
+                  />
+                </TableHead>
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap">Período</TableHead>
                 <TableHead className="text-xs sm:text-sm">Cliente</TableHead>
                 <TableHead className="text-xs sm:text-sm">Monto</TableHead>
@@ -353,15 +495,30 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
             <TableBody>
               {payments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     No hay pagos para mostrar
                   </TableCell>
                 </TableRow>
               ) : (
                 payments.map((p) => (
                   <TableRow key={p.id}>
+                    <TableCell className="w-10 px-2">
+                      {p.status === "approved" && (p as PaymentWithPlayerName).requiereFactura !== false ? (
+                        <Checkbox
+                          checked={selectedIds.has(p.id)}
+                          onCheckedChange={() => toggleSelect(p.id)}
+                        />
+                      ) : p.status === "approved" ? (
+                        <span className="text-xs text-muted-foreground" title="Cliente marcado como no facturar">—</span>
+                      ) : null}
+                    </TableCell>
                     <TableCell>{formatPeriodDisplay(p.period)}</TableCell>
-                    <TableCell>{p.playerName ?? p.playerId}</TableCell>
+                    <TableCell>
+                      <span>{p.playerName ?? p.playerId}</span>
+                      {p.status === "approved" && (p as PaymentWithPlayerName).requiereFactura === false && (
+                        <Badge variant="secondary" className="ml-1 text-xs">No factura</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {p.currency} {p.amount.toLocaleString("es-AR")}
                     </TableCell>

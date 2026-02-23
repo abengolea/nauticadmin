@@ -96,6 +96,28 @@ export interface SchoolUser {
   assignedCategories?: string[]; // IDs de las categorías asignadas
 }
 
+/** Servicio adicional contratado por el cliente (lavado, marinería, kayaks, etc.) */
+export interface ServicioAdicional {
+  id: string;
+  /** ID del tipo de pricing (BoatPricingItem.id) */
+  claseId: string;
+}
+
+/** Embarcación de un cliente. Cada cliente puede tener una o más. */
+export interface Embarcacion {
+  id: string;
+  /** Nombre de la embarcación */
+  nombre?: string;
+  /** Matrícula */
+  matricula?: string;
+  /** Medidas y características */
+  medidas?: string;
+  /** Datos adicionales */
+  datos?: string;
+  /** ID del tipo de pricing (BoatPricingItem.id) - define cuánto cobrar por canon mensual */
+  claseId?: string;
+}
+
 export interface Player {
   id: string;
   firstName: string;
@@ -141,13 +163,17 @@ export interface Player {
   escuelaId?: string;
 
   // --- Campos específicos para clientes náuticos ---
-  /** Nombre de la embarcación */
+  /** Lista de embarcaciones del cliente (una o más). Si está definida, es la fuente principal. */
+  embarcaciones?: Embarcacion[];
+  /** Servicios adicionales contratados (lavado, marinería, kayaks, guarda bote auxiliar, etc.) */
+  serviciosAdicionales?: ServicioAdicional[];
+  /** @deprecated Usar embarcaciones[].nombre - Nombre de la embarcación (compatibilidad) */
   embarcacionNombre?: string;
-  /** Matrícula de la embarcación */
+  /** @deprecated Usar embarcaciones[].matricula - Matrícula de la embarcación (compatibilidad) */
   embarcacionMatricula?: string;
-  /** Medidas y características de la embarcación */
+  /** @deprecated Usar embarcaciones[].medidas - Medidas y características (compatibilidad) */
   embarcacionMedidas?: string;
-  /** Ubicación (amarra, muelle, etc.) */
+  /** Ubicación (amarra, muelle, etc.) - a nivel cliente */
   ubicacion?: string;
   /** Fecha desde que es cliente (string o Date) */
   clienteDesde?: string;
@@ -155,10 +181,16 @@ export interface Player {
   creditoActivo?: boolean;
   /** Personas autorizadas a manejar la embarcación (nombres separados por coma o array) */
   personasAutorizadas?: string[];
-  /** Datos adicionales de la embarcación */
+  /** @deprecated Usar embarcaciones[].datos - Datos adicionales (compatibilidad) */
   embarcacionDatos?: string;
   /** ID del cliente en la app externa de pagos (para importar pagos por Excel) */
   usuarioId?: string;
+  /** CUIT del cliente (para facturación electrónica) */
+  cuit?: string;
+  /** Si requiere factura (default true). Si false, no se factura. */
+  requiereFactura?: boolean;
+  /** Fecha en que se envió la invitación de acceso al panel (para no reenviar). */
+  accessInviteSentAt?: Date;
 }
 
 /** Ficha médica del jugador (PDF). Subida por jugador o staff; aprobada o rechazada por admin/entrenador. */

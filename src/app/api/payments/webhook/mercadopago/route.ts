@@ -11,12 +11,10 @@
 import { NextResponse } from 'next/server';
 import { getAdminFirestore } from '@/lib/firebase-admin';
 import {
-  findPaymentByProviderId,
-  createPayment,
   updatePlayerStatus,
-  playerExistsInSchool,
   getMercadoPagoConnection,
 } from '@/lib/payments/db';
+import { ingestPayment } from '@/lib/duplicate-payments/payment-ingestion';
 import { sendEmailEvent } from '@/lib/payments/email-events';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import type admin from 'firebase-admin';
@@ -107,56 +105,60 @@ async function processNotification(params: {
   const amount = payment.transaction_amount ?? 0;
   const currency = payment.currency_id ?? 'ARS';
 
-  const playerExists = await playerExistsInSchool(db, schoolId, playerId);
-  if (!playerExists) {
-    console.warn('[webhook/mercadopago] Player not in school', { schoolId, playerId });
-    return NextResponse.json({ ok: true });
-  }
-
   const now = new Date();
-  const idempotencyKey = `mercadopago_${paymentId}`;
-  await createPayment(
-    db,
-    {
-      playerId,
+
+  try {
+    const result = await ingestPayment(db, {
+      provider: 'mercadopago',
+      providerPaymentId: String(paymentId),
+      customerId: playerId,
       schoolId,
       period,
       amount,
       currency,
-      provider: 'mercadopago',
-      providerPaymentId: String(paymentId),
-      status: 'approved',
       paidAt: now,
-    },
-    idempotencyKey
-  );
+      method: 'card',
+      reference: payment.external_reference ?? null,
+      status: 'accredited',
+    });
 
-  await updatePlayerStatus(db, schoolId, playerId, 'active');
-
-  const playerRef = db.collection('schools').doc(schoolId).collection('players').doc(playerId);
-  const playerSnap = await playerRef.get();
-  const playerData = playerSnap.data();
-  const playerName = playerData
-    ? `${playerData.firstName ?? ''} ${playerData.lastName ?? ''}`.trim()
-    : 'Jugador';
-  const toEmail = playerData?.email;
-  if (toEmail) {
-    try {
-      await sendEmailEvent({
-        db: db as admin.firestore.Firestore,
-        type: 'payment_receipt',
-        playerId,
-        schoolId,
-        period,
-        to: toEmail,
-        playerName,
-        amount,
-        currency,
-        paidAt: now,
-      });
-    } catch (emailErr) {
-      console.warn('[webhook/mercadopago] Email no enviado:', emailErr);
+    if (result.isDuplicateTechnical) {
+      return NextResponse.json({ ok: true });
     }
+
+    await updatePlayerStatus(db, schoolId, playerId, 'active');
+
+    // Solo enviar email recibo si NO hay caso de duplicado abierto
+    if (!result.duplicateCaseId) {
+      const playerRef = db.collection('schools').doc(schoolId).collection('players').doc(playerId);
+      const playerSnap = await playerRef.get();
+      const playerData = playerSnap.data();
+      const playerName = playerData
+        ? `${playerData.firstName ?? ''} ${playerData.lastName ?? ''}`.trim()
+        : 'Jugador';
+      const toEmail = playerData?.email;
+      if (toEmail) {
+        try {
+          await sendEmailEvent({
+            db: db as admin.firestore.Firestore,
+            type: 'payment_receipt',
+            playerId,
+            schoolId,
+            period,
+            to: toEmail,
+            playerName,
+            amount,
+            currency,
+            paidAt: now,
+          });
+        } catch (emailErr) {
+          console.warn('[webhook/mercadopago] Email no enviado:', emailErr);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[webhook/mercadopago] ingestPayment failed', err);
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ ok: true });

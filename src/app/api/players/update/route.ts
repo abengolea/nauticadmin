@@ -27,12 +27,15 @@ type UpdatePayload = {
     pie_dominante: string | null;
     posicion_preferida: string | null;
     // Campos náuticos
+    embarcaciones?: Array<{ id: string; nombre?: string; matricula?: string; medidas?: string; datos?: string; claseId?: string }> | null;
+    serviciosAdicionales?: Array<{ id: string; claseId: string }> | null;
     embarcacionNombre?: string | null;
     embarcacionMatricula?: string | null;
     embarcacionMedidas?: string | null;
     ubicacion?: string | null;
     clienteDesde?: string | null;
     creditoActivo?: boolean | null;
+    requiereFactura?: boolean | null;
     personasAutorizadas?: string[] | null;
     embarcacionDatos?: string | null;
     usuarioId?: string | null;

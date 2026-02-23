@@ -195,14 +195,19 @@ export async function POST(request: Request) {
     }
 
     const aliasToPlayer = new Map<string, DocSnapshot>();
+    const playersById = new Map(playersSnap.docs.map((d) => [d.id, d]));
     for (const d of aliasesSnap.docs) {
-      const data = d.data() as { normalized_payer_name?: string; client_id?: string };
+      const data = d.data() as { normalized_payer_name?: string; client_id?: string; player_id?: string };
       const payerNorm = data.normalized_payer_name ?? '';
-      const clientId = data.client_id ?? '';
-      if (payerNorm && clientId) {
-        const playerDoc = recClientIdToPlayer.get(clientId);
-        if (playerDoc) aliasToPlayer.set(payerNorm, playerDoc);
+      if (!payerNorm) continue;
+      let playerDoc: DocSnapshot | undefined;
+      if (data.player_id) {
+        playerDoc = playersById.get(data.player_id);
       }
+      if (!playerDoc && data.client_id) {
+        playerDoc = recClientIdToPlayer.get(data.client_id);
+      }
+      if (playerDoc) aliasToPlayer.set(payerNorm, playerDoc);
     }
 
     const unappliedRef = db.collection('schools').doc(schoolId).collection('unappliedPayments');

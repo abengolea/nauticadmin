@@ -7,7 +7,7 @@
 
 /**
  * Convierte string numérico argentino/europeo a number.
- * Ej: "526.350,00" => 526350.00, "1.234,56" => 1234.56
+ * Ej: "526.350,00" => 526350.00, "1.234,56" => 1234.56, "6.880" => 6880
  */
 export function normalizeNumber(value: string | number | undefined | null): number | undefined {
   if (value === undefined || value === null) return undefined;
@@ -16,11 +16,19 @@ export function normalizeNumber(value: string | number | undefined | null): numb
   if (!str) return undefined;
   // Quitar espacios y caracteres no numéricos excepto . , -
   const cleaned = str.replace(/\s/g, '').replace(/[^\d.,\-]/g, '');
-  // Formato argentino: 1.234,56 (punto miles, coma decimal)
+  // Formato argentino: 1.234,56 (punto miles, coma decimal) o 6.880 (punto miles, sin decimales)
   const hasCommaDecimal = /,\d{1,2}$/.test(cleaned) || /,\d+$/.test(cleaned);
-  const normalized = hasCommaDecimal
-    ? cleaned.replace(/\./g, '').replace(',', '.')
-    : cleaned.replace(/,/g, '');
+  let normalized: string;
+  if (hasCommaDecimal) {
+    normalized = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (cleaned.includes('.')) {
+    // Sin coma: "6.880" = 6880 (punto como miles). Si la parte tras el punto tiene 3 dígitos, es miles.
+    const afterDot = cleaned.split('.').pop() ?? '';
+    const isThousands = afterDot.length === 3 && /^\d+$/.test(afterDot);
+    normalized = isThousands ? cleaned.replace(/\./g, '') : cleaned;
+  } else {
+    normalized = cleaned.replace(/,/g, '');
+  }
   const num = parseFloat(normalized);
   return Number.isNaN(num) ? undefined : num;
 }

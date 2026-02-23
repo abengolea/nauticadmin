@@ -21,6 +21,7 @@ const ColumnMappingSchema = z.object({
   /** Campo del sistema al que mapear */
   systemField: z.enum([
     'apellidoNombres',
+    'email',
     'telefono',
     'datosEmbarcacion',
     'nombreEmbarcacion',
@@ -76,6 +77,7 @@ Eres un asistente de una plataforma de administración de náuticas (NauticAdmin
 
 **Campos del sistema que necesitamos:**
 - apellidoNombres: Apellido Nombres (persona) o Razón Social (empresa) - propietario del cliente
+- email: Email o correo electrónico del cliente
 - telefono: Teléfono de contacto
 - datosEmbarcacion: Datos generales de la embarcación
 - nombreEmbarcacion: Nombre de la embarcación

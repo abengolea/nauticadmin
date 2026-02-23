@@ -186,13 +186,15 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
         <CardDescription>
           {hasPending ? (
             isAdminView ? (
-              <>Lo que debe este cliente: {[
-                delinquents.some((d) => d.period === REGISTRATION_PERIOD) && "inscripción",
-                delinquents.some((d) => d.period !== REGISTRATION_PERIOD && !d.period?.startsWith?.("ropa-")) && "cuota mensual",
-                clothingPending.length > 0 && "ropa",
-              ].filter(Boolean).join(", ")}.</>
+              <>Debe: {[
+                ...delinquents.map((d) => formatPeriodLabel(d.period)),
+                ...clothingPending.map((c) => formatPeriodLabel(c.period)),
+              ].join(", ")}</>
             ) : (
-              <>Tenés pagos pendientes.</>
+              <>Tenés pagos pendientes: {[
+                ...delinquents.map((d) => formatPeriodLabel(d.period)),
+                ...clothingPending.map((c) => formatPeriodLabel(c.period)),
+              ].join(", ")}</>
             )
           ) : (
             isAdminView ? (
@@ -249,7 +251,7 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
         ) : (
           <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
             <CheckCircle className="h-5 w-5 shrink-0" />
-            <span className="font-medium">Al día (inscripción, cuota y ropa)</span>
+            <span className="font-medium">Al día</span>
           </div>
         )}
       </CardContent>

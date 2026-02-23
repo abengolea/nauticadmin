@@ -16,6 +16,12 @@ describe('normalizeNumber', () => {
     expect(normalizeNumber('526.350,00')).toBe(526350);
     expect(normalizeNumber('1.234,56')).toBe(1234.56);
     expect(normalizeNumber('0,50')).toBe(0.5);
+    expect(normalizeNumber('68,8')).toBe(68.8);
+  });
+
+  it('interpreta punto como miles cuando no hay coma decimal (ej: 6.880)', () => {
+    expect(normalizeNumber('6.880')).toBe(6880);
+    expect(normalizeNumber('1.234')).toBe(1234);
   });
 
   it('acepta números ya parseados', () => {

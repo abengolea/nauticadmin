@@ -47,19 +47,22 @@ export function matchPayment(
   const { tokens: payerTokens } = normalizeAndTokenize(payerNorm);
 
   const alias = aliases.get(payerNorm);
-  if (alias) {
-    const client = clients.find((c) => c.client_id === alias.client_id);
-    return {
-      decision: 'auto',
-      payment_id: '', // se asigna después
-      client_id: alias.client_id,
-      score: 100,
-      top_candidates: client
-        ? [{ client_id: client.client_id, client_name_raw: client.full_name_raw, score: 100 }]
-        : [],
-      explanation: `Alias: ${payerNorm} -> ${alias.client_id}`,
-      reason: 'alias',
-    };
+  if (alias && (alias.client_id || (alias as PayerAlias & { _resolved_client_id?: string })._resolved_client_id)) {
+    const clientId = alias.client_id ?? (alias as PayerAlias & { _resolved_client_id?: string })._resolved_client_id;
+    if (clientId) {
+      const client = clients.find((c) => c.client_id === clientId);
+      return {
+        decision: 'auto',
+        payment_id: '', // se asigna después
+        client_id: clientId,
+        score: 100,
+        top_candidates: client
+          ? [{ client_id: client.client_id, client_name_raw: client.full_name_raw, score: 100 }]
+          : [],
+        explanation: `Alias: ${payerNorm} -> ${clientId}`,
+        reason: 'alias',
+      };
+    }
   }
 
   const clientList = clients.map((c) => ({
