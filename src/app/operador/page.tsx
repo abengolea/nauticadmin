@@ -5,6 +5,12 @@ import { useUserProfile } from '@/firebase';
 import { getAuth } from 'firebase/auth';
 import { useFirebase } from '@/firebase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -49,18 +55,22 @@ function SolicitudCard({
   onRegreso?: () => void;
   variant: 'pendiente' | 'sin_regreso';
 }) {
+  const [showPhoto, setShowPhoto] = useState(false);
+
+  const handleEmbarcacionClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowPhoto(true);
+  };
+
   const content = (
     <>
-      {solicitud.photoUrl && (
-        <div className="w-full max-w-[200px] sm:max-w-[280px] aspect-video rounded-xl overflow-hidden bg-muted shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={solicitud.photoUrl}
-            alt={solicitud.nombreEmbarcacion}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      )}
+      <button
+        type="button"
+        onClick={handleEmbarcacionClick}
+        className="text-3xl sm:text-4xl md:text-5xl font-bold font-headline text-foreground text-center break-words px-4 py-2 rounded-xl border-2 border-primary bg-primary/20 hover:bg-primary/30 transition-colors touch-manipulation"
+      >
+        {solicitud.nombreEmbarcacion}
+      </button>
       {solicitud.ubicacion && (
         <div className="flex flex-col items-center gap-2">
           <span className="text-xl sm:text-2xl text-muted-foreground">Ubicación</span>
@@ -73,40 +83,65 @@ function SolicitudCard({
       <p className="text-3xl sm:text-4xl md:text-5xl font-bold font-headline text-primary text-center break-words">
         {solicitud.nombreCliente}
       </p>
-      <p className="text-2xl sm:text-3xl text-muted-foreground text-center">Embarcación</p>
-      <p className="text-3xl sm:text-4xl md:text-5xl font-bold font-headline text-foreground text-center break-words">
-        {solicitud.nombreEmbarcacion}
-      </p>
       {variant === 'pendiente' && (
-        <p className="text-xl sm:text-2xl text-muted-foreground mt-2">Tocá para ir a buscar</p>
+        <span className="inline-block text-xl sm:text-2xl font-semibold text-primary mt-2 px-5 py-2.5 rounded-xl bg-primary/25 border-2 border-primary shadow-md">
+          Tocá para ir a buscar
+        </span>
       )}
       {variant === 'sin_regreso' && (
-        <p className="text-base sm:text-lg text-muted-foreground mt-2">Tocá para marcar regreso</p>
+        <span className="inline-block text-base sm:text-lg font-semibold text-primary mt-2 px-4 py-2 rounded-xl bg-primary/25 border-2 border-primary shadow-md">
+          Tocá para marcar regreso
+        </span>
       )}
     </>
   );
 
+  const cardClassName =
+    variant === 'pendiente'
+      ? 'w-full min-h-[320px] sm:min-h-[380px] rounded-2xl border-4 border-primary bg-primary/20 hover:bg-primary/30 active:scale-[0.98] transition-all touch-manipulation flex flex-col items-center justify-center gap-4 p-6 cursor-pointer'
+      : 'min-h-[180px] sm:min-h-[200px] rounded-2xl border-4 border-primary bg-primary/10 hover:bg-primary/20 active:scale-[0.98] transition-all touch-manipulation flex flex-col items-center justify-center gap-2 p-6 cursor-pointer';
+
+  const photoDialog = (
+    <Dialog open={showPhoto} onOpenChange={setShowPhoto}>
+      <DialogContent className="max-w-[90vw] sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{solicitud.nombreEmbarcacion}</DialogTitle>
+        </DialogHeader>
+        {solicitud.photoUrl ? (
+          <div className="w-full aspect-video rounded-xl overflow-hidden bg-muted">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={solicitud.photoUrl}
+              alt={solicitud.nombreEmbarcacion}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <p className="text-lg text-muted-foreground text-center py-8">No hay foto</p>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+
   if (variant === 'pendiente' && onTomar) {
     return (
-      <button
-        type="button"
-        onClick={onTomar}
-        className="w-full min-h-[320px] sm:min-h-[380px] rounded-2xl border-4 border-primary bg-primary/20 hover:bg-primary/30 active:scale-[0.98] transition-all touch-manipulation flex flex-col items-center justify-center gap-4 p-6"
-      >
-        {content}
-      </button>
+      <>
+        <div role="button" tabIndex={0} onClick={onTomar} onKeyDown={(e) => e.key === 'Enter' && onTomar()} className={cardClassName}>
+          {content}
+        </div>
+        {photoDialog}
+      </>
     );
   }
 
   if (variant === 'sin_regreso' && onRegreso) {
     return (
-      <button
-        type="button"
-        onClick={onRegreso}
-        className="min-h-[180px] sm:min-h-[200px] rounded-2xl border-4 border-primary bg-primary/10 hover:bg-primary/20 active:scale-[0.98] transition-all touch-manipulation flex flex-col items-center justify-center gap-2 p-6"
-      >
-        {content}
-      </button>
+      <>
+        <div role="button" tabIndex={0} onClick={onRegreso} onKeyDown={(e) => e.key === 'Enter' && onRegreso()} className={cardClassName}>
+          {content}
+        </div>
+        {photoDialog}
+      </>
     );
   }
 
