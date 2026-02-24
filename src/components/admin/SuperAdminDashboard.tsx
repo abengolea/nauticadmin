@@ -85,9 +85,9 @@ export function SuperAdminDashboard() {
 
     return (
         <div className="flex flex-col gap-4 min-w-0">
-            <div className="flex items-center justify-between space-y-2">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight font-headline">Panel de Super Administrador</h1>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-headline">Panel de Super Administrador</h1>
                     <p className="text-muted-foreground">Gestiona todas las náuticas y usuarios de la plataforma.</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">

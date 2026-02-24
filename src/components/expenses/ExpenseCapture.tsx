@@ -1,9 +1,16 @@
 'use client';
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Camera, FileText, Upload, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Camera, FileText, Upload, X, ImagePlus } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { compressImageForUpload } from '@/lib/image-compress';
 
@@ -27,6 +34,9 @@ export function ExpenseCapture({
 }: ExpenseCaptureProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const queueRef = useRef<File[]>([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
@@ -35,10 +45,58 @@ export function ExpenseCapture({
   const [totalInBatch, setTotalInBatch] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   const isImage = (f: File) => f.type.startsWith('image/');
   const isPdf = (f: File) => f.type === 'application/pdf';
   const isValidFile = (f: File) => isImage(f) || isPdf(f);
+
+  const stopStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!cameraOpen) {
+      stopStream();
+      setCameraError(null);
+      return;
+    }
+    let cancelled = false;
+    setCameraError(null);
+    // Para facturas: preferir cámara trasera (environment) en móvil
+    const constraints: MediaStreamConstraints = {
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    };
+    navigator.mediaDevices
+      .getUserMedia(constraints)
+      .catch(() => navigator.mediaDevices.getUserMedia({ video: true }))
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.muted = true;
+          videoRef.current.play().catch(() => {});
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setCameraError(err.message || 'No se pudo acceder a la cámara. Verificá los permisos.');
+        }
+      });
+    return () => {
+      cancelled = true;
+      stopStream();
+    };
+  }, [cameraOpen, stopStream]);
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const arr = Array.from(newFiles);
@@ -224,7 +282,29 @@ export function ExpenseCapture({
     processOneFile(files[0]!, queueRef.current, 0);
   };
 
-  const handleCapture = () => inputRef.current?.click();
+  const openFileInput = () => inputRef.current?.click();
+
+  const handleCameraCapture = () => {
+    const video = videoRef.current;
+    if (!video || !streamRef.current || video.readyState < 2) return;
+    const canvas = canvasRef.current || document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const name = `factura-${Date.now()}.jpg`;
+        const file = new File([blob], name, { type: 'image/jpeg' });
+        addFiles([file]);
+        setCameraOpen(false);
+      },
+      'image/jpeg',
+      0.9
+    );
+  };
 
   const totalFiles = files.length;
   const progressLabel =
@@ -242,11 +322,47 @@ export function ExpenseCapture({
         ref={inputRef}
         type="file"
         accept="image/*,application/pdf"
-        capture="environment"
         multiple
         className="hidden"
         onChange={handleFileChange}
       />
+      <canvas ref={canvasRef} className="hidden" />
+
+      <Dialog open={cameraOpen} onOpenChange={setCameraOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Tomar foto de la factura</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {cameraError ? (
+              <p className="text-sm text-destructive">{cameraError}</p>
+            ) : (
+              <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-muted">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCameraOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCameraCapture}
+              disabled={!!cameraError || !streamRef.current}
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              Capturar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div
         onDrop={handleDrop}
@@ -257,12 +373,18 @@ export function ExpenseCapture({
         }`}
       >
         <p className="text-sm text-muted-foreground mb-2">
-          Arrastrá imágenes o PDFs aquí, o hacé clic para elegir
+          Arrastrá imágenes o PDFs aquí, o elegí una opción
         </p>
-        <Button type="button" variant="outline" onClick={handleCapture} disabled={loading}>
-          <Camera className="h-4 w-4 mr-2" />
-          Elegir archivos
-        </Button>
+        <div className="flex flex-wrap gap-2 justify-center">
+          <Button type="button" variant="outline" onClick={() => setCameraOpen(true)} disabled={loading}>
+            <Camera className="h-4 w-4 mr-2" />
+            Tomar foto
+          </Button>
+          <Button type="button" variant="outline" onClick={openFileInput} disabled={loading}>
+            <ImagePlus className="h-4 w-4 mr-2" />
+            Elegir de galería
+          </Button>
+        </div>
       </div>
 
       {files.length > 0 && (

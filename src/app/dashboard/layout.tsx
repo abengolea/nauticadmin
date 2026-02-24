@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { SidebarNav } from "@/components/layout/SidebarNav";
 import { SchoolFeeBanner } from "@/components/admin/SchoolFeeBanner";
 import { SidebarProvider, Sidebar, SidebarInset } from "@/components/ui/sidebar";
+import { ClientSearchProvider } from "@/context/ClientSearchContext";
 import { useUserProfile, useDoc } from "@/firebase";
 import { isPlayerProfileComplete } from "@/lib/utils";
 import type { Player } from "@/lib/types";
@@ -59,16 +60,18 @@ export default function DashboardLayout({
   // If a profile exists, the user is authorized to see the dashboard layout.
   return (
     <SidebarProvider>
+        <ClientSearchProvider>
         <Sidebar variant="inset" collapsible="icon">
           <SidebarNav />
         </Sidebar>
         <SidebarInset className="bg-background min-w-0 overflow-x-hidden">
           <Header />
           <SchoolFeeBanner />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-4 pt-6 md:p-8">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-3 pt-4 sm:p-4 sm:pt-6 md:p-8">
             {children}
           </main>
         </SidebarInset>
+        </ClientSearchProvider>
     </SidebarProvider>
   );
 }

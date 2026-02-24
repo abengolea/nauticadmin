@@ -14,7 +14,12 @@
     "seed:support": "tsx scripts/seed-support-flows.ts",
     "seed:aliases": "tsx scripts/seed-payer-aliases.ts",
     "simulate:payment": "tsx scripts/simulate-electronic-payment.ts",
-    "emit:invoice": "tsx scripts/emit-test-invoice.ts"
+    "emit:invoice": "tsx scripts/emit-test-invoice.ts",
+    "test-afip": "tsx scripts/test-afip.ts",
+    "test-afip:homo": "tsx scripts/test-afip.ts homo",
+    "test-afip:prod": "cross-env OPENSSL_CONF=./openssl.cnf tsx scripts/test-afip.ts prod",
+    "emit:invoice:homo": "tsx scripts/emit-test-invoice.ts homo",
+    "emit:invoice:prod": "cross-env OPENSSL_CONF=./openssl.cnf tsx scripts/emit-test-invoice.ts prod"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.20.0",
@@ -79,6 +84,8 @@
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "cross-env": "^10.1.0",
+    "eslint": "9.39.3",
+    "eslint-config-next": "16.1.6",
     "firebase-admin": "^13.6.1",
     "genkit-cli": "^1.20.0",
     "postcss": "^8",

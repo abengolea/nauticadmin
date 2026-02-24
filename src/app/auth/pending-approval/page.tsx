@@ -105,10 +105,10 @@ export default function PendingApprovalPage() {
   };
 
   return (
-    <Card className="w-full max-w-md shadow-2xl border-2">
+    <Card className="w-full max-w-md min-w-0 shadow-2xl border-2 mx-auto">
       <CardHeader className="items-center text-center">
         <UserX className="h-16 w-16 text-destructive" />
-        <CardTitle className="text-2xl font-headline mt-4">
+        <CardTitle className="text-xl sm:text-2xl font-headline mt-4">
           {isAccountDisabled ? "Cuenta desactivada" : "Acceso Pendiente"}
         </CardTitle>
         <CardDescription>

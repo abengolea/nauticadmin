@@ -160,16 +160,16 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       <div>
-        <h1 className="text-2xl font-bold">Gastos</h1>
+        <h1 className="text-xl sm:text-2xl font-bold font-headline">Gastos</h1>
         <p className="text-muted-foreground">
           Cargá facturas sacando una foto, extraemos los datos con IA y llevamos la cuenta corriente.
         </p>
       </div>
 
-      <Tabs defaultValue="list" className="w-full">
-        <TabsList>
+      <Tabs defaultValue="list" className="w-full min-w-0">
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1 w-full sm:inline-flex sm:w-auto">
           <TabsTrigger value="list">
             <List className="h-4 w-4 mr-2" />
             Listado
@@ -221,7 +221,7 @@ export default function ExpensesPage() {
         </TabsContent>
 
         <TabsContent value="add" className="mt-4">
-          <div className="max-w-md">
+          <div className="w-full max-w-md min-w-0">
             <ExpenseCapture
               schoolId={schoolId}
               onUploadComplete={handleUploadComplete}
@@ -312,7 +312,7 @@ function ExpenseListFilters({
   if (years.length === 0) years.push(new Date().getFullYear().toString());
 
   return (
-    <div className="flex flex-wrap items-center gap-2 mb-4">
+    <div className="flex flex-wrap items-center gap-2 mb-4 min-w-0">
       <Filter className="h-4 w-4 text-muted-foreground" />
       <Select value={statusFilter} onValueChange={onStatusChange}>
         <SelectTrigger className="w-36">
@@ -480,7 +480,7 @@ function ExpenseListTable({
         )}
       </div>
       {someSelected && (
-        <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+        <div className="flex flex-wrap items-center gap-2 p-2 rounded-md bg-muted/50">
           <span className="text-sm text-muted-foreground">
             {selectedIds.size} seleccionado(s)
           </span>
@@ -517,8 +517,8 @@ function ExpenseListTable({
           </Button>
         </div>
       )}
-      <div className="rounded-md border">
-        <table className="w-full text-sm">
+      <div className="rounded-md border overflow-x-auto -mx-1">
+        <table className="w-full text-sm min-w-[600px]">
           <thead>
             <tr className="border-b bg-muted/50">
               <th className="p-3 w-10">

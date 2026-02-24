@@ -1,13 +1,31 @@
 /**
  * Script para probar la conexión AFIP.
- * Ejecutar: npx tsx scripts/test-afip.ts
+ *
+ * Uso:
+ *   npx tsx scripts/test-afip.ts        → usa .env.local (último bloque)
+ *   npx tsx scripts/test-afip.ts homo  → fuerza homologación (.env.afip.homo)
+ *   npx tsx scripts/test-afip.ts prod  → fuerza producción (.env.afip.prod)
  */
+import '../src/lib/afip/tls-patch'; // debe ser el primer import (parche DH para AFIP prod)
 
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+const cwd = process.cwd();
+
+// 1) Cargar .env y .env.local
 dotenv.config();
+dotenv.config({ path: path.resolve(cwd, '.env.local'), override: true });
+
+// 2) Si se pasa homo o prod como argumento, cargar .env.afip.homo o .env.afip.prod
+const arg = process.argv[2]?.toLowerCase();
+if (arg === 'homo' || arg === 'prod') {
+  const envFile = path.resolve(cwd, `.env.afip.${arg}`);
+  const result = dotenv.config({ path: envFile, override: true });
+  if (result.error) {
+    console.warn(`[test-afip] No se encontró ${envFile}. Creá el archivo copiando .env.afip.${arg}.example`);
+  }
+}
 import { getAfipConfig } from '../src/lib/duplicate-payments/afip-config';
 import { emitAfipComprobante } from '../src/lib/duplicate-payments/afip-client';
 
@@ -19,8 +37,11 @@ async function main() {
   const hasCertPath = !!process.env.AFIP_CERT_PATH;
   const hasKeyPath = !!process.env.AFIP_KEY_PATH;
   const hasChainPath = !!process.env.AFIP_CHAIN_PATH;
+  const rawProduction = process.env.AFIP_PRODUCTION ?? '(no definido)';
+  const productionEnv = String(rawProduction).trim().toLowerCase() === 'true';
   console.log('Variables:', {
     AFIP_CUIT: hasCuit ? '✓' : '✗',
+    AFIP_PRODUCTION: productionEnv ? 'true (prod)' : `false (homo) [valor: "${rawProduction}"]`,
     AFIP_CERT_PATH: hasCertPath ? '✓' : '✗',
     AFIP_KEY_PATH: hasKeyPath ? '✓' : '✗',
     AFIP_CHAIN_PATH: hasChainPath ? '✓' : '✗',
@@ -54,7 +75,8 @@ async function main() {
   });
   console.log('');
 
-  console.log('Intentando emitir comprobante de prueba (homologación)...');
+  const envProduction = String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
+  console.log('Intentando emitir comprobante de prueba (' + (envProduction ? 'producción' : 'homologación') + ')...');
   try {
     const result = await emitAfipComprobante({
       concept: 'Prueba de integración',

@@ -1,6 +1,6 @@
 # Configuración: Facturación Electrónica AFIP (Notificas)
 
-Guía para implementar la emisión automática de facturas electrónicas cada vez que la app recibe un pago de un cliente. Pensado para cualquier proyecto que use Cursor/Notificas y necesite facturar contra AFIP.
+Guía completa para la emisión automática de facturas electrónicas. Integración directa con AFIP (WSAA + WSFE), sin dependencias externas.
 
 ---
 
@@ -16,7 +16,7 @@ Webhook / evento de pago
 POST /api/facturas/emit  (receptor + items)
         │
         ▼
-AFIP WSFE → CAE
+AFIP WSAA (token) → AFIP WSFE (CAE)
         │
         ▼
 PDF generado en ./facturas/
@@ -29,39 +29,51 @@ Opcional: enviar PDF por email al cliente
 
 ## 2. Requisitos previos
 
-- **CUIT** de la empresa emisora (ej: NOTIFICAS S. R. L.)
-- **Certificado digital AFIP** (homologación o producción)
-- **Punto de venta** y **tipo de comprobante** (ej: Factura B) dados de alta en AFIP
+- **CUIT** de la empresa emisora
+- **Certificado digital AFIP** (homologación y/o producción)
+- **Punto de venta** dado de alta en AFIP para el tipo de comprobante
+- **OpenSSL** en el sistema (o Git Bash en Windows) para firmar el TRA
 - Datos del **cliente receptor**: razón social, CUIT/DNI, domicilio
 
 ---
 
-## 3. Variables de entorno
+## 3. Configuración completa
 
-Copiar a `.env.local` (o el archivo de env que use tu app):
+### 3.1 Variables compartidas (`.env.local`)
+
+Solo las variables que no cambian entre homo y prod:
 
 ```env
-# AFIP - Facturación Electrónica
-# CUIT con o sin guiones (ej: 33-71729868-9 o 33717298689)
+# AFIP - Variables compartidas (homo y prod)
 AFIP_CUIT=33717298689
-
-# true = producción, false = homologación (pruebas)
-AFIP_PRODUCTION=false
-
-# Punto de venta (default 1)
 AFIP_PTO_VTA=1
-
-# Tipo comprobante: 6=Factura B, 11=Factura C (default 6)
 AFIP_CBTE_TIPO=6
-
-# Rutas a certificados (crear carpeta afip/ en la raíz del proyecto)
-AFIP_CERT_PATH=./afip/certificado_homo.crt
-AFIP_KEY_PATH=./afip/privada_homo.key
-AFIP_CHAIN_PATH=./afip/chain.pem
 
 # Datos del emisor (para el PDF)
 AFIP_RAZON_SOCIAL=NOTIFICAS S. R. L.
-AFIP_DOMICILIO=Av. Corrientes 1234, CABA
+AFIP_DOMICILIO=Av. Belgrano 174, San Nicolas de los Arroyos, Provincia de Buenos Aires
+```
+
+### 3.2 Entorno homologación (`.env.afip.homo`)
+
+Crear copiando `.env.afip.homo.example`:
+
+```env
+AFIP_PRODUCTION=false
+AFIP_CERT_PATH=./afip/certificado_homo.crt
+AFIP_KEY_PATH=./afip/privada_homo.key
+AFIP_CHAIN_PATH=./afip/chain.pem
+```
+
+### 3.3 Entorno producción (`.env.afip.prod`)
+
+Crear copiando `.env.afip.prod.example`:
+
+```env
+AFIP_PRODUCTION=true
+AFIP_CERT_PATH=./afip/certificado_prod.crt
+AFIP_KEY_PATH=./afip/privada_prod.key
+AFIP_CHAIN_PATH=./afip/chain_prod.pem
 ```
 
 ---
@@ -80,14 +92,30 @@ AFIP_DOMICILIO=Av. Corrientes 1234, CABA
 ```
 proyecto/
 ├── afip/
-│   ├── certificado_homo.crt   # homologación
+│   ├── certificado_homo.crt    # homologación
 │   ├── privada_homo.key
-│   └── chain.pem
+│   ├── chain.pem
+│   ├── certificado_prod.crt    # producción
+│   ├── privada_prod.key
+│   ├── chain_prod.pem
+│   ├── ta_wsfe_homo.json       # caché TA (auto-generado)
+│   └── ta_wsfe_prod.json       # caché TA (auto-generado)
 ├── .env.local
+├── .env.afip.homo
+├── .env.afip.prod
+├── openssl.cnf                 # opcional (tls-patch es la solución principal)
 └── ...
 ```
 
 **Importante:** La carpeta `afip/` debe estar en `.gitignore`. Nunca subir certificados a Git.
+
+### 4.3 Comando OpenSSL para firmar (referencia)
+
+Si necesitás firmar manualmente el TRA:
+
+```bash
+openssl smime -sign -signer ./afip/certificado_homo.crt -inkey ./afip/privada_homo.key -certfile ./afip/chain.pem -in ./afip/loginTicketRequest.xml -out ./afip/loginTicketRequest.xml.cms -outform DER -nodetach
+```
 
 ---
 
@@ -206,13 +234,16 @@ const { pdfPath, CAE, voucherNumber } = await result.json();
 // Opcional: enviar PDF por email, guardar referencia en el pago
 ```
 
-### 6.3 Script de prueba (sin webhook)
+### 6.3 Scripts de prueba (sin webhook)
 
 ```bash
-npm run emit:invoice
+npm run test-afip:homo     # Probar conexión homologación
+npm run test-afip:prod     # Probar conexión producción
+npm run emit:invoice:homo  # Emitir factura de prueba en homo
+npm run emit:invoice:prod  # Emitir factura de prueba en prod
 ```
 
-Emite una factura de prueba ($100 + IVA) y genera el PDF en `./facturas/`.
+Emite una factura ($100 + 21% IVA = $121) y genera el PDF en `./facturas/`.
 
 ---
 
@@ -275,30 +306,57 @@ Emite una factura de prueba ($100 + IVA) y genera el PDF en `./facturas/`.
 
 6. **Caché del TA**: En producción se usa `ta_wsfe_prod.json`. El sistema reutiliza el TA válido automáticamente.
 
+### 8.2 Tener ambos entornos activos (homo + prod)
+
+Para alternar entre homologación y producción sin editar `.env.local`:
+
+1. **Crear archivos de entorno** (copiar los `.example`):
+   ```bash
+   copy .env.afip.homo.example .env.afip.homo
+   copy .env.afip.prod.example .env.afip.prod
+   ```
+   Luego editar cada uno con las rutas correctas a los certificados.
+
+2. **Ejecutar con el entorno deseado**:
+   ```bash
+   npm run test-afip:homo    # homologación
+   npm run test-afip:prod    # producción
+   npm run emit:invoice:homo # factura de prueba en homo
+   npm run emit:invoice:prod # factura de prueba en prod
+   ```
+
+   O directamente: `npx tsx scripts/test-afip.ts homo` / `prod`
+
 ---
 
 ## 9. Archivos del proyecto (referencia)
 
 | Archivo | Función |
 |---------|---------|
-| `src/lib/afip/wsaa.ts` | Autenticación WSAA (token AFIP) |
+| `src/lib/afip/tls-patch.ts` | Parche TLS para Node.js 18+ (dh key too small en AFIP prod) |
+| `src/lib/afip/wsaa.ts` | Autenticación WSAA (OpenSSL + SOAP → token) |
 | `src/lib/afip/wsfe.ts` | Emisión de comprobantes (FECAESolicitar) |
 | `src/lib/factura-pdf.ts` | Generación de PDF con CAE y QR |
 | `src/app/api/facturas/emit/route.ts` | Endpoint POST de emisión |
-| `scripts/emit-test-invoice.ts` | Script de prueba |
+| `scripts/test-afip.ts` | Script de prueba de conexión |
+| `scripts/emit-test-invoice.ts` | Script de emisión de factura de prueba |
+| `.env.afip.homo` | Variables AFIP homologación |
+| `.env.afip.prod` | Variables AFIP producción |
 
 ---
 
 ## 10. Checklist para nueva app
 
-- [ ] Crear carpeta `afip/` y agregar certificados
-- [ ] Configurar variables de entorno (`.env.local`)
-- [ ] Copiar módulos: `src/lib/afip/`, `src/lib/factura-pdf.ts`
+- [ ] Crear carpeta `afip/` y agregar certificados (homo y/o prod)
+- [ ] Configurar `.env.local` (variables compartidas)
+- [ ] Crear `.env.afip.homo` y `.env.afip.prod` (copiar desde `.example`)
+- [ ] Copiar módulos: `src/lib/afip/` (incluye tls-patch.ts), `src/lib/factura-pdf.ts`
 - [ ] Copiar endpoint: `src/app/api/facturas/emit/`
 - [ ] Instalar dependencias: `jspdf`, `qrcode`, `axios`, `node-forge`
 - [ ] Crear carpeta `facturas/` (o la que use `FACTURAS_DIR`)
+- [ ] Dar de alta punto de venta en AFIP
 - [ ] Integrar llamada a `/api/facturas/emit` en el webhook/evento de pago
-- [ ] Probar con `npm run emit:invoice` o script equivalente
+- [ ] Probar con `npm run test-afip:homo` y luego `npm run emit:invoice:prod`
 
 ---
 
@@ -323,13 +381,36 @@ await sendEmail({
 
 ---
 
-## 12. Errores frecuentes
+## 12. Comandos npm
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run test-afip` | Prueba conexión (usa .env.local) |
+| `npm run test-afip:homo` | Prueba en homologación |
+| `npm run test-afip:prod` | Prueba en producción |
+| `npm run emit:invoice` | Emite factura de prueba (usa .env.local) |
+| `npm run emit:invoice:homo` | Emite factura en homologación |
+| `npm run emit:invoice:prod` | Emite factura en producción |
+
+---
+
+## 13. Node.js 18+ y OpenSSL 3.x
+
+AFIP producción usa claves DH legacy que Node.js 18+ rechaza (`dh key too small`). La solución es el parche en `src/lib/afip/tls-patch.ts`, que se importa automáticamente al inicio de los scripts y de `wsfe.ts`. No requiere configuración adicional.
+
+---
+
+## 14. Errores frecuentes
 
 | Error | Causa | Solución |
 |-------|-------|----------|
 | `AFIP_CUIT no configurado` | Falta variable de entorno | Agregar `AFIP_CUIT` en `.env.local` |
 | `Certificados no encontrados` | Rutas incorrectas | Verificar `AFIP_CERT_PATH`, `AFIP_KEY_PATH`, `AFIP_CHAIN_PATH` |
+| `dh key too small` | Node.js 18+ rechaza DH legacy de AFIP | Ya resuelto con `tls-patch.ts` |
+| `10005 NO AUTORIZADO A EMITIR` | Punto de venta no dado de alta | Dar de alta el PtoVta en AFIP para el tipo de comprobante |
+| `coe.alreadyAuthenticated` | Ya hay un TA válido | Usar `ta_wsfe_homo.json` o `ta_wsfe_prod.json` (caché automático) |
 | `10246 Condicion IVA receptor` | Campo obligatorio RG 5616 | Ya implementado con `CondicionIVAReceptorId` |
+| `10070 Si ImpNeto > 0 el objeto IVA es obligatorio` | Falta bloque Iva | Ya implementado en afip-client |
 | `CUIT del receptor inválido` | CUIT mal formado | Debe tener 11 dígitos (con o sin guiones) |
 
 ---

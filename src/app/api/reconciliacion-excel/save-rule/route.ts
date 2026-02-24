@@ -1,14 +1,14 @@
 /**
  * POST /api/reconciliacion-excel/save-rule
  * Guarda una regla manual (Pagador->Cuenta preferida) para desempatar o crear relación.
+ * Escribe en payerMappings (colección unificada).
  */
 
 import { NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { verifyIdToken } from "@/lib/auth-server";
 import { normalizePayer } from "@/lib/reconciliacion-excel/normalize";
-
-const COLLECTION = "recExcelRelations";
+import { PAYER_MAPPINGS_COLLECTION } from "@/lib/reconciliation/payer-mappings";
 
 async function checkAuth(request: Request, schoolId: string | null) {
   const auth = await verifyIdToken(request.headers.get("Authorization"));
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     if ("error" in check) {
       return NextResponse.json({ error: check.error }, { status: check.status });
     }
-    const { db } = check;
+    const { auth, db } = check;
 
     const body = await request.json();
     const payerRaw = body?.payerRaw as string | undefined;
@@ -53,17 +53,18 @@ export async function POST(request: Request) {
     const payerKey = normalizePayer(payerRaw);
     const now = new Date().toISOString();
 
-    const docId = `${payerKey}_${accountKey}`.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 150);
-    const col = db.collection("schools").doc(schoolId!).collection(COLLECTION);
+    const docId = `${payerKey}_account_${accountKey}`.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 150);
+    const col = db.collection("schools").doc(schoolId!).collection(PAYER_MAPPINGS_COLLECTION);
 
     await col.doc(docId).set({
-      accountKey,
       payerKey,
       payerRaw: payerRaw.trim(),
-      accountRaw: (accountRaw ?? accountKey).trim(),
-      createdAt: now,
-      updatedAt: now,
+      targetType: "account",
+      targetId: accountKey,
+      targetRaw: (accountRaw ?? accountKey).trim(),
       source: "manual",
+      createdAt: now,
+      createdBy: auth.uid,
     });
 
     return NextResponse.json({

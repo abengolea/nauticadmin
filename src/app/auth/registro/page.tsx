@@ -6,9 +6,9 @@ import Link from "next/link";
 
 export default function RegistroPage() {
   return (
-    <Card className="w-full max-w-md shadow-2xl border-2">
+    <Card className="w-full max-w-md min-w-0 shadow-2xl border-2 mx-auto">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline">Registro de Cliente</CardTitle>
+        <CardTitle className="text-xl sm:text-2xl font-headline">Registro de Cliente</CardTitle>
         <CardDescription>
           Elegí tu náutica, ingresá tu email dos veces y una contraseña. Un administrador revisará tu solicitud y te avisará cuando te aprueben.
         </CardDescription>

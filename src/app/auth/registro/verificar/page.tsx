@@ -198,7 +198,7 @@ function VerificarContent() {
 
   if (step === "loading") {
     return (
-      <Card className="w-full max-w-md shadow-2xl border-2">
+      <Card className="w-full max-w-md min-w-0 shadow-2xl border-2 mx-auto">
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
           <p className="text-muted-foreground">Verificando enlace...</p>
@@ -209,7 +209,7 @@ function VerificarContent() {
 
   if (step === "error") {
     return (
-      <Card className="w-full max-w-md shadow-2xl border-2">
+      <Card className="w-full max-w-md min-w-0 shadow-2xl border-2 mx-auto">
         <CardHeader>
           <CardTitle className="text-destructive">Error</CardTitle>
           <CardDescription>{errorMsg}</CardDescription>
@@ -225,7 +225,7 @@ function VerificarContent() {
 
   if (step === "password") {
     return (
-      <Card className="w-full max-w-md shadow-2xl border-2">
+      <Card className="w-full max-w-md min-w-0 shadow-2xl border-2 mx-auto">
         <CardHeader>
           <CardTitle>Crear contraseña</CardTitle>
           <CardDescription>
@@ -269,7 +269,7 @@ function VerificarContent() {
 
   if (step === "creating") {
     return (
-      <Card className="w-full max-w-md shadow-2xl border-2">
+      <Card className="w-full max-w-md min-w-0 shadow-2xl border-2 mx-auto">
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
           <p className="text-muted-foreground">Creando solicitud...</p>
@@ -279,7 +279,7 @@ function VerificarContent() {
   }
 
   return (
-    <Card className="w-full max-w-md shadow-2xl border-2">
+    <Card className="w-full max-w-md min-w-0 shadow-2xl border-2 mx-auto">
       <CardHeader>
         <div className="flex justify-center">
           <CheckCircle className="h-16 w-16 text-green-600" />
@@ -303,7 +303,7 @@ export default function VerificarPage() {
   return (
     <Suspense
       fallback={
-        <Card className="w-full max-w-md shadow-2xl border-2">
+        <Card className="w-full max-w-md min-w-0 shadow-2xl border-2 mx-auto">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
             <p className="text-muted-foreground">Cargando...</p>

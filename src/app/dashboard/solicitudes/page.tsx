@@ -1,12 +1,25 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useUserProfile } from '@/firebase';
 import { getAuth } from 'firebase/auth';
 import { useFirebase } from '@/firebase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { ExternalLink, Link2, Ship, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 type Solicitud = {
   id: string;
@@ -40,16 +53,21 @@ const TIPO_LABEL: Record<string, string> = {
 export default function SolicitudesPage() {
   const { profile, isReady } = useUserProfile();
   const { app } = useFirebase();
+  const { toast } = useToast();
   const schoolId = profile?.activeSchoolId ?? profile?.memberships?.[0]?.schoolId;
   const [pendientes, setPendientes] = useState<Solicitud[]>([]);
   const [sinRegreso, setSinRegreso] = useState<Solicitud[]>([]);
   const [registro, setRegistro] = useState<RegistroItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activo, setActivo] = useState<'pendientes' | 'sin_regreso' | 'registro'>('pendientes');
-  const [pendienteIndex, setPendienteIndex] = useState(0);
-  const touchStartX = useRef<number>(0);
-  const touchEndX = useRef<number>(0);
+  const [activo, setActivo] = useState<'pendientes' | 'entregadas' | 'devueltas' | 'registro'>('pendientes');
+  const [tomandoId, setTomandoId] = useState<string | null>(null);
+  const [regresandoId, setRegresandoId] = useState<string | null>(null);
+
+  const devueltas = useMemo(
+    () => registro.filter((r) => r.tipo === 'regreso'),
+    [registro]
+  );
 
   const fetchWithAuth = useCallback(async (url: string) => {
     const auth = getAuth(app!);
@@ -74,7 +92,6 @@ export default function SolicitudesPage() {
       setPendientes(pendRes?.items ?? []);
       setSinRegreso(salioRes?.items ?? []);
       setRegistro(regRes?.items ?? []);
-      setPendienteIndex(0);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar');
     } finally {
@@ -88,6 +105,7 @@ export default function SolicitudesPage() {
 
   const handleTomar = async (s: Solicitud) => {
     if (!schoolId || !app) return;
+    setTomandoId(s.id);
     try {
       const auth = getAuth(app);
       const token = await auth.currentUser?.getIdToken();
@@ -103,11 +121,14 @@ export default function SolicitudesPage() {
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al tomar');
+    } finally {
+      setTomandoId(null);
     }
   };
 
   const handleRegreso = async (s: Solicitud) => {
     if (!schoolId || !app) return;
+    setRegresandoId(s.id);
     try {
       const auth = getAuth(app);
       const token = await auth.currentUser?.getIdToken();
@@ -123,31 +144,10 @@ export default function SolicitudesPage() {
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al marcar regreso');
+    } finally {
+      setRegresandoId(null);
     }
   };
-
-  const handleSwipe = (dir: 'left' | 'right') => {
-    if (dir === 'left') {
-      setPendienteIndex((i) => Math.min(i + 1, pendientes.length - 1));
-    } else {
-      setPendienteIndex((i) => Math.max(i - 1, 0));
-    }
-  };
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-  const onTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX;
-  };
-  const onTouchEnd = () => {
-    const delta = touchStartX.current - touchEndX.current;
-    if (Math.abs(delta) > 50) {
-      handleSwipe(delta > 0 ? 'left' : 'right');
-    }
-  };
-
-  const currentPendiente = pendientes[pendienteIndex];
 
   if (!isReady || !profile) {
     return <div className="flex items-center justify-center min-h-[60vh]">Cargando...</div>;
@@ -168,14 +168,31 @@ export default function SolicitudesPage() {
           <h1 className="text-3xl font-bold font-headline">Solicitudes de embarcaciones</h1>
           <p className="text-muted-foreground mt-1">Tomá solicitudes, marcá regresos y consultá el registro.</p>
         </div>
-        <a
-          href="/operador"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center px-4 py-2 rounded-lg border-2 border-primary bg-primary/10 hover:bg-primary/20 text-primary font-semibold transition-colors"
-        >
-          Abrir vista operador (pantalla completa)
-        </a>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => {
+              if (!schoolId) return;
+              const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/solicitud?schoolId=${schoolId}`;
+              navigator.clipboard.writeText(url).then(
+                () => toast({ title: 'Link copiado', description: 'El link del cliente se copió al portapapeles.' }),
+                () => toast({ variant: 'destructive', title: 'Error', description: 'No se pudo copiar el link.' })
+              );
+            }}
+            disabled={!schoolId}
+          >
+            <Link2 className="h-4 w-4" />
+            Generar link del cliente
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2" asChild>
+            <a href="/operador" target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-4 w-4" />
+              Abrir vista operador
+            </a>
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -185,155 +202,226 @@ export default function SolicitudesPage() {
       )}
 
       <Tabs value={activo} onValueChange={(v) => setActivo(v as typeof activo)}>
-        <TabsList className="grid w-full grid-cols-3 h-14 text-lg">
-          <TabsTrigger value="pendientes" className="text-base sm:text-lg">
+        <TabsList className="grid w-full grid-cols-4 h-12 text-sm">
+          <TabsTrigger value="pendientes" className="gap-1.5">
+            <Ship className="h-4 w-4" />
             Pendientes ({pendientes.length})
           </TabsTrigger>
-          <TabsTrigger value="sin_regreso" className="text-base sm:text-lg">
-            Sin regreso ({sinRegreso.length})
+          <TabsTrigger value="entregadas" className="gap-1.5">
+            <ExternalLink className="h-4 w-4" />
+            Entregadas ({sinRegreso.length})
           </TabsTrigger>
-          <TabsTrigger value="registro" className="text-base sm:text-lg">
+          <TabsTrigger value="devueltas" className="gap-1.5">
+            <ArrowLeft className="h-4 w-4" />
+            Devueltas ({devueltas.length})
+          </TabsTrigger>
+          <TabsTrigger value="registro" className="gap-1.5">
+            <CheckCircle2 className="h-4 w-4" />
             Registro
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pendientes" className="mt-6">
-          {loading ? (
-            <div className="flex items-center justify-center min-h-[60vh] text-xl">Cargando...</div>
-          ) : pendientes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-              <p className="text-2xl sm:text-3xl text-muted-foreground text-center">
-                No hay solicitudes pendientes
+          <Card>
+            <CardHeader>
+              <CardTitle>Pedidos pendientes</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Solicitudes que esperan que un operador vaya a buscar la embarcación.
               </p>
-              <p className="text-lg text-muted-foreground">Deslizá con la mano para pasar entre solicitudes. Tocá para tomar (ir a buscar).</p>
-            </div>
-          ) : (
-            <div
-              className="touch-manipulation select-none"
-              onTouchStart={onTouchStart}
-              onTouchMove={onTouchMove}
-              onTouchEnd={onTouchEnd}
-            >
-              <div className="flex gap-4 items-center mb-6">
-                <button
-                  type="button"
-                  onClick={() => handleSwipe('right')}
-                  disabled={pendienteIndex === 0}
-                  className="min-h-[56px] min-w-[56px] rounded-xl border-2 border-input bg-background text-2xl font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted/50 active:scale-95 transition-all touch-manipulation"
-                >
-                  ←
-                </button>
-                <span className="text-xl font-semibold">
-                  {pendienteIndex + 1} / {pendientes.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleSwipe('left')}
-                  disabled={pendienteIndex >= pendientes.length - 1}
-                  className="min-h-[56px] min-w-[56px] rounded-xl border-2 border-input bg-background text-2xl font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted/50 active:scale-95 transition-all touch-manipulation"
-                >
-                  →
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleTomar(currentPendiente)}
-                className="w-full min-h-[280px] sm:min-h-[320px] rounded-2xl border-4 border-primary bg-primary/20 hover:bg-primary/30 active:scale-[0.98] transition-all touch-manipulation flex flex-col items-center justify-center gap-6 p-8"
-              >
-                <p className="text-2xl sm:text-3xl text-muted-foreground text-center">
-                  Cliente
-                </p>
-                <p className="text-4xl sm:text-5xl md:text-6xl font-bold font-headline text-primary text-center break-words">
-                  {currentPendiente.nombreCliente}
-                </p>
-                <p className="text-2xl sm:text-3xl text-muted-foreground text-center">
-                  Embarcación
-                </p>
-                <p className="text-4xl sm:text-5xl md:text-6xl font-bold font-headline text-foreground text-center break-words">
-                  {currentPendiente.nombreEmbarcacion}
-                </p>
-                <p className="text-xl sm:text-2xl text-muted-foreground mt-2">
-                  Tocá para ir a buscar
-                </p>
-              </button>
-            </div>
-          )}
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="py-12 text-center text-muted-foreground">Cargando...</div>
+              ) : pendientes.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  No hay solicitudes pendientes.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Embarcación</TableHead>
+                      <TableHead>Hora</TableHead>
+                      <TableHead className="text-right">Acción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendientes.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.nombreCliente}</TableCell>
+                        <TableCell>{s.nombreEmbarcacion}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {s.createdAt ? format(new Date(s.createdAt), 'HH:mm', { locale: es }) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            onClick={() => handleTomar(s)}
+                            disabled={tomandoId === s.id}
+                          >
+                            {tomandoId === s.id ? '...' : 'Tomar'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="sin_regreso" className="mt-6">
-          {loading ? (
-            <div className="flex items-center justify-center min-h-[60vh] text-xl">Cargando...</div>
-          ) : sinRegreso.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-              <p className="text-2xl sm:text-3xl text-muted-foreground text-center">
-                No hay embarcaciones sin regreso
+        <TabsContent value="entregadas" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Entregadas (sin regreso)</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Embarcaciones que salieron y aún no regresaron. Marcá regreso cuando vuelvan.
               </p>
-              <p className="text-lg text-muted-foreground text-center">
-                Al final del día, tocá las que volvieron para marcarlas.
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="py-12 text-center text-muted-foreground">Cargando...</div>
+              ) : sinRegreso.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  No hay embarcaciones entregadas sin regreso.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Embarcación</TableHead>
+                      <TableHead>Operador</TableHead>
+                      <TableHead>Hora salida</TableHead>
+                      <TableHead className="text-right">Acción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sinRegreso.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.nombreCliente}</TableCell>
+                        <TableCell>{s.nombreEmbarcacion}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {s.salioOperadorNombre ?? '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {s.salioAt ? format(new Date(s.salioAt), 'HH:mm', { locale: es }) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRegreso(s)}
+                            disabled={regresandoId === s.id}
+                          >
+                            {regresandoId === s.id ? '...' : 'Marcar regreso'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="devueltas" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Devueltas</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Embarcaciones que ya regresaron.
               </p>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {sinRegreso.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => handleRegreso(s)}
-                  className="min-h-[140px] sm:min-h-[160px] rounded-2xl border-4 border-primary bg-primary/10 hover:bg-primary/20 active:scale-[0.98] transition-all touch-manipulation flex flex-col items-center justify-center gap-2 p-6 text-left"
-                >
-                  <p className="text-2xl sm:text-3xl font-bold font-headline text-primary text-center break-words w-full">
-                    {s.nombreEmbarcacion}
-                  </p>
-                  <p className="text-xl sm:text-2xl text-muted-foreground text-center break-words w-full">
-                    {s.nombreCliente}
-                  </p>
-                  <p className="text-base sm:text-lg text-muted-foreground mt-2">
-                    Tocá para marcar regreso
-                  </p>
-                </button>
-              ))}
-            </div>
-          )}
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="py-12 text-center text-muted-foreground">Cargando...</div>
+              ) : devueltas.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  No hay embarcaciones devueltas.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Embarcación</TableHead>
+                      <TableHead>Operador</TableHead>
+                      <TableHead>Hora regreso</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {devueltas.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-medium">{r.nombreCliente}</TableCell>
+                        <TableCell>{r.nombreEmbarcacion}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {r.operadorNombre ?? '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {r.createdAt ? format(new Date(r.createdAt), 'PPp', { locale: es }) : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="registro" className="mt-6">
-          {loading ? (
-            <div className="flex items-center justify-center min-h-[60vh] text-xl">Cargando...</div>
-          ) : registro.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-              <p className="text-2xl sm:text-3xl text-muted-foreground text-center">
-                No hay movimientos registrados
+          <Card>
+            <CardHeader>
+              <CardTitle>Registro completo</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Historial de todos los movimientos: solicitudes creadas, tomadas y regresos.
               </p>
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-[70vh] overflow-y-auto">
-              {registro.map((r) => (
-                <div
-                  key={r.id}
-                  className="p-4 sm:p-6 rounded-xl border-2 border-border bg-card flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
-                >
-                  <span className="text-lg sm:text-xl font-semibold">
-                    {TIPO_LABEL[r.tipo] ?? r.tipo}
-                  </span>
-                  <span className="text-xl sm:text-2xl font-bold font-headline text-primary">
-                    {r.nombreEmbarcacion}
-                  </span>
-                  <span className="text-lg sm:text-xl text-muted-foreground">
-                    {r.nombreCliente}
-                  </span>
-                  {r.operadorNombre && (
-                    <span className="text-base sm:text-lg text-muted-foreground">
-                      {r.operadorNombre}
-                    </span>
-                  )}
-                  <span className="text-base sm:text-lg text-muted-foreground ml-auto">
-                    {r.createdAt ? format(new Date(r.createdAt), "PPp", { locale: es }) : '-'}
-                  </span>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="py-12 text-center text-muted-foreground">Cargando...</div>
+              ) : registro.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  No hay movimientos registrados.
                 </div>
-              ))}
-            </div>
-          )}
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Embarcación</TableHead>
+                      <TableHead>Operador</TableHead>
+                      <TableHead>Hora</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {registro.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>
+                          <Badge variant={r.tipo === 'regreso' ? 'default' : r.tipo === 'tomada' ? 'secondary' : 'outline'}>
+                            {TIPO_LABEL[r.tipo] ?? r.tipo}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{r.nombreCliente}</TableCell>
+                        <TableCell>{r.nombreEmbarcacion}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {r.operadorNombre ?? '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {r.createdAt ? format(new Date(r.createdAt), 'PPp', { locale: es }) : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

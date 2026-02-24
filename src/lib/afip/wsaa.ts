@@ -5,17 +5,27 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import https from 'https';
+import { constants } from 'crypto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import axios from 'axios';
+
+/** Agente HTTPS para AFIP producción (usa OPENSSL_CONF=./openssl.cnf con SECLEVEL=0) */
+const afipAgent = new https.Agent({
+  minVersion: 'TLSv1',
+  secureOptions: constants.SSL_OP_LEGACY_SERVER_CONNECT,
+});
 
 const execAsync = promisify(exec);
 
 const WSAA_URL_HOMO = 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms';
 const WSAA_URL_PROD = 'https://wsaa.afip.gov.ar/ws/services/LoginCms';
-const WSAA_URL =
-  process.env.AFIP_WSAA_URL ??
-  (process.env.AFIP_PRODUCTION === 'true' ? WSAA_URL_PROD : WSAA_URL_HOMO);
+
+function getWsaaUrl(): string {
+  const production = String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
+  return process.env.AFIP_WSAA_URL ?? (production ? WSAA_URL_PROD : WSAA_URL_HOMO);
+}
 const CACHE_TTL_MS = 10 * 60 * 60 * 1000; // 10 horas
 const TA_MARGIN_MS = 10 * 60 * 1000; // 10 minutos de margen antes de expiración
 
@@ -25,7 +35,8 @@ let cacheExpiry = 0;
 /** Ruta del archivo de caché del TA (distinto para homo/prod) */
 function getTaFilePath(): string {
   const workDir = path.resolve(process.cwd(), process.env.AFIP_WORK_DIR ?? 'afip');
-  const suffix = process.env.AFIP_PRODUCTION === 'true' ? 'prod' : 'homo';
+  const production = String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
+  const suffix = production ? 'prod' : 'homo';
   return path.join(workDir, `ta_wsfe_${suffix}.json`);
 }
 
@@ -309,15 +320,18 @@ export async function getAfipToken(): Promise<{ token: string; sign: string }> {
    </soapenv:Body>
 </soapenv:Envelope>`;
 
-  console.log('[WSAA] Paso 5: Enviando SOAP a', WSAA_URL);
+  const wsaaUrl = getWsaaUrl();
+  const isProduction = String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
+  console.log('[WSAA] Paso 5: Enviando SOAP a', wsaaUrl);
   let response;
   try {
-    response = await axios.post(WSAA_URL, soapEnvelope, {
+    response = await axios.post(wsaaUrl, soapEnvelope, {
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
         SOAPAction: '',
       },
       timeout: 30000,
+      httpsAgent: isProduction ? afipAgent : undefined,
     });
   } catch (err) {
     if (axios.isAxiosError(err)) {

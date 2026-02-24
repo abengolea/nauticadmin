@@ -17,11 +17,13 @@ import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { useClientSearch } from "@/context/ClientSearchContext";
 
 export function Header() {
   const { user } = useUser();
   const auth = useAuth();
   const router = useRouter();
+  const { searchQuery, setSearchQuery } = useClientSearch();
   const { isReady, activeSchoolId, profile } = useUserProfile();
   // Solo staff (school_admin o coach) puede listar jugadores y pendingPlayers; nunca listar si es jugador.
   const isStaff = profile?.role === "school_admin" || profile?.role === "coach";
@@ -48,16 +50,16 @@ export function Header() {
        </div>
       <div className="w-full flex-1 min-w-0">
         {isStaff && (
-          <form>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Buscar clientes..."
-                className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3"
-              />
-            </div>
-          </form>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Buscar clientes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3"
+            />
+          </div>
         )}
       </div>
       <DropdownMenu>
@@ -75,7 +77,7 @@ export function Header() {
             <span className="sr-only">Notificaciones y novedades</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuContent align="end" className="w-[min(20rem,calc(100vw-2rem))]">
           <DropdownMenuLabel className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
             Novedades
@@ -122,8 +124,8 @@ export function Header() {
             <span className="sr-only">Alternar menú de usuario</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{user?.displayName || user?.email}</DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="w-[min(20rem,calc(100vw-2rem))]">
+          <DropdownMenuLabel className="truncate">{user?.displayName || user?.email}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
              <Link href="/dashboard/settings">Ajustes</Link>

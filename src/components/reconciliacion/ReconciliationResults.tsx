@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useUser } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +28,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
   ReconciliationResult,
   RelationRow,
@@ -66,7 +72,7 @@ export function ReconciliationResults({
         return;
       }
       const cand = r.candidateAccounts.find((c) => c.accountKey === accountKey);
-      const accountRaw = cand?.accountRaw ?? accountKey;
+      const accountRaw = cand?.accountRaw ?? relations.find((rel) => rel.accountKey === accountKey)?.accountRaw ?? accountKey;
       setSaving(r.paymentRowId);
       try {
         await onSaveRule(r.payerRaw, accountKey, accountRaw);
@@ -81,11 +87,21 @@ export function ReconciliationResults({
         setSaving(null);
       }
     },
-    [manualSelections, onSaveRule, toast]
+    [manualSelections, onSaveRule, toast, relations]
   );
 
   const getAccountRaw = (accountKey: string) =>
     relations.find((r) => r.accountKey === accountKey)?.accountRaw ?? accountKey;
+
+  /** Cuentas únicas para asignación manual en Sin Conciliar */
+  const uniqueAccounts = useMemo(() => {
+    const seen = new Set<string>();
+    return relations.filter((r) => {
+      if (seen.has(r.accountKey)) return false;
+      seen.add(r.accountKey);
+      return true;
+    });
+  }, [relations]);
 
   return (
     <Card>
@@ -166,21 +182,31 @@ export function ReconciliationResults({
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button
-                      size="sm"
-                      onClick={() => handleSaveRule(r)}
-                      disabled={
-                        !manualSelections[r.paymentRowId] ||
-                        saving === r.paymentRowId
-                      }
-                    >
-                      {saving === r.paymentRowId ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4 mr-1" />
-                      )}
-                      Guardar regla
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveRule(r)}
+                            disabled={
+                              !manualSelections[r.paymentRowId] ||
+                              saving === r.paymentRowId
+                            }
+                          >
+                            {saving === r.paymentRowId ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Save className="h-4 w-4 mr-1" />
+                            )}
+                            Guardar regla
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Guarda esta relación Pagador → Cuenta.</p>
+                          <p className="text-xs mt-1">En próximas conciliaciones se asociará automáticamente.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
               ))}
@@ -192,27 +218,70 @@ export function ReconciliationResults({
             </div>
           </TabsContent>
           <TabsContent value="unmatched" className="mt-4">
-            <div className="rounded border overflow-x-auto max-h-96">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Pagador</TableHead>
-                    <TableHead>Score máximo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {unmatched.map((r) => (
-                    <TableRow key={r.paymentRowId}>
-                      <TableCell>{r.payerRaw}</TableCell>
-                      <TableCell>
-                        {r.candidateAccounts[0]
-                          ? `${r.candidateAccounts[0].accountRaw} (${r.candidateAccounts[0].score})`
-                          : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Elegí la cuenta/cliente para cada pagador y guardá la regla. Se usará en futuras conciliaciones.
+              </p>
+              {unmatched.map((r) => (
+                <div
+                  key={r.paymentRowId}
+                  className="border rounded-lg p-4 space-y-2"
+                >
+                  <p className="font-medium">{r.payerRaw}</p>
+                  {uniqueAccounts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Cargá primero el archivo de relaciones para poder asignar manualmente.
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Select
+                        value={manualSelections[r.paymentRowId] ?? ""}
+                        onValueChange={(v) => handleManualSelect(r.paymentRowId, v)}
+                      >
+                        <SelectTrigger className="w-[220px]">
+                          <SelectValue placeholder="Elegir cuenta/cliente…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {uniqueAccounts.map((rel) => (
+                            <SelectItem key={rel.accountKey} value={rel.accountKey}>
+                              {rel.accountRaw}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              onClick={() => handleSaveRule(r)}
+                              disabled={
+                                !manualSelections[r.paymentRowId] ||
+                                saving === r.paymentRowId
+                              }
+                            >
+                              {saving === r.paymentRowId ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Save className="h-4 w-4 mr-1" />
+                              )}
+                              Guardar regla
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Guarda Pagador → Cuenta para futuras conciliaciones.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {unmatched.length === 0 && (
+                <p className="text-muted-foreground py-8 text-center">
+                  No hay pagos sin conciliar.
+                </p>
+              )}
             </div>
           </TabsContent>
         </Tabs>

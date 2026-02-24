@@ -13,23 +13,26 @@ export async function GET(request: Request) {
     const q = String(searchParams.get('q') ?? '').trim().toLowerCase();
     const tipo = searchParams.get('tipo'); // nombre | embarcacion
     const nombreCliente = String(searchParams.get('nombreCliente') ?? '').trim();
+    const schoolIdParam = searchParams.get('schoolId')?.trim();
 
     if (!tipo || !['nombre', 'embarcacion'].includes(tipo)) {
       return NextResponse.json({ error: 'tipo debe ser nombre o embarcacion' }, { status: 400 });
     }
 
     const db = getAdminFirestore();
-    const schoolsSnap = await db
-      .collection('schools')
-      .where('status', '==', 'active')
-      .limit(1)
-      .get();
+    let schoolId = schoolIdParam;
 
-    if (schoolsSnap.empty) {
-      return NextResponse.json({ sugerencias: [] });
+    if (!schoolId) {
+      const schoolsSnap = await db
+        .collection('schools')
+        .where('status', '==', 'active')
+        .limit(1)
+        .get();
+      if (schoolsSnap.empty) {
+        return NextResponse.json({ sugerencias: [] });
+      }
+      schoolId = schoolsSnap.docs[0].id;
     }
-
-    const schoolId = schoolsSnap.docs[0].id;
     const playersSnap = await db
       .collection('schools')
       .doc(schoolId)

@@ -117,3 +117,15 @@ export async function getAvailableGeminiModel(): Promise<string | null> {
 export function hasGeminiApiKey(): boolean {
   return !!getApiKey();
 }
+
+/** Mensaje de error cuando falta GEMINI_API_KEY. En producción no menciona .env.local. */
+export function getGeminiApiKeyMissingMessage(): string {
+  const isProd =
+    process.env.NODE_ENV === 'production' ||
+    !!process.env.VERCEL ||
+    !!process.env.FIREBASE_CONFIG;
+  if (isProd) {
+    return 'Falta GEMINI_API_KEY. Configurá la variable en las variables de entorno del servidor (App Hosting: firebase apphosting:secrets:set GEMINI_API_KEY). Obtenerla en: https://aistudio.google.com/apikey';
+  }
+  return 'Falta GEMINI_API_KEY en .env.local. Agregá la variable y reiniciá el servidor. Obtenerla en: https://aistudio.google.com/apikey';
+}

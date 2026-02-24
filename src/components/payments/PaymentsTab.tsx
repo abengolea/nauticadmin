@@ -348,8 +348,8 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-4 min-w-0">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border bg-card p-4">
           <p className="text-sm text-muted-foreground">Pagos aprobados en lista</p>
           <p className="text-2xl font-bold">

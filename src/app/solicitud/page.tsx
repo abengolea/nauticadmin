@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { NauticAdminLogo } from '@/components/icons/NauticAdminLogo';
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -12,7 +13,10 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-export default function SolicitudPage() {
+function SolicitudPageContent() {
+  const searchParams = useSearchParams();
+  const schoolId = useMemo(() => searchParams.get('schoolId')?.trim() || undefined, [searchParams]);
+
   const [nombreCliente, setNombreCliente] = useState('');
   const [nombreEmbarcacion, setNombreEmbarcacion] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,6 +28,10 @@ export default function SolicitudPage() {
   const [showDropdownEmbarcacion, setShowDropdownEmbarcacion] = useState(false);
   const nombreRef = useRef<HTMLDivElement>(null);
   const embarcacionRef = useRef<HTMLDivElement>(null);
+  const nombreClienteRef = useRef(nombreCliente);
+  const nombreEmbarcacionRef = useRef(nombreEmbarcacion);
+  nombreClienteRef.current = nombreCliente;
+  nombreEmbarcacionRef.current = nombreEmbarcacion;
 
   const debouncedNombre = useDebounce(nombreCliente, 300);
   const debouncedEmbarcacion = useDebounce(nombreEmbarcacion, 300);
@@ -33,15 +41,23 @@ export default function SolicitudPage() {
     if (tipo === 'embarcacion' && !q && !nombreClienteParam) return [];
     const params = new URLSearchParams({ q: q || '', tipo });
     if (tipo === 'embarcacion' && nombreClienteParam) params.set('nombreCliente', nombreClienteParam);
+    if (schoolId) params.set('schoolId', schoolId);
     const res = await fetch(`/api/solicitud-embarcacion/sugerencias?${params}`);
     const data = await res.json();
     return data.sugerencias ?? [];
-  }, []);
+  }, [schoolId]);
 
   useEffect(() => {
     if (debouncedNombre.length >= 2) {
-      fetchSugerencias('nombre', debouncedNombre).then(setSugerenciasNombre);
-      setShowDropdownNombre(true);
+      let cancelled = false;
+      fetchSugerencias('nombre', debouncedNombre).then((sugerencias) => {
+        if (cancelled) return;
+        setSugerenciasNombre(sugerencias);
+        const valorActual = nombreClienteRef.current.trim();
+        const esSeleccionExacta = sugerencias.some((s) => s === valorActual);
+        setShowDropdownNombre(!esSeleccionExacta && sugerencias.length > 0);
+      });
+      return () => { cancelled = true; };
     } else {
       setSugerenciasNombre([]);
       setShowDropdownNombre(false);
@@ -52,10 +68,16 @@ export default function SolicitudPage() {
     const q = debouncedEmbarcacion.trim();
     const tieneNombre = nombreCliente.trim().length >= 2;
     if (q.length >= 2 || tieneNombre) {
-      fetchSugerencias('embarcacion', q, nombreCliente || undefined).then((s) => {
-        setSugerenciasEmbarcacion(s);
-        setShowDropdownEmbarcacion(s.length > 0);
+      let cancelled = false;
+      fetchSugerencias('embarcacion', q, nombreCliente || undefined).then((sugerencias) => {
+        if (cancelled) return;
+        setSugerenciasEmbarcacion(sugerencias);
+        // Usar ref para tener el valor más reciente (evita race: fetch antiguo con closure desactualizado)
+        const valorActual = nombreEmbarcacionRef.current.trim();
+        const esSeleccionExacta = sugerencias.some((s) => s === valorActual);
+        setShowDropdownEmbarcacion(!esSeleccionExacta && sugerencias.length > 0);
       });
+      return () => { cancelled = true; };
     } else {
       setSugerenciasEmbarcacion([]);
       setShowDropdownEmbarcacion(false);
@@ -77,13 +99,16 @@ export default function SolicitudPage() {
     setLoading(true);
 
     try {
+      const body: { nombreCliente: string; nombreEmbarcacion: string; schoolId?: string } = {
+        nombreCliente: nombreCliente.trim(),
+        nombreEmbarcacion: nombreEmbarcacion.trim(),
+      };
+      if (schoolId) body.schoolId = schoolId;
+
       const res = await fetch('/api/solicitud-embarcacion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombreCliente: nombreCliente.trim(),
-          nombreEmbarcacion: nombreEmbarcacion.trim(),
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -106,6 +131,12 @@ export default function SolicitudPage() {
   const handleNuevaSolicitud = () => {
     setSuccess(false);
     setError(null);
+    setNombreCliente('');
+    setNombreEmbarcacion('');
+    setSugerenciasNombre([]);
+    setSugerenciasEmbarcacion([]);
+    setShowDropdownNombre(false);
+    setShowDropdownEmbarcacion(false);
   };
 
   if (success) {
@@ -178,7 +209,10 @@ export default function SolicitudPage() {
                 type="text"
                 value={nombreCliente}
                 onChange={(e) => setNombreCliente(e.target.value)}
-                onFocus={() => sugerenciasNombre.length > 0 && setShowDropdownNombre(true)}
+                onFocus={() => {
+                  const exactMatch = sugerenciasNombre.some((s) => s === nombreCliente.trim());
+                  if (sugerenciasNombre.length > 0 && !exactMatch) setShowDropdownNombre(true);
+                }}
                 placeholder="Ej: Juan Pérez"
                 autoComplete="off"
                 disabled={loading}
@@ -190,6 +224,7 @@ export default function SolicitudPage() {
                     <li key={s}>
                       <button
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           setNombreCliente(s);
                           setShowDropdownNombre(false);
@@ -219,8 +254,10 @@ export default function SolicitudPage() {
                 value={nombreEmbarcacion}
                 onChange={(e) => setNombreEmbarcacion(e.target.value)}
                 onFocus={() => {
-                  if (sugerenciasEmbarcacion.length > 0) setShowDropdownEmbarcacion(true);
-                  else if (nombreCliente.trim().length >= 2 && nombreEmbarcacion.trim().length < 2) {
+                  const exactMatch = sugerenciasEmbarcacion.some((s) => s === nombreEmbarcacion.trim());
+                  if (sugerenciasEmbarcacion.length > 0 && !exactMatch) {
+                    setShowDropdownEmbarcacion(true);
+                  } else if (nombreCliente.trim().length >= 2 && nombreEmbarcacion.trim().length < 2) {
                     fetchSugerencias('embarcacion', '', nombreCliente).then((s) => {
                       setSugerenciasEmbarcacion(s);
                       setShowDropdownEmbarcacion(s.length > 0);
@@ -238,6 +275,7 @@ export default function SolicitudPage() {
                     <li key={s}>
                       <button
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           setNombreEmbarcacion(s);
                           setShowDropdownEmbarcacion(false);
@@ -273,5 +311,23 @@ export default function SolicitudPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SolicitudPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col flex-1 items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
+        <div className="w-full max-w-2xl animate-pulse space-y-6">
+          <div className="h-16 w-16 rounded-full bg-muted mx-auto" />
+          <div className="h-10 bg-muted rounded w-3/4 mx-auto" />
+          <div className="h-6 bg-muted rounded w-1/2 mx-auto" />
+          <div className="h-14 bg-muted rounded" />
+          <div className="h-14 bg-muted rounded" />
+        </div>
+      </div>
+    }>
+      <SolicitudPageContent />
+    </Suspense>
   );
 }

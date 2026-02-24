@@ -10,6 +10,7 @@ import { z } from 'genkit';
 import {
   getAvailableGeminiModel,
   hasGeminiApiKey,
+  getGeminiApiKeyMissingMessage,
 } from '@/ai/get-available-gemini-model';
 import type { ExcelFieldKey } from '@/lib/excel-import-types';
 
@@ -115,7 +116,7 @@ const analyzeExcelFlow = ai.defineFlow(
   async (input) => {
     if (!hasGeminiApiKey()) {
       throw new Error(
-        'Falta GEMINI_API_KEY en .env.local. Agregá la variable (sin #) y reiniciá el servidor. Obtenerla en: https://aistudio.google.com/apikey'
+        getGeminiApiKeyMissingMessage()
       );
     }
     const modelName = await getAvailableGeminiModel();

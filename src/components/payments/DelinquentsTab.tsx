@@ -205,14 +205,15 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleCreateIntent(d)}
+                        className="w-full sm:w-auto"
                       >
-                        <ExternalLink className="mr-1 h-4 w-4" />
-                        Link de pago
+                        <ExternalLink className="mr-1 h-4 w-4 shrink-0" />
+                        <span className="truncate">Link de pago</span>
                       </Button>
                       <Button
                         size="sm"
@@ -221,6 +222,7 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
                           setManualDialog(d);
                           setManualAmount(String(d.amount));
                         }}
+                        className="w-full sm:w-auto"
                       >
                         Pago manual
                       </Button>

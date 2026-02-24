@@ -6,7 +6,7 @@ Control de gastos con captura de facturas por foto, extracción de datos con IA 
 
 ### Variables de entorno
 
-Agregá a `.env.local`:
+**Local (`.env.local`):**
 
 ```env
 # Ya existentes para Firebase
@@ -17,6 +17,12 @@ GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
 # Para extracción con IA (Gemini Vision)
 GEMINI_API_KEY=tu_api_key
 # O alternativamente: GOOGLE_API_KEY o GOOGLE_GENAI_API_KEY
+```
+
+**Producción (Firebase App Hosting):** La config está en `apphosting.yaml`. Crear el secreto:
+
+```bash
+firebase apphosting:secrets:set GEMINI_API_KEY
 ```
 
 Obtener API key: https://aistudio.google.com/apikey

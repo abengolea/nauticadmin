@@ -11,6 +11,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Upload, Loader2, CheckCircle2 } from "lucide-react";
 import { parseRelationsFile } from "@/lib/reconciliacion-excel/parser";
 import type { RelationRow } from "@/lib/reconciliacion-excel/types";
@@ -75,7 +81,7 @@ export function ImportRelations({
     try {
       const token = await user.getIdToken();
       const res = await fetch(
-        `/api/reconciliacion-excel/relations?schoolId=${encodeURIComponent(schoolId)}`,
+        `/api/reconciliation/payer-mappings?schoolId=${encodeURIComponent(schoolId)}`,
         {
           method: "POST",
           headers: {
@@ -114,36 +120,57 @@ export function ImportRelations({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Primero subí el archivo con las relaciones Cuenta ↔ Pagador. Luego guardalo para usarlas en la conciliación.
+        </p>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={handleFileChange}
-              disabled={loading}
-            />
-            <Button type="button" variant="outline" asChild>
-              <span>
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-2" />
-                )}
-                {file ? file.name : "Seleccionar archivo"}
-              </span>
-            </Button>
-          </label>
-          {relations.length > 0 && !error && (
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-              )}
-              Guardar {relations.length} relaciones
-            </Button>
-          )}
+          <TooltipProvider>
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={handleFileChange}
+                disabled={loading}
+              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="outline" asChild>
+                    <span>
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Upload className="h-4 w-4 mr-2" />
+                      )}
+                      {file ? file.name : "Seleccionar archivo"}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Subí el Excel/CSV con columnas AYB (Cuenta) y Pagador.</p>
+                  <p className="text-xs mt-1">Se detectan automáticamente variantes de nombre.</p>
+                </TooltipContent>
+              </Tooltip>
+            </label>
+            {relations.length > 0 && !error && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button onClick={handleSave} disabled={saving}>
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                    )}
+                    Guardar {relations.length} relaciones
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Persistí las relaciones en el sistema.</p>
+                  <p className="text-xs mt-1">Se usarán en esta y futuras conciliaciones.</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </TooltipProvider>
         </div>
 
         {error && (

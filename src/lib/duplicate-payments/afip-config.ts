@@ -49,7 +49,7 @@ export function getAfipConfig(): AfipConfig | null {
     return null;
   }
 
-  const production = process.env.AFIP_PRODUCTION === 'true';
+  const production = String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
   const ptoVta = parseInt(process.env.AFIP_PTO_VTA ?? '1', 10) || 1;
   const cbteTipo = parseInt(process.env.AFIP_CBTE_TIPO ?? '6', 10) || 6;
 

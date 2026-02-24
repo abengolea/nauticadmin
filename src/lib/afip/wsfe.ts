@@ -3,16 +3,26 @@
  * Llamadas SOAP directas a AFIP, sin dependencias externas.
  * Usa getAfipToken() de wsaa.ts para autenticación.
  */
+import './tls-patch'; // primer import (parche DH para AFIP prod)
 
+import https from 'https';
+import { constants } from 'crypto';
 import axios from 'axios';
 import { getAfipToken } from './wsaa';
+
+/** Agente HTTPS para AFIP producción (usa OPENSSL_CONF=./openssl.cnf con SECLEVEL=0) */
+const afipAgent = new https.Agent({
+  minVersion: 'TLSv1',
+  secureOptions: constants.SSL_OP_LEGACY_SERVER_CONNECT,
+});
 
 const WSFE_URL_HOMO = 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx';
 const WSFE_URL_PROD = 'https://servicios1.afip.gov.ar/wsfev1/service.asmx';
 const NS = 'http://ar.gov.afip.dif.FEV1/';
 
 function getWsfeUrl(): string {
-  return process.env.AFIP_PRODUCTION === 'true' ? WSFE_URL_PROD : WSFE_URL_HOMO;
+  const production = String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
+  return production ? WSFE_URL_PROD : WSFE_URL_HOMO;
 }
 
 /** Formato fecha AFIP: yyyymmdd */
@@ -92,11 +102,13 @@ async function executeSoap<T>(operation: string, content: string): Promise<strin
   const body = buildSoapBody(operation, fullContent);
 
   const url = getWsfeUrl();
+  const isProduction = String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
   const response = await axios.post(url, body, {
     headers: {
       'Content-Type': 'application/soap+xml; charset=utf-8',
     },
     timeout: 30000,
+    httpsAgent: isProduction ? afipAgent : undefined,
   });
 
   const responseData = typeof response.data === 'string' ? response.data : String(response.data);

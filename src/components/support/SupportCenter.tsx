@@ -108,9 +108,9 @@ export function SupportCenter() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       <div>
-        <h1 className="font-headline text-3xl font-bold tracking-tight">Centro de Soporte</h1>
+        <h1 className="font-headline text-2xl sm:text-3xl font-bold tracking-tight">Centro de Soporte</h1>
         <p className="text-muted-foreground">
           Resolvé dudas frecuentes o creá un ticket para que te contactemos.
         </p>

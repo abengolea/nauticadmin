@@ -165,7 +165,7 @@ export async function parsePaymentsFile(
 
   const colPayer = headers.indexOf(mapping.payer);
   const colAmount = headers.indexOf(mapping.amount);
-  const colDate = headers.indexOf(mapping.date);
+  const colDate = mapping.date ? headers.indexOf(mapping.date) : -1;
   const colRef = mapping.reference ? headers.indexOf(mapping.reference) : -1;
 
   if (colPayer < 0) {
@@ -186,15 +186,6 @@ export async function parsePaymentsFile(
       error: "Columna Monto no encontrada en el mapeo",
     };
   }
-  if (colDate < 0) {
-    return {
-      payments: [],
-      headers,
-      preview: rows.slice(0, 21),
-      totalRows: rows.length,
-      error: "Columna Fecha no encontrada en el mapeo",
-    };
-  }
 
   function parseAmount(val: unknown): number {
     if (val == null) return 0;
@@ -209,7 +200,7 @@ export async function parsePaymentsFile(
     const row = dataRows[i] ?? [];
     const payerRaw = String(row[colPayer] ?? "").trim();
     const amount = parseAmount(row[colAmount]);
-    const date = String(row[colDate] ?? "").trim();
+    const date = colDate >= 0 ? String(row[colDate] ?? "").trim() : "";
     const reference = colRef >= 0 ? String(row[colRef] ?? "").trim() : "";
 
     payments.push({
