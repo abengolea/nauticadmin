@@ -10,13 +10,22 @@ import {
 } from "@/components/ui/card";
 import { PlusCircle, Users, School } from "lucide-react";
 import Link from "next/link";
-import { useCollection, useUserProfile, useDoc } from "@/firebase";
+import { useCollection, useUserProfile, useDoc, useFirebase } from "@/firebase";
+import { getAuth } from "firebase/auth";
 import type { Player, School as SchoolType } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
+import { DashboardStats } from "./DashboardStats";
 
 export function SchoolAdminDashboard() {
   const { profile, isReady, activeSchoolId } = useUserProfile();
+  const { app } = useFirebase();
+
+  const getToken = useCallback(async () => {
+    if (!app) return null;
+    const user = getAuth(app).currentUser;
+    return user?.getIdToken?.() ?? null;
+  }, [app]);
   
   const { data: school, loading: schoolLoading } = useDoc<SchoolType>(
     activeSchoolId ? `schools/${activeSchoolId}` : ''
@@ -113,19 +122,13 @@ export function SchoolAdminDashboard() {
           </CardContent>
         </Card>
       </div>
-      <div className="grid gap-4 md:grid-cols-1">
-        <Card>
-          <CardHeader>
-            <CardTitle>Actividad Reciente</CardTitle>
-            <CardDescription>
-              Resumen de evaluaciones y actualizaciones recientes.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <p className="text-sm text-muted-foreground p-4">Funcionalidad en construcción.</p>
-          </CardContent>
-        </Card>
-      </div>
+
+      {activeSchoolId && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">Resumen del mes</h2>
+          <DashboardStats schoolId={activeSchoolId} getToken={getToken} />
+        </div>
+      )}
     </div>
   );
 }
