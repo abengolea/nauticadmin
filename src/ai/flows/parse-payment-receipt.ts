@@ -1,4 +1,3 @@
-'use server';
 /**
  * Flujo para extraer datos de comprobantes de pago (cheque, transferencia, cupón de tarjeta)
  * usando Gemini Vision.
