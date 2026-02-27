@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     }
 
     const role = (schoolUserSnap.data() as { role?: string })?.role;
-    if (role !== "school_admin" && role !== "coach") {
+    if (role !== "school_admin" && role !== "operador") {
       return NextResponse.json(
         { error: "Solo el administrador o entrenador puede modificar facturación" },
         { status: 403 }

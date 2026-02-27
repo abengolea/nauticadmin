@@ -25,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertCircle, ExternalLink } from "lucide-react";
+import { AlertCircle, ExternalLink, Mail, Loader2 } from "lucide-react";
 import type { DelinquentInfo } from "@/lib/types";
 
 const REGISTRATION_PERIOD = "inscripcion";
@@ -48,7 +48,11 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
   const [loading, setLoading] = useState(true);
   const [manualDialog, setManualDialog] = useState<DelinquentInfo | null>(null);
   const [manualAmount, setManualAmount] = useState("");
+  const [manualPeriod, setManualPeriod] = useState("");
+  const [unpaidPeriods, setUnpaidPeriods] = useState<{ period: string; amount: number; currency: string; label: string }[]>([]);
+  const [unpaidLoading, setUnpaidLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [sending, setSending] = useState(false);
   const { toast } = useToast();
 
   const fetchDelinquents = useCallback(async () => {
@@ -81,6 +85,58 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
   useEffect(() => {
     fetchDelinquents();
   }, [fetchDelinquents]);
+
+  useEffect(() => {
+    if (!manualDialog || !schoolId) {
+      setUnpaidPeriods([]);
+      return;
+    }
+    let cancelled = false;
+    const fetchUnpaid = async () => {
+      setUnpaidLoading(true);
+      const token = await getToken();
+      if (!token) {
+        setUnpaidLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/payments/player-unpaid?schoolId=${encodeURIComponent(schoolId)}&playerId=${encodeURIComponent(manualDialog.playerId)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          const unpaid = data.unpaid ?? [];
+          setUnpaidPeriods(unpaid);
+          if (unpaid.length > 0) {
+            const first = unpaid[0];
+            setManualPeriod(first.period);
+            setManualAmount(String(first.amount));
+          } else {
+            setManualPeriod(manualDialog.period);
+            setManualAmount(String(manualDialog.amount));
+          }
+        } else {
+          setManualPeriod(manualDialog.period);
+          setManualAmount(String(manualDialog.amount));
+          setUnpaidPeriods([]);
+        }
+      } catch {
+        if (!cancelled) {
+          setManualPeriod(manualDialog.period);
+          setManualAmount(String(manualDialog.amount));
+          setUnpaidPeriods([]);
+        }
+      } finally {
+        if (!cancelled) setUnpaidLoading(false);
+      }
+    };
+    fetchUnpaid();
+    return () => {
+      cancelled = true;
+    };
+  }, [manualDialog, schoolId, getToken]);
 
   const handleCreateIntent = async (d: DelinquentInfo) => {
     const token = await getToken();
@@ -122,6 +178,7 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
     const token = await getToken();
     if (!token) return;
     try {
+      const period = manualPeriod || manualDialog.period;
       const res = await fetch("/api/payments/manual", {
         method: "POST",
         headers: {
@@ -131,7 +188,7 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
         body: JSON.stringify({
           playerId: manualDialog.playerId,
           schoolId: manualDialog.schoolId,
-          period: manualDialog.period,
+          period,
           amount,
           currency: manualDialog.currency,
         }),
@@ -155,8 +212,67 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
     }
   };
 
+  const handleSendEmailToDelinquents = async () => {
+    const withEmail = delinquents.filter((d) => d.playerEmail?.trim()?.includes("@"));
+    if (withEmail.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Sin destinatarios",
+        description: "Ningún moroso tiene email cargado en su perfil.",
+      });
+      return;
+    }
+    setSending(true);
+    const token = await getToken();
+    if (!token) {
+      toast({ variant: "destructive", title: "No se pudo obtener sesión." });
+      setSending(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/payments/send-reminder", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ schoolId, type: "delinquents" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Error al enviar");
+      toast({
+        title: "Correos encolados",
+        description: data.message ?? `Se enviarán ${data.sent ?? 0} correos a morosos.`,
+      });
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: e instanceof Error ? e.message : "Error al enviar correos",
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {delinquents.length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSendEmailToDelinquents}
+            disabled={sending || delinquents.filter((d) => d.playerEmail?.trim()).length === 0}
+          >
+            {sending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Mail className="mr-2 h-4 w-4" />
+            )}
+            Enviar mail a morosos
+          </Button>
+        </div>
+      )}
       {loading ? (
         <Skeleton className="h-64 w-full" />
       ) : delinquents.length === 0 ? (
@@ -240,11 +356,49 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
           <DialogHeader>
             <DialogTitle>Marcar pago manual</DialogTitle>
             <DialogDescription>
-              Registrar un pago realizado fuera del sistema para {manualDialog?.playerName} -
-              período {manualDialog?.period}
+              Elegí a qué cuota imputar el pago para {manualDialog?.playerName}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div>
+              <Label>Imputar a la cuota</Label>
+              {unpaidLoading ? (
+                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Cargando cuotas adeudadas…
+                </p>
+              ) : unpaidPeriods.length === 0 ? (
+                <p className="text-sm text-muted-foreground mt-1">
+                  No hay cuotas adeudadas para este cliente.
+                </p>
+              ) : (
+                <div className="mt-2 space-y-2 max-h-48 overflow-y-auto rounded-md border p-2">
+                  {unpaidPeriods.map((u) => (
+                    <label
+                      key={u.period}
+                      className={`flex items-center justify-between gap-2 p-2 rounded cursor-pointer hover:bg-muted/50 ${
+                        manualPeriod === u.period ? "bg-muted" : ""
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="manual-period"
+                        checked={manualPeriod === u.period}
+                        onChange={() => {
+                          setManualPeriod(u.period);
+                          setManualAmount(String(u.amount));
+                        }}
+                        className="sr-only"
+                      />
+                      <span className="font-medium">{u.label}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {u.currency} {u.amount.toLocaleString("es-AR")}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
             <div>
               <Label htmlFor="amount">Monto</Label>
               <Input

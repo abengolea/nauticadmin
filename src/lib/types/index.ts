@@ -92,7 +92,7 @@ export interface SchoolUser {
   id: string; // auth uid
   displayName: string;
   email: string;
-  role: 'school_admin' | 'coach' | 'editor' | 'viewer' | 'player';
+  role: 'school_admin' | 'operador' | 'editor' | 'viewer' | 'player';
   assignedCategories?: string[]; // IDs de las categorías asignadas
 }
 
@@ -112,6 +112,8 @@ export interface Embarcacion {
   matricula?: string;
   /** Medidas y características */
   medidas?: string;
+  /** Lona (característica de la embarcación) */
+  lona?: string;
   /** Datos adicionales */
   datos?: string;
   /** ID del tipo de pricing (BoatPricingItem.id) - define cuánto cobrar por canon mensual */
@@ -187,10 +189,14 @@ export interface Player {
   usuarioId?: string;
   /** CUIT del cliente (para facturación electrónica) */
   cuit?: string;
+  /** Condición frente al IVA (Responsable Inscripto, Consumidor Final, Monotributista) */
+  condicionIVA?: string;
   /** Si requiere factura (default true). Si false, no se factura. */
   requiereFactura?: boolean;
   /** Fecha en que se envió la invitación de acceso al panel (para no reenviar). */
   accessInviteSentAt?: Date;
+  /** URL de documentación del cliente (ej. carpeta o archivo en Google Drive). */
+  documentacion?: string;
 }
 
 /** Ficha médica del jugador (PDF). Subida por jugador o staff; aprobada o rechazada por admin/entrenador. */
@@ -358,7 +364,7 @@ export interface UserProfile extends SchoolUser {
 
 export interface SchoolMembership {
     schoolId: string;
-    role: 'school_admin' | 'coach' | 'editor' | 'viewer' | 'player';
+    role: 'school_admin' | 'operador' | 'editor' | 'viewer' | 'player';
 }
 
 /** Evaluación física del jugador. Campos varían según edad. */

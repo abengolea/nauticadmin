@@ -27,7 +27,7 @@ type UpdatePayload = {
     pie_dominante: string | null;
     posicion_preferida: string | null;
     // Campos náuticos
-    embarcaciones?: Array<{ id: string; nombre?: string; matricula?: string; medidas?: string; datos?: string; claseId?: string }> | null;
+    embarcaciones?: Array<{ id: string; nombre?: string; matricula?: string; medidas?: string; lona?: string; datos?: string; claseId?: string }> | null;
     serviciosAdicionales?: Array<{ id: string; claseId: string }> | null;
     embarcacionNombre?: string | null;
     embarcacionMatricula?: string | null;
@@ -39,6 +39,7 @@ type UpdatePayload = {
     personasAutorizadas?: string[] | null;
     embarcacionDatos?: string | null;
     usuarioId?: string | null;
+    condicionIVA?: string | null;
   };
   oldEmail?: string | null;
 };

@@ -25,8 +25,8 @@ export function Header() {
   const router = useRouter();
   const { searchQuery, setSearchQuery } = useClientSearch();
   const { isReady, activeSchoolId, profile } = useUserProfile();
-  // Solo staff (school_admin o coach) puede listar jugadores y pendingPlayers; nunca listar si es jugador.
-  const isStaff = profile?.role === "school_admin" || profile?.role === "coach";
+  // Solo staff (school_admin u operador) puede listar jugadores y pendingPlayers; nunca listar si es jugador.
+  const isStaff = profile?.role === "school_admin" || profile?.role === "operador";
   const canListSchoolCollections = isReady && activeSchoolId && isStaff;
   const { data: pendingPlayers } = useCollection(
     canListSchoolCollections ? `schools/${activeSchoolId}/pendingPlayers` : "",

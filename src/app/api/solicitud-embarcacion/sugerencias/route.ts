@@ -63,14 +63,15 @@ export async function GET(request: Request) {
     }
 
     // tipo === embarcacion (si hay nombreCliente, mostrar todas sus embarcaciones aunque q esté vacío)
+    // Solo mostramos el nombre de la embarcación, no la matrícula
     const embarcaciones = new Set<string>();
     const qMatch = q.length > 0;
     for (const p of players) {
       const nombreFull = `${(p.firstName ?? '').trim()} ${(p.lastName ?? '').trim()}`.trim();
       if (nombreCliente && nombreFull.toLowerCase() !== nombreCliente.toLowerCase()) continue;
       const embs = p.embarcaciones?.length
-        ? p.embarcaciones.map((e) => [(e.nombre ?? '').trim(), (e.matricula ?? '').trim()]).flat()
-        : [(p.embarcacionNombre ?? '').trim(), (p.embarcacionMatricula ?? '').trim()];
+        ? p.embarcaciones.map((e) => (e.nombre ?? '').trim()).filter(Boolean)
+        : [(p.embarcacionNombre ?? '').trim()].filter(Boolean);
       for (const v of embs) {
         if (v && (!qMatch || v.toLowerCase().includes(q))) embarcaciones.add(v);
       }

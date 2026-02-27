@@ -33,11 +33,11 @@ service cloud.firestore {
           && userData.role == 'school_admin';
     }
 
-    function isCoach(schoolId) {
+    function isOperador(schoolId) {
       let userData = getSchoolUserData(schoolId);
       return isSignedIn()
           && userData != null
-          && userData.role == 'coach';
+          && userData.role == 'operador';
     }
 
     function isMemberOfSchool(schoolId) {
@@ -79,7 +79,7 @@ service cloud.firestore {
     // --- Schema Validation Helpers ---
 
     function isValidSchoolUserRole(role) {
-      return role in ['school_admin', 'coach', 'editor', 'viewer'];
+      return role in ['school_admin', 'operador', 'editor', 'viewer'];
     }
 
     function isEditor(schoolId) {
@@ -99,7 +99,7 @@ service cloud.firestore {
     function isStaffOfSchool(schoolId) {
       return isSuperAdmin()
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId)
+          || isOperador(schoolId)
           || isEditor(schoolId)
           || isViewer(schoolId);
     }
@@ -130,9 +130,9 @@ service cloud.firestore {
       allow read: if isSignedIn() && request.auth.token.email != null && emailKey == request.auth.token.email.lower();
       allow create, update: if isSuperAdmin()
         || (request.resource.data.schoolId != null && request.resource.data.playerId != null
-            && (isCoach(request.resource.data.schoolId) || isSchoolAdmin(request.resource.data.schoolId)));
+            && (isOperador(request.resource.data.schoolId) || isSchoolAdmin(request.resource.data.schoolId)));
       allow delete: if isSuperAdmin()
-        || (resource.data.schoolId != null && (isCoach(resource.data.schoolId) || isSchoolAdmin(resource.data.schoolId)));
+        || (resource.data.schoolId != null && (isOperador(resource.data.schoolId) || isSchoolAdmin(resource.data.schoolId)));
     }
 
     match /platformUsers/{userId} {
@@ -173,7 +173,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && request.auth.token.email != null
           && emailKey == request.auth.token.email.lower();
       allow delete: if isSuperAdmin() || (resource != null && resource.data.schoolId != null
-          && (isSchoolAdmin(resource.data.schoolId) || isCoach(resource.data.schoolId)));
+          && (isSchoolAdmin(resource.data.schoolId) || isOperador(resource.data.schoolId)));
     }
 
     match /schools/{schoolId} {
@@ -195,11 +195,11 @@ service cloud.firestore {
       allow read: if isSuperAdmin()
           || isMemberOfSchool(schoolId)
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId)
+          || isOperador(schoolId)
           || (isSignedIn() && request.auth.token.email != null && resource.data.get('email', '').lower() == request.auth.token.email.lower())
           || hasPlayerLoginFor(schoolId, playerId);
       // Solo staff crea jugadores; staff o jugador (email en request = auth email, o playerLogin) pueden actualizar.
-      allow create: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow create: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
       allow update: if isSuperAdmin()
           || isMemberOfSchool(schoolId)
           || requestEmailMatchesAuth(schoolId, playerId)
@@ -212,7 +212,7 @@ service cloud.firestore {
         allow read, delete: if isSuperAdmin()
             || isMemberOfSchool(schoolId)
             || isSchoolAdmin(schoolId)
-            || isCoach(schoolId);
+            || isOperador(schoolId);
         // Allow any signed-in user to create a request. This can be tightened later if needed.
         allow create: if isSignedIn();
     }
@@ -221,11 +221,11 @@ service cloud.firestore {
       allow get, list: if isSuperAdmin()
           || isMemberOfSchool(schoolId)
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId)
+          || isOperador(schoolId)
           || isOwnPlayer(schoolId, resource.data.playerId);
       // Cualquier miembro de la escuela (admin o coach) puede crear/editar/borrar evaluaciones.
-      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId) || isMemberOfSchool(schoolId);
-      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId) || isMemberOfSchool(schoolId);
+      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
     }
 
     // --- Other collections ---
@@ -235,15 +235,15 @@ service cloud.firestore {
       allow read: if isSuperAdmin()
           || isMemberOfSchool(schoolId)
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId)
+          || isOperador(schoolId)
           || isSignedIn();
-      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
     }
 
     match /schools/{schoolId}/trainings/{trainingId}/attendance/{playerId} {
-      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId)
+      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId)
           || isOwnPlayer(schoolId, playerId);
-      allow write: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow write: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
     }
     
     match /schools/{schoolId}/invites/{inviteId} {
@@ -254,7 +254,7 @@ service cloud.firestore {
         allow read: if isSuperAdmin()
             || isMemberOfSchool(schoolId)
             || isSchoolAdmin(schoolId)
-            || isCoach(schoolId);
+            || isOperador(schoolId);
         allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
     
@@ -266,7 +266,7 @@ service cloud.firestore {
         allow read: if isSuperAdmin()
             || isMemberOfSchool(schoolId)
             || isSchoolAdmin(schoolId)
-            || isCoach(schoolId);
+            || isOperador(schoolId);
         allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
 
@@ -275,8 +275,8 @@ service cloud.firestore {
       allow read: if isSuperAdmin()
           || isMemberOfSchool(schoolId)
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId);
-      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+          || isOperador(schoolId);
+      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
       allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
     }
 
@@ -285,9 +285,9 @@ service cloud.firestore {
       allow read: if isSuperAdmin()
           || isMemberOfSchool(schoolId)
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId)
+          || isOperador(schoolId)
           || isOwnPlayer(schoolId, resource.data.playerId);
-      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
     }
 
     // Videoteca: videos por jugador (grabados/subidos por el entrenador)
@@ -295,9 +295,9 @@ service cloud.firestore {
       allow read: if isSuperAdmin()
           || isMemberOfSchool(schoolId)
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId)
+          || isOperador(schoolId)
           || isOwnPlayer(schoolId, resource.data.playerId);
-      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow create, update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
     }
 
     // --- Pagos y Morosidad ---
@@ -334,14 +334,14 @@ service cloud.firestore {
 
     // Configuración de cuotas por escuela
     match /schools/{schoolId}/paymentConfig/{configId} {
-      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
       allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId);
       allow delete: if false;
     }
 
     // Configuración de mensualidad de escuela a plataforma (solo super admin escribe)
     match /schools/{schoolId}/schoolFeeConfig/{configId} {
-      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
       allow create, update: if isSuperAdmin();
       allow delete: if false;
     }
@@ -350,20 +350,20 @@ service cloud.firestore {
     match /schoolFeePayments/{paymentId} {
       allow read: if isSuperAdmin()
         || (resource.data.schoolId != null && isSchoolAdmin(resource.data.schoolId))
-        || (resource.data.schoolId != null && isCoach(resource.data.schoolId));
+        || (resource.data.schoolId != null && isOperador(resource.data.schoolId));
       allow write: if false;
     }
 
     // Configuración de precios de embarcaciones por náutica
     match /schools/{schoolId}/boatPricingConfig/{configId} {
-      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
       allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId);
       allow delete: if false;
     }
 
     // Configuración de turnos por náutica (admin configura; clientes leen si está habilitado)
     match /schools/{schoolId}/appointmentConfig/{configId} {
-      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId)
+      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId)
           || (isMemberOfSchool(schoolId) && resource.data.get('enabled', false) == true);
       allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId);
       allow delete: if false;
@@ -373,18 +373,18 @@ service cloud.firestore {
     match /schools/{schoolId}/appointments/{appointmentId} {
       allow read: if isSuperAdmin()
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId)
+          || isOperador(schoolId)
           || (isMemberOfSchool(schoolId) && resource.data.playerId != null
               && (isOwnPlayer(schoolId, resource.data.playerId)
                   || hasPlayerLoginFor(schoolId, resource.data.playerId)));
       allow create: if isSuperAdmin()
           || isSchoolAdmin(schoolId)
-          || isCoach(schoolId)
+          || isOperador(schoolId)
           || (isMemberOfSchool(schoolId) && request.resource.data.playerId != null
               && request.resource.data.schoolId == schoolId
               && (isOwnPlayer(schoolId, request.resource.data.playerId)
                   || hasPlayerLoginFor(schoolId, request.resource.data.playerId)));
-      allow update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isCoach(schoolId);
+      allow update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
     }
 
     // Conexión OAuth Mercado Pago por escuela (tokens; solo servidor debería escribir en producción)

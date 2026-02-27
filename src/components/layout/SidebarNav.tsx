@@ -50,12 +50,12 @@ const schoolUserMenuItems = [
 
 const superAdminMenuItems = [
     { href: "/dashboard", label: "Náuticas", icon: Building },
-    { href: "/dashboard/admin/mensualidades", label: "Mensualidades", icon: Banknote },
     { href: "/dashboard/support/operator", label: "Tickets de Soporte", icon: Headphones },
     { href: "/dashboard/admin/config", label: "Configuración global", icon: Sliders },
     { href: "/dashboard/admin/test-email", label: "Probar Trigger Email", icon: Mail },
     { href: "/dashboard/admin/audit", label: "Auditoría", icon: History },
     { href: "/dashboard/admin/delete-test-users", label: "Borrar usuarios de prueba", icon: UserX },
+    { href: "/dashboard/admin/mensualidades", label: "Mensualidades", icon: Banknote },
 ];
 
 
@@ -120,11 +120,11 @@ export function SidebarNav() {
       ];
     }
   } else {
-    // Start with the base items for any school user (coach / school_admin)
+    // Start with the base items for any school user (operador / school_admin)
     menuItems = [...schoolUserMenuItems];
     // Add Pagos, Mensajes y Gestionar Náutica solo para school_admin, en orden de importancia
     if (profile?.role === 'school_admin' && profile.activeSchoolId) {
-      const pagos = { href: "/dashboard/payments", label: "Pagos", icon: Banknote };
+      const pagos = { href: "/dashboard/payments", label: "Ventas y pagos", icon: Banknote };
       const mensualidades = { href: "/dashboard/payments?tab=mensualidad", label: "Mensualidades", icon: Building2 };
       const conciliacion = { href: "/dashboard/reconciliation", label: "Conciliación", icon: FileSpreadsheet };
       const gastos = { href: "/dashboard/expenses", label: "Gastos", icon: Receipt };
@@ -137,12 +137,12 @@ export function SidebarNav() {
       menuItems = [
         ...menuItems.slice(0, 2), // Panel Principal, Clientes
         pagos,
-        mensualidades,
         conciliacion,
         gastos,
         ...menuItems.slice(2),   // Centro de Soporte
         mensajes,
-        gestionarNautica
+        gestionarNautica,
+        mensualidades
       ];
     }
   }

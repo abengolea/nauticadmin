@@ -29,6 +29,14 @@ function toDate(val: unknown): Date {
   return new Date();
 }
 
+/** Mapea condicionIVA del cliente a CondIVAReceptor AFIP (RG 5616). 5=Consumidor Final, 1=RI, 6=Monotributo */
+function condicionIVAtoAfipId(condicionIVA: string | undefined): number {
+  const v = (condicionIVA ?? '').trim();
+  if (v === 'Responsable Inscripto') return 1;
+  if (v === 'Monotributista') return 6;
+  return 5; // Consumidor Final por defecto
+}
+
 export async function POST(request: Request) {
   try {
     const auth = await verifyIdToken(request.headers.get('Authorization'));
@@ -194,6 +202,8 @@ export async function POST(request: Request) {
             continue;
           }
 
+          const condIvaReceptor = condicionIVAtoAfipId(playerData?.condicionIVA);
+
           const result = await createNextVoucher({
             PtoVta: ptoVta,
             CbteTipo: cbteTipo,
@@ -209,7 +219,7 @@ export async function POST(request: Request) {
             ImpTrib: 0,
             MonId: currency === 'USD' ? 'DOL' : 'PES',
             MonCotiz: 1,
-            CondIVAReceptor: 5,
+            CondIVAReceptor: condIvaReceptor,
             Iva: [{ Id: 5, BaseImp: impNeto, Importe: impIva }],
           });
           voucherNumber = result.voucherNumber;
@@ -217,12 +227,15 @@ export async function POST(request: Request) {
           caeVto = result.CAEFchVto;
         }
 
+        const metadata = (pData.metadata ?? {}) as { concept?: string };
         const concepto =
           period === 'inscripcion'
             ? 'Derecho de inscripción'
             : period.startsWith('ropa-')
               ? `Cuota de indumentaria (${period})`
-              : `Cuota ${period}`;
+              : period.startsWith('extra-') && metadata.concept
+                ? metadata.concept
+                : `Cuota ${period}`;
 
         const pdfPath = await generarFacturaPDF({
           emisor,
@@ -234,7 +247,7 @@ export async function POST(request: Request) {
             razonSocial: playerName,
             cuit: String(docReceptor),
             domicilio: '-',
-            condicionIVA: 'Consumidor Final',
+            condicionIVA: playerData?.condicionIVA?.trim() || 'Consumidor Final',
           },
           items: [
             {
@@ -254,6 +267,13 @@ export async function POST(request: Request) {
         });
 
         const filename = path.basename(pdfPath);
+
+        // Marcar pago como facturado
+        await paymentsCol.doc(paymentId).update({
+          facturado: true,
+          facturadoAt: new Date(),
+        });
+
         results.push({
           paymentId,
           ok: true,

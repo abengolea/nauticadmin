@@ -54,7 +54,7 @@ export function useUserProfile() {
         return; // Exit early, no need to fetch memberships
     }
     
-    // 4. If not super admin, it must be a regular user. Fetch their school roles (coach/admin).
+    // 4. If not super admin, it must be a regular user. Fetch their school roles (operador/admin).
     setIsSuperAdmin(false);
     
     const userRolesQuery = query(
@@ -180,7 +180,7 @@ export function useUserProfile() {
     isReady,
     activeSchoolId: profile?.activeSchoolId,
     isAdmin: isSuperAdmin || profile?.role === 'school_admin',
-    isCoach: profile?.role === 'coach',
+    isOperador: profile?.role === 'operador',
     isPlayer: profile?.role === 'player',
     isSuperAdmin: isSuperAdmin,
   };

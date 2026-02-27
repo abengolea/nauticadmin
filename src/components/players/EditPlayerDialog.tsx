@@ -49,6 +49,7 @@ const embarcacionSchema = z.object({
   nombre: z.string().optional(),
   matricula: z.string().optional(),
   medidas: z.string().optional(),
+  lona: z.string().optional(),
   datos: z.string().optional(),
   claseId: z.string().optional(),
 });
@@ -77,6 +78,8 @@ const playerSchema = z.object({
   requiereFactura: z.boolean().optional(),
   personasAutorizadas: z.string().optional(),
   usuarioId: z.string().optional(),
+  condicionIVA: z.string().optional(),
+  documentacion: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
 });
 
 interface EditPlayerDialogProps {
@@ -119,7 +122,7 @@ export function EditPlayerDialog({
       status: player.status ?? "active",
       observations: player.observations ?? "",
       photoUrl: player.photoUrl ?? "",
-      embarcaciones: embarcacionesIniciales.length > 0 ? embarcacionesIniciales : [{ id: crypto.randomUUID(), nombre: "", matricula: "", medidas: "", datos: "", claseId: "" }],
+      embarcaciones: embarcacionesIniciales.length > 0 ? embarcacionesIniciales : [{ id: crypto.randomUUID(), nombre: "", matricula: "", medidas: "", lona: "", datos: "", claseId: "" }],
       serviciosAdicionales: (player as { serviciosAdicionales?: { id: string; claseId: string }[] }).serviciosAdicionales ?? [],
       ubicacion: player.ubicacion ?? "",
       clienteDesde: player.clienteDesde ?? "",
@@ -127,6 +130,8 @@ export function EditPlayerDialog({
       requiereFactura: player.requiereFactura !== false,
       personasAutorizadas: Array.isArray(player.personasAutorizadas) ? player.personasAutorizadas.join(", ") : (player.personasAutorizadas as string) ?? "",
       usuarioId: player.usuarioId ?? "",
+      condicionIVA: (player as { condicionIVA?: string }).condicionIVA ?? "Consumidor Final",
+      documentacion: (player as { documentacion?: string }).documentacion ?? "",
     },
   });
 
@@ -180,6 +185,8 @@ export function EditPlayerDialog({
         requiereFactura: player.requiereFactura !== false,
         personasAutorizadas: Array.isArray(player.personasAutorizadas) ? player.personasAutorizadas.join(", ") : (player.personasAutorizadas as string) ?? "",
         usuarioId: player.usuarioId ?? "",
+        condicionIVA: (player as { condicionIVA?: string }).condicionIVA ?? "Consumidor Final",
+        documentacion: (player as { documentacion?: string }).documentacion ?? "",
       });
     }
   }, [isOpen, player, form]);
@@ -192,12 +199,13 @@ export function EditPlayerDialog({
       : undefined;
 
     const embarcaciones = values.embarcaciones
-      ?.filter((e) => (e.claseId?.trim() || e.nombre?.trim() || e.matricula?.trim() || e.medidas?.trim()))
+      ?.filter((e) => (e.claseId?.trim() || e.nombre?.trim() || e.matricula?.trim() || e.medidas?.trim() || e.lona?.trim()))
       .map((e) => ({
         id: e.id,
         nombre: e.nombre?.trim() || undefined,
         matricula: e.matricula?.trim() || undefined,
         medidas: e.medidas?.trim() || undefined,
+        lona: e.lona?.trim() || undefined,
         datos: e.datos?.trim() || undefined,
         claseId: e.claseId?.trim() || undefined,
       })) ?? [];
@@ -224,6 +232,8 @@ export function EditPlayerDialog({
       requiereFactura: values.requiereFactura ?? true,
       personasAutorizadas: personasArr ?? null,
       usuarioId: values.usuarioId?.trim() || null,
+      condicionIVA: values.condicionIVA?.trim() || null,
+      documentacion: values.documentacion?.trim() || null,
     };
     if (embarcaciones.length > 0) {
       updateData.embarcacionNombre = null;
@@ -455,6 +465,24 @@ export function EditPlayerDialog({
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="documentacion"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Documentación</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="url"
+                            placeholder="https://drive.google.com/..."
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>Link a carpeta o archivo en Google Drive con la documentación del cliente.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </TabsContent>
               <TabsContent value="nautica" className="mt-0 space-y-6">
@@ -467,7 +495,7 @@ export function EditPlayerDialog({
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => append({ id: crypto.randomUUID(), nombre: "", matricula: "", medidas: "", datos: "", claseId: "" })}
+                      onClick={() => append({ id: crypto.randomUUID(), nombre: "", matricula: "", medidas: "", lona: "", datos: "", claseId: "" })}
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       Agregar embarcación
@@ -549,6 +577,19 @@ export function EditPlayerDialog({
                               <FormLabel>Medidas</FormLabel>
                               <FormControl>
                                 <Input placeholder="Ej: 6.20m x 2.50m" {...f} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`embarcaciones.${index}.lona`}
+                          render={({ field: f }) => (
+                            <FormItem>
+                              <FormLabel>Lona</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: Sí / No / Tipo" {...f} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -667,6 +708,29 @@ export function EditPlayerDialog({
                       )}
                     />
                   )}
+                  <FormField
+                    control={form.control}
+                    name="condicionIVA"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Condición frente al IVA</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? "Consumidor Final"}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Responsable Inscripto">Responsable Inscripto</SelectItem>
+                            <SelectItem value="Consumidor Final">Consumidor Final</SelectItem>
+                            <SelectItem value="Monotributista">Monotributista</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>Define el tipo de factura a emitir (AFIP).</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="requiereFactura"

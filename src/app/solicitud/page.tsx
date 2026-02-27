@@ -245,7 +245,7 @@ function SolicitudPageContent() {
               htmlFor="embarcacion"
               className="block text-xl sm:text-2xl font-semibold text-foreground"
             >
-              Nombre de la embarcación o matrícula
+              Nombre de la embarcación
             </label>
             <div className="relative">
               <input
@@ -264,7 +264,7 @@ function SolicitudPageContent() {
                     });
                   }
                 }}
-                placeholder="Ej: La Gaviota o matrícula"
+                placeholder="Ej: La Gaviota"
                 autoComplete="off"
                 disabled={loading}
                 className="w-full min-h-[64px] sm:min-h-[72px] px-5 sm:px-6 text-xl sm:text-2xl md:text-3xl rounded-xl border-2 border-input bg-background focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all touch-manipulation"

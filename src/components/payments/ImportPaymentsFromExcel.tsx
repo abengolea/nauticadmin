@@ -363,7 +363,7 @@ export function ImportPaymentsFromExcel({ schoolId }: { schoolId: string }) {
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Se imputará a {periodYear}-{String(periodMonth).padStart(2, "0")} • {rows.length} filas
+              Los pagos aplicados se imputan a la cuota más vieja de cada cliente. Período {periodYear}-{String(periodMonth).padStart(2, "0")} para no aplicados • {rows.length} filas
             </p>
             <Button onClick={handleImport} disabled={importing}>
               {importing ? (

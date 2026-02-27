@@ -14,11 +14,20 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExpenseCapture } from '@/components/expenses/ExpenseCapture';
 import { ExpenseConfirmDialog } from '@/components/expenses/ExpenseConfirmDialog';
-import { Pencil, Plus, List, TrendingUp, ExternalLink, Filter } from 'lucide-react';
+import { VendorPaymentDialog } from '@/components/expenses/VendorPaymentDialog';
+import { Pencil, Plus, List, TrendingUp, ExternalLink, Filter, Banknote, Trash2, Receipt, Wallet, Download, FileText, FileSpreadsheet, ChevronDown, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import * as XLSX from 'xlsx';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Expense } from '@/lib/expenses/types';
 import type { AIExtractedExpense } from '@/lib/expenses/schemas';
 
@@ -28,11 +37,13 @@ export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showArchived, setShowArchived] = useState(false);
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [yearFilter, setYearFilter] = useState<string>('all');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [summary, setSummary] = useState<{ totalFacturas: number; totalPagos: number; saldoTotal: number } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmData, setConfirmData] = useState<{
     expenseId: string;
@@ -56,17 +67,27 @@ export default function ExpensesPage() {
       const token = await user.getIdToken();
       const params = new URLSearchParams({ schoolId, limit: '300' });
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      const res = await fetch(`/api/expenses?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setExpenses(data.expenses ?? []);
+      const [expensesRes, summaryRes] = await Promise.all([
+        fetch(`/api/expenses?${params}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`/api/expenses/summary?schoolId=${schoolId}`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      if (expensesRes.ok) {
+        const data = await expensesRes.json();
+        const list = data.expenses ?? [];
+        setExpenses(showArchived ? list.filter((e: Expense) => e.archivedAt) : list.filter((e: Expense) => !e.archivedAt));
+      }
+      if (summaryRes.ok) {
+        const sumData = await summaryRes.json();
+        setSummary({
+          totalFacturas: sumData.totalFacturas ?? 0,
+          totalPagos: sumData.totalPagos ?? 0,
+          saldoTotal: sumData.saldoTotal ?? 0,
+        });
       }
     } finally {
       setLoading(false);
     }
-  }, [schoolId, statusFilter]);
+  }, [schoolId, statusFilter, showArchived]);
 
   useEffect(() => {
     if (schoolId) fetchExpenses();
@@ -161,12 +182,56 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-6 min-w-0">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold font-headline">Gastos</h1>
-        <p className="text-muted-foreground">
-          Cargá facturas sacando una foto, extraemos los datos con IA y llevamos la cuenta corriente.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold font-headline">Gastos</h1>
+          <p className="text-muted-foreground">
+            Cargá facturas sacando una foto, extraemos los datos con IA y llevamos la cuenta corriente.
+          </p>
+        </div>
+        <ExportIvaButton
+          schoolId={schoolId}
+          monthFilter={monthFilter}
+          yearFilter={yearFilter}
+        />
       </div>
+
+      {summary && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total facturas</CardTitle>
+              <Receipt className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">ARS {summary.totalFacturas.toLocaleString('es-AR')}</div>
+              <p className="text-xs text-muted-foreground">Confirmadas + pagadas</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total pagos</CardTitle>
+              <Banknote className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">ARS {summary.totalPagos.toLocaleString('es-AR')}</div>
+              <p className="text-xs text-muted-foreground">Pagados a proveedores</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Saldo con proveedores</CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${summary.saldoTotal > 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+                ARS {summary.saldoTotal.toLocaleString('es-AR')}
+              </div>
+              <p className="text-xs text-muted-foreground">Deuda pendiente</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Tabs defaultValue="list" className="w-full min-w-0">
         <TabsList className="flex flex-wrap h-auto gap-1 p-1 w-full sm:inline-flex sm:w-auto">
@@ -176,7 +241,7 @@ export default function ExpensesPage() {
           </TabsTrigger>
           <TabsTrigger value="add">
             <Plus className="h-4 w-4 mr-2" />
-            Cargar gasto
+            Cargar factura
           </TabsTrigger>
           <TabsTrigger value="accounts">
             <TrendingUp className="h-4 w-4 mr-2" />
@@ -186,6 +251,8 @@ export default function ExpensesPage() {
 
         <TabsContent value="list" className="mt-4">
           <ExpenseListFilters
+            showArchived={showArchived}
+            onShowArchivedChange={setShowArchived}
             statusFilter={statusFilter}
             onStatusChange={setStatusFilter}
             monthFilter={monthFilter}
@@ -201,7 +268,7 @@ export default function ExpensesPage() {
           {loading ? (
             <p className="text-muted-foreground">Cargando...</p>
           ) : expenses.length === 0 ? (
-            <p className="text-muted-foreground">No hay gastos. Cargá uno desde la pestaña &quot;Cargar gasto&quot;.</p>
+            <p className="text-muted-foreground">No hay gastos. Cargá uno desde la pestaña &quot;Cargar factura&quot;.</p>
           ) : (
             <ExpenseListTable
               expenses={expenses}
@@ -209,6 +276,7 @@ export default function ExpensesPage() {
               yearFilter={yearFilter}
               supplierFilter={supplierFilter}
               schoolId={schoolId}
+              showArchived={showArchived}
               onEdit={handleEditExpense}
               onRefresh={fetchExpenses}
               toast={toast}
@@ -255,6 +323,116 @@ export default function ExpensesPage() {
   );
 }
 
+function ExportIvaButton({
+  schoolId,
+  monthFilter,
+  yearFilter,
+}: {
+  schoolId: string;
+  monthFilter: string;
+  yearFilter: string;
+}) {
+  const { toast } = useToast();
+  const [exporting, setExporting] = useState(false);
+
+  const fetchAndExport = async (format: 'txt' | 'excel') => {
+    const user = getAuth().currentUser;
+    if (!user) return;
+    setExporting(true);
+    try {
+      const token = await user.getIdToken();
+      const params = new URLSearchParams({ schoolId });
+      if (monthFilter !== 'all') params.set('month', monthFilter);
+      if (yearFilter !== 'all') params.set('year', yearFilter);
+      const res = await fetch(`/api/reports/iva?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Error al obtener datos');
+      }
+      const data = await res.json();
+      const { ivaVentas, ivaCompras } = data;
+      const suffix = `${yearFilter !== 'all' ? yearFilter : ''}${monthFilter !== 'all' ? `-${String(monthFilter).padStart(2, '0')}` : ''}`.replace(/^-/, '') || format(new Date(), 'yyyy-MM');
+
+      if (format === 'txt') {
+        const lines: string[] = [];
+        lines.push('=== IVA VENTAS ===');
+        lines.push('Fecha\tTipo\tPtoVta\tNúmero\tCUIT/DNI\tNombre\tNeto\tIVA\tTotal');
+        for (const r of ivaVentas) {
+          lines.push(`${r.fecha}\t${r.tipoCbte}\t${r.ptoVta}\t${r.numero}\t${r.cuitDni}\t${r.nombre}\t${r.neto.toFixed(2)}\t${r.iva.toFixed(2)}\t${r.total.toFixed(2)}`);
+        }
+        lines.push('');
+        lines.push('=== IVA COMPRAS ===');
+        lines.push('Fecha\tTipo\tPtoVta\tNúmero\tCUIT\tRazón Social\tNeto\tIVA\tTotal');
+        for (const r of ivaCompras) {
+          lines.push(`${r.fecha}\t${r.tipoCbte}\t${r.ptoVta}\t${r.numero}\t${r.cuit}\t${r.razonSocial}\t${r.neto.toFixed(2)}\t${r.iva.toFixed(2)}\t${r.total.toFixed(2)}`);
+        }
+        const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `iva-ventas-compras-${suffix}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const wb = XLSX.utils.book_new();
+        const wsVentas = XLSX.utils.aoa_to_sheet([
+          ['IVA VENTAS'],
+          ['Fecha', 'Tipo', 'Pto Vta', 'Número', 'CUIT/DNI', 'Nombre', 'Neto', 'IVA', 'Total'],
+          ...ivaVentas.map((r) => [r.fecha, r.tipoCbte, r.ptoVta, r.numero, r.cuitDni, r.nombre, r.neto, r.iva, r.total]),
+        ]);
+        const wsCompras = XLSX.utils.aoa_to_sheet([
+          ['IVA COMPRAS'],
+          ['Fecha', 'Tipo', 'Pto Vta', 'Número', 'CUIT', 'Razón Social', 'Neto', 'IVA', 'Total'],
+          ...ivaCompras.map((r) => [r.fecha, r.tipoCbte, r.ptoVta, r.numero, r.cuit, r.razonSocial, r.neto, r.iva, r.total]),
+        ]);
+        XLSX.utils.book_append_sheet(wb, wsVentas, 'IVA Ventas');
+        XLSX.utils.book_append_sheet(wb, wsCompras, 'IVA Compras');
+        XLSX.writeFile(wb, `iva-ventas-compras-${suffix}.xlsx`);
+      }
+      toast({
+        title: 'Exportado',
+        description: `IVA ventas (${ivaVentas.length}) e IVA compras (${ivaCompras.length}) en ${format === 'txt' ? 'TXT' : 'Excel'}.`,
+      });
+    } catch (e) {
+      toast({
+        variant: 'destructive',
+        title: 'Error al exportar',
+        description: e instanceof Error ? e.message : 'No se pudo exportar',
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" disabled={exporting}>
+          {exporting ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <Download className="h-4 w-4 mr-2" />
+          )}
+          Exportar IVA
+          <ChevronDown className="h-4 w-4 ml-2" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => fetchAndExport('txt')} disabled={exporting}>
+          <FileText className="h-4 w-4 mr-2" />
+          Exportar en TXT
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => fetchAndExport('excel')} disabled={exporting}>
+          <FileSpreadsheet className="h-4 w-4 mr-2" />
+          Exportar en Excel
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 const MONTHS = [
   { value: 'all', label: 'Todos los meses' },
   { value: '1', label: 'Enero' },
@@ -280,6 +458,8 @@ function ExpenseListFilters({
   onYearChange,
   supplierFilter,
   onSupplierChange,
+  showArchived,
+  onShowArchivedChange,
   expenses,
   onRefresh,
 }: {
@@ -291,6 +471,8 @@ function ExpenseListFilters({
   onYearChange: (v: string) => void;
   supplierFilter: string;
   onSupplierChange: (v: string) => void;
+  showArchived: boolean;
+  onShowArchivedChange: (v: boolean) => void;
   expenses: Expense[];
   onRefresh: () => void;
 }) {
@@ -321,9 +503,8 @@ function ExpenseListFilters({
         <SelectContent>
           <SelectItem value="all">Todos</SelectItem>
           <SelectItem value="draft">Borrador</SelectItem>
-          <SelectItem value="confirmed">Confirmado</SelectItem>
-          <SelectItem value="paid">Pagado</SelectItem>
-          <SelectItem value="cancelled">Cancelado</SelectItem>
+          <SelectItem value="confirmed">Confirmada</SelectItem>
+          <SelectItem value="paid">Pagada</SelectItem>
         </SelectContent>
       </Select>
       <Select value={monthFilter} onValueChange={onMonthChange}>
@@ -367,6 +548,13 @@ function ExpenseListFilters({
       <Button variant="outline" size="sm" onClick={onRefresh}>
         Actualizar
       </Button>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <Checkbox
+          checked={showArchived}
+          onCheckedChange={(c) => onShowArchivedChange(!!c)}
+        />
+        Ver papelera
+      </label>
     </div>
   );
 }
@@ -377,6 +565,7 @@ function ExpenseListTable({
   yearFilter,
   supplierFilter,
   schoolId,
+  showArchived,
   onEdit,
   onRefresh,
   toast,
@@ -390,6 +579,7 @@ function ExpenseListTable({
   yearFilter: string;
   supplierFilter: string;
   schoolId: string;
+  showArchived: boolean;
   onEdit: (e: Expense) => void;
   onRefresh: () => void;
   toast: ReturnType<typeof useToast>['toast'];
@@ -416,6 +606,7 @@ function ExpenseListTable({
   const visibleIds = new Set(filtered.map((e) => e.id));
   const allSelected = filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id));
   const someSelected = filtered.some((e) => selectedIds.has(e.id));
+  const [paymentExpense, setPaymentExpense] = useState<Expense | null>(null);
 
   const toggleAll = () => {
     if (allSelected) {
@@ -490,23 +681,7 @@ function ExpenseListTable({
             onClick={() => bulkUpdateStatus('confirmed')}
             disabled={bulkUpdating}
           >
-            Marcar como confirmado
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => bulkUpdateStatus('paid')}
-            disabled={bulkUpdating}
-          >
-            Marcar como pagado
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => bulkUpdateStatus('cancelled')}
-            disabled={bulkUpdating}
-          >
-            Marcar como cancelado
+            Marcar como confirmada
           </Button>
           <Button
             variant="ghost"
@@ -543,8 +718,11 @@ function ExpenseListTable({
                 key={e.id}
                 expense={e}
                 schoolId={schoolId}
+                showArchived={showArchived}
                 onEdit={onEdit}
+                onArchive={onRefresh}
                 onStatusChange={onRefresh}
+                onOpenPayment={setPaymentExpense}
                 toast={toast}
                 selected={selectedIds.has(e.id)}
                 onSelectionChange={(checked) => toggleOne(e.id, checked)}
@@ -553,6 +731,18 @@ function ExpenseListTable({
           </tbody>
         </table>
       </div>
+      {paymentExpense && (
+        <VendorPaymentDialog
+          open={!!paymentExpense}
+          onOpenChange={(open) => !open && setPaymentExpense(null)}
+          schoolId={schoolId}
+          vendorId={getVendorId(paymentExpense) || `temp-${paymentExpense.id}`}
+          expenseId={paymentExpense.id}
+          suggestedAmount={paymentExpense.amounts?.total}
+          onSuccess={onRefresh}
+          title="Registrar pago"
+        />
+      )}
     </div>
   );
 }
@@ -593,29 +783,46 @@ function VerFacturaButton({ expenseId, schoolId }: { expenseId: string; schoolId
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Borrador',
-  confirmed: 'Confirmado',
-  paid: 'Pagado',
-  cancelled: 'Cancelado',
+  confirmed: 'Confirmada',
+  paid: 'Pagada',
 };
+
+function getVendorId(expense: Expense): string {
+  return (
+    expense.supplier?.vendorId ||
+    expense.supplier?.cuit?.replace(/\D/g, '') ||
+    expense.supplier?.name ||
+    ''
+  );
+}
 
 function ExpenseRow({
   expense,
   schoolId,
+  showArchived,
   onEdit,
+  onArchive,
   onStatusChange,
+  onOpenPayment,
   toast,
   selected,
   onSelectionChange,
 }: {
   expense: Expense;
   schoolId: string;
+  showArchived: boolean;
   onEdit: (e: Expense) => void;
+  onArchive: () => void;
   onStatusChange: () => void;
+  onOpenPayment: (expense: Expense) => void;
   toast: ReturnType<typeof useToast>['toast'];
   selected?: boolean;
   onSelectionChange?: (checked: boolean) => void;
 }) {
   const [updating, setUpdating] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const vendorId = getVendorId(expense);
+
   const updateStatus = async (newStatus: string) => {
     const user = getAuth().currentUser;
     if (!user) return;
@@ -645,6 +852,69 @@ function ExpenseRow({
       setUpdating(false);
     }
   };
+
+  const handleArchive = async () => {
+    const user = getAuth().currentUser;
+    if (!user) return;
+    setArchiving(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/expenses', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          expenseId: expense.id,
+          schoolId,
+          updates: { archivedAt: new Date().toISOString() },
+        }),
+      });
+      if (res.ok) {
+        toast({ title: 'Movido a papelera' });
+        onArchive();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({ variant: 'destructive', title: 'Error', description: data.error ?? 'No se pudo mover' });
+      }
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    const user = getAuth().currentUser;
+    if (!user) return;
+    setArchiving(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/expenses', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          expenseId: expense.id,
+          schoolId,
+          updates: { archivedAt: null },
+        }),
+      });
+      if (res.ok) {
+        toast({ title: 'Restaurado' });
+        onArchive();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({ variant: 'destructive', title: 'Error', description: data.error ?? 'No se pudo restaurar' });
+      }
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const displayStatus = expense.status === 'cancelled' ? 'confirmed' : expense.status;
+
   return (
     <tr className="border-b hover:bg-muted/30">
       <td className="p-3 w-10">
@@ -671,25 +941,40 @@ function ExpenseRow({
           : '-'}
       </td>
       <td className="p-3">
-        <Select
-          value={expense.status}
-          onValueChange={updateStatus}
-          disabled={updating}
-        >
-          <SelectTrigger className="h-8 w-28">
-            <SelectValue />
-          </SelectTrigger>
+        {!showArchived ? (
+          <Select
+            value={displayStatus}
+            onValueChange={updateStatus}
+            disabled={updating}
+          >
+            <SelectTrigger className="h-8 w-28">
+              <SelectValue />
+            </SelectTrigger>
           <SelectContent>
             <SelectItem value="draft">{STATUS_LABELS.draft}</SelectItem>
             <SelectItem value="confirmed">{STATUS_LABELS.confirmed}</SelectItem>
             <SelectItem value="paid">{STATUS_LABELS.paid}</SelectItem>
-            <SelectItem value="cancelled">{STATUS_LABELS.cancelled}</SelectItem>
           </SelectContent>
-        </Select>
+          </Select>
+        ) : (
+          <span className="text-muted-foreground">En papelera</span>
+        )}
       </td>
       <td className="p-3 text-right">
         {expense.source?.storagePath && (
           <VerFacturaButton expenseId={expense.id} schoolId={schoolId} />
+        )}
+        {!showArchived && vendorId && expense.status !== 'paid' && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onOpenPayment(expense)}
+            title="Pagar factura"
+          >
+            <Banknote className="h-4 w-4" />
+          </Button>
         )}
         <Button
           variant="ghost"
@@ -699,6 +984,16 @@ function ExpenseRow({
           title="Editar"
         >
           <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          onClick={showArchived ? handleRestore : handleArchive}
+          disabled={archiving}
+          title={showArchived ? 'Restaurar' : 'Mover a papelera'}
+        >
+          <Trash2 className="h-4 w-4" />
         </Button>
       </td>
     </tr>

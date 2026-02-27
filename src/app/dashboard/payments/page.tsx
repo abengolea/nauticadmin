@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PaymentsTab } from "@/components/payments/PaymentsTab";
 import { DelinquentsTab } from "@/components/payments/DelinquentsTab";
 import { UnappliedTab } from "@/components/payments/UnappliedTab";
+import { PaymentsSummaryCard } from "@/components/payments/PaymentsSummaryCard";
 import { PaymentConfigTab } from "@/components/payments/PaymentConfigTab";
 import { PlayerPaymentsView } from "@/components/payments/PlayerPaymentsView";
 import { SchoolAdminMensualidadView } from "@/components/payments/SchoolAdminMensualidadView";
@@ -129,8 +130,8 @@ export default function PaymentsPage() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Pagos</CardTitle>
-          <CardDescription>Seleccioná una escuela para gestionar pagos</CardDescription>
+          <CardTitle>Ventas y pagos</CardTitle>
+          <CardDescription>Seleccioná una escuela para gestionar ventas y pagos</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -152,7 +153,7 @@ export default function PaymentsPage() {
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">Pagos y Morosidad</h1>
+              <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">Ventas y pagos</h1>
               <p className="text-muted-foreground text-sm sm:text-base">
                 Gestioná cuotas, pagos ingresados y morosos de tu escuela
               </p>
@@ -182,6 +183,8 @@ export default function PaymentsPage() {
       {isMensualidadTab ? (
         <SchoolAdminMensualidadView schoolId={schoolId} getToken={getToken} refreshTrigger={schoolFeeResult} />
       ) : (
+        <>
+        <PaymentsSummaryCard schoolId={schoolId} getToken={getToken} refreshTrigger={paymentResult ?? schoolFeeResult} />
         <Tabs value={activeTab} onValueChange={onTabChange} key={tabFromUrl ?? "payments"}>
           <TabsList className="w-full grid grid-cols-5 gap-1 p-1 h-auto md:h-10 bg-card">
             <TabsTrigger value="payments" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
@@ -222,6 +225,7 @@ export default function PaymentsPage() {
             <PaymentConfigTab schoolId={schoolId} getToken={getToken} />
           </TabsContent>
         </Tabs>
+        </>
       )}
     </div>
   );

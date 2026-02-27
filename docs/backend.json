@@ -44,7 +44,7 @@
       "properties": {
         "displayName": { "type": "string" },
         "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["school_admin", "coach"] },
+        "role": { "type": "string", "enum": ["school_admin", "operador"] },
         "assignedCategories": { "type": "array", "items": { "type": "string" }, "description": "Lista de IDs de categorías asignadas a un entrenador."}
       },
       "required": ["displayName", "email", "role"]

@@ -38,7 +38,7 @@ import { es } from "date-fns/locale";
 import type { Payment, Player } from "@/lib/types";
 
 /** Pago con nombre de jugador enriquecido por la API */
-type PaymentWithPlayerName = Payment & { playerName?: string; requiereFactura?: boolean };
+type PaymentWithPlayerName = Payment & { playerName?: string; requiereFactura?: boolean; facturado?: boolean };
 
 interface PaymentsTabProps {
   schoolId: string;
@@ -63,11 +63,20 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 const REGISTRATION_PERIOD = "inscripcion";
 
-/** Convierte "2026-02" → "FEBRERO-2026", "inscripcion" → "Inscripción", "ropa-1" → "Pago de ropa (1)" */
-function formatPeriodDisplay(period: string): string {
+/** Convierte "2026-02" → "FEBRERO-2026", "inscripcion" → "Inscripción", "ropa-1" → "Pago de ropa (1)", "extra-202602-*" → "Servicio (Feb 2026)" */
+function formatPeriodDisplay(period: string, payment?: PaymentWithPlayerName): string {
   if (period === REGISTRATION_PERIOD) return "Inscripción";
   const ropaMatch = period.match(/^ropa-(\d+)$/);
   if (ropaMatch) return `Pago de ropa (${ropaMatch[1]})`;
+  const extraMatch = period.match(/^extra-(\d{6})-\d+$/);
+  if (extraMatch) {
+    const y = extraMatch[1].slice(0, 4);
+    const m = extraMatch[1].slice(4, 6);
+    const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+    const monthName = format(date, "MMM", { locale: es });
+    const concept = (payment?.metadata as { concept?: string } | undefined)?.concept;
+    return concept ? `${concept} (${monthName} ${y})` : `Servicio (${monthName} ${y})`;
+  }
   if (!period || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return period;
   const [y, m] = period.split("-");
   const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
@@ -105,6 +114,7 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
     period: "",
     status: "",
     provider: "",
+    facturado: "",
   });
   const [manualOpenLocal, setManualOpenLocal] = useState(false);
   const manualOpen = manualOpenProp ?? manualOpenLocal;
@@ -113,6 +123,8 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
   const [manualPeriod, setManualPeriod] = useState(currentPeriod());
   const [manualAmount, setManualAmount] = useState("15000");
   const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [unpaidPeriods, setUnpaidPeriods] = useState<{ period: string; amount: number; currency: string; label: string }[]>([]);
+  const [unpaidLoading, setUnpaidLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [facturando, setFacturando] = useState(false);
   const [modoSimulacion, setModoSimulacion] = useState(true);
@@ -132,6 +144,7 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
     if (filters.period) params.set("period", filters.period);
     if (filters.status) params.set("status", filters.status);
     if (filters.provider) params.set("provider", filters.provider);
+    if (filters.facturado) params.set("facturado", filters.facturado);
     try {
       const res = await fetch(`/api/payments?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -155,11 +168,49 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
     } finally {
       setLoading(false);
     }
-  }, [schoolId, filters.period, filters.status, filters.provider, getToken]);
+  }, [schoolId, filters.period, filters.status, filters.provider, filters.facturado, getToken]);
 
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
+
+  const fetchUnpaidForPlayer = useCallback(async () => {
+    if (!manualPlayerId || !schoolId) {
+      setUnpaidPeriods([]);
+      return;
+    }
+    setUnpaidLoading(true);
+    const token = await getToken();
+    if (!token) {
+      setUnpaidLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/payments/player-unpaid?schoolId=${encodeURIComponent(schoolId)}&playerId=${encodeURIComponent(manualPlayerId)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setUnpaidPeriods(data.unpaid ?? []);
+        const first = data.unpaid?.[0];
+        if (first) {
+          setManualPeriod(first.period);
+          setManualAmount(String(first.amount));
+        }
+      } else {
+        setUnpaidPeriods([]);
+      }
+    } catch {
+      setUnpaidPeriods([]);
+    } finally {
+      setUnpaidLoading(false);
+    }
+  }, [manualPlayerId, schoolId, getToken]);
+
+  useEffect(() => {
+    fetchUnpaidForPlayer();
+  }, [fetchUnpaidForPlayer]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -329,7 +380,9 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
     return ts >= currentMonthStart && ts <= currentMonthEnd;
   };
   const approvedInList = payments.filter((p) => p.status === "approved");
-  const approvedFacturable = approvedInList.filter((p) => (p as PaymentWithPlayerName).requiereFactura !== false);
+  const approvedFacturable = approvedInList.filter(
+    (p) => (p as PaymentWithPlayerName).requiereFactura !== false && !(p as PaymentWithPlayerName).facturado
+  );
   const totalInList = approvedInList.reduce((s, p) => s + p.amount, 0);
   const approvedThisMonth = approvedInList.filter(isInCurrentMonth);
   const totalThisMonth = approvedThisMonth.reduce((s, p) => s + p.amount, 0);
@@ -442,6 +495,19 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
             ))}
           </SelectContent>
         </Select>
+        <Select
+          value={filters.facturado || "all"}
+          onValueChange={(v) => setFilters((f) => ({ ...f, facturado: v === "all" ? "" : v }))}
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Facturado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="yes">Facturado</SelectItem>
+            <SelectItem value="no">No facturado</SelectItem>
+          </SelectContent>
+        </Select>
         {approvedFacturable.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:border-l sm:pl-4">
             <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
@@ -489,13 +555,14 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
                 <TableHead className="text-xs sm:text-sm">Monto</TableHead>
                 <TableHead className="text-xs sm:text-sm">Proveedor</TableHead>
                 <TableHead className="text-xs sm:text-sm">Estado</TableHead>
+                <TableHead className="text-xs sm:text-sm whitespace-nowrap">Facturado</TableHead>
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap">Fecha</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {payments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No hay pagos para mostrar
                   </TableCell>
                 </TableRow>
@@ -503,16 +570,20 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
                 payments.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="w-10 px-2">
-                      {p.status === "approved" && (p as PaymentWithPlayerName).requiereFactura !== false ? (
+                      {p.status === "approved" &&
+                      (p as PaymentWithPlayerName).requiereFactura !== false &&
+                      !(p as PaymentWithPlayerName).facturado ? (
                         <Checkbox
                           checked={selectedIds.has(p.id)}
                           onCheckedChange={() => toggleSelect(p.id)}
                         />
+                      ) : p.status === "approved" && (p as PaymentWithPlayerName).facturado ? (
+                        <span className="text-xs text-muted-foreground" title="Ya facturado">—</span>
                       ) : p.status === "approved" ? (
                         <span className="text-xs text-muted-foreground" title="Cliente marcado como no facturar">—</span>
                       ) : null}
                     </TableCell>
-                    <TableCell>{formatPeriodDisplay(p.period)}</TableCell>
+                    <TableCell>{formatPeriodDisplay(p.period, p)}</TableCell>
                     <TableCell>
                       <span>{p.playerName ?? p.playerId}</span>
                       {p.status === "approved" && (p as PaymentWithPlayerName).requiereFactura === false && (
@@ -542,6 +613,15 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
                       >
                         {STATUS_LABELS[p.status] ?? p.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {(p as PaymentWithPlayerName).facturado ? (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                          Sí
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">No</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {p.paidAt
@@ -580,16 +660,59 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="manual-period">Período (YYYY-MM)</Label>
-              <Input
-                id="manual-period"
-                value={manualPeriod}
-                onChange={(e) => setManualPeriod(e.target.value)}
-                placeholder="2026-02"
-                className="mt-1"
-              />
-            </div>
+            {manualPlayerId && (
+              <div>
+                <Label>Imputar a la cuota</Label>
+                {unpaidLoading ? (
+                  <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Cargando cuotas adeudadas…
+                  </p>
+                ) : unpaidPeriods.length === 0 ? (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Este cliente no tiene cuotas adeudadas. Podés registrar un pago adelantado con período manual.
+                  </p>
+                ) : (
+                  <div className="mt-2 space-y-2 max-h-48 overflow-y-auto rounded-md border p-2">
+                    {unpaidPeriods.map((u) => (
+                      <label
+                        key={u.period}
+                        className={`flex items-center justify-between gap-2 p-2 rounded cursor-pointer hover:bg-muted/50 ${
+                          manualPeriod === u.period ? "bg-muted" : ""
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="manual-period"
+                          checked={manualPeriod === u.period}
+                          onChange={() => {
+                            setManualPeriod(u.period);
+                            setManualAmount(String(u.amount));
+                          }}
+                          className="sr-only"
+                        />
+                        <span className="font-medium">{u.label}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {u.currency} {u.amount.toLocaleString("es-AR")}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {(!manualPlayerId || unpaidPeriods.length === 0) && (
+              <div>
+                <Label htmlFor="manual-period">Período (YYYY-MM) — pago adelantado</Label>
+                <Input
+                  id="manual-period"
+                  value={manualPeriod}
+                  onChange={(e) => setManualPeriod(e.target.value)}
+                  placeholder="2026-02"
+                  className="mt-1"
+                />
+              </div>
+            )}
             <div>
               <Label htmlFor="manual-amount">Monto (ARS)</Label>
               <Input

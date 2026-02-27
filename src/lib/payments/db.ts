@@ -6,7 +6,7 @@
 import type admin from 'firebase-admin';
 import { getAdminFirestore, getAdminAuth } from '@/lib/firebase-admin';
 import { COLLECTIONS, REGISTRATION_PERIOD, CLOTHING_PERIOD_PREFIX, MERCADOPAGO_CONNECTION_DOC } from './constants';
-import { getDueDate, isRegistrationPeriod, isClothingPeriod } from './schemas';
+import { getDueDate, isRegistrationPeriod, isClothingPeriod, isServicePeriod } from './schemas';
 import type { Payment, PaymentIntent, PaymentConfig, DelinquentInfo, MercadoPagoConnection } from '@/lib/types/payments';
 import type { Player } from '@/lib/types';
 import { getCategoryLabel } from '@/lib/utils';
@@ -52,13 +52,15 @@ function toPayment(docSnap: DocumentSnapshot): Payment {
     paidAt: d.paidAt ? toDate(d.paidAt) : undefined,
     createdAt: toDate(d.createdAt),
     metadata: d.metadata,
-    paymentType: d.paymentType ?? (isRegistrationPeriod(period) ? 'registration' : isClothingPeriod(period) ? 'clothing' : 'monthly'),
+    paymentType: d.paymentType ?? (isRegistrationPeriod(period) ? 'registration' : isClothingPeriod(period) ? 'clothing' : isServicePeriod(period) ? 'service' : 'monthly'),
     method: d.method,
     reference: d.reference,
     fingerprintHash: d.fingerprintHash,
     duplicateStatus: d.duplicateStatus,
     duplicateCaseId: d.duplicateCaseId,
     updatedAt: d.updatedAt ? toDate(d.updatedAt) : undefined,
+    facturado: d.facturado === true,
+    facturadoAt: d.facturadoAt ? toDate(d.facturadoAt) : undefined,
   };
 }
 
@@ -378,7 +380,7 @@ export async function createPayment(
   data: Omit<Payment, 'id' | 'createdAt'>,
   idempotencyKey?: string
 ): Promise<Payment> {
-  const paymentType = data.paymentType ?? (isRegistrationPeriod(data.period) ? 'registration' : isClothingPeriod(data.period) ? 'clothing' : 'monthly');
+  const paymentType = data.paymentType ?? (isRegistrationPeriod(data.period) ? 'registration' : isClothingPeriod(data.period) ? 'clothing' : isServicePeriod(data.period) ? 'service' : 'monthly');
   const admin = await import('firebase-admin');
   const now = admin.firestore.Timestamp.now();
   const col = db.collection(COLLECTIONS.payments);
@@ -590,6 +592,8 @@ export async function listPayments(
     status?: string;
     period?: string;
     provider?: string;
+    /** 'yes' = solo facturados, 'no' = solo no facturados */
+    facturado?: 'yes' | 'no';
     limit?: number;
     offset?: number;
   }
@@ -617,6 +621,14 @@ export async function listPayments(
     docs = docs.filter((docSnap) => {
       const created = docSnap.data().createdAt?.toMillis?.() ?? new Date(docSnap.data().createdAt).getTime();
       return created >= from && created <= to;
+    });
+  }
+
+  // Filtro facturado (post-query)
+  if (opts.facturado) {
+    docs = docs.filter((docSnap) => {
+      const facturado = docSnap.data().facturado === true;
+      return opts.facturado === 'yes' ? facturado : !facturado;
     });
   }
 
@@ -826,6 +838,106 @@ export async function computeDelinquents(
   }
 
   return delinquents.sort((a, b) => b.daysOverdue - a.daysOverdue);
+}
+
+/** Cuota adeudada para selector de imputación (manual o Excel). */
+export interface UnpaidPeriodItem {
+  period: string;
+  amount: number;
+  currency: string;
+  label: string;
+  /** Orden: inscripción primero, luego YYYY-MM ascendente (más vieja primero). */
+  sortKey: string;
+}
+
+/**
+ * Obtiene las cuotas adeudadas de un jugador, ordenadas de la más vieja a la más nueva.
+ * Usado para: (1) selector en pago manual, (2) imputación automática en Excel (cuota más vieja).
+ */
+export async function getUnpaidPeriodsForPlayer(
+  db: Firestore,
+  schoolId: string,
+  playerId: string,
+  approvedPaymentsMap?: Map<string, Set<string>>
+): Promise<UnpaidPeriodItem[]> {
+  const playerRef = db.collection('schools').doc(schoolId).collection('players').doc(playerId);
+  const playerSnap = await playerRef.get();
+  if (!playerSnap.exists) return [];
+
+  const config = await getOrCreatePaymentConfig(db, schoolId);
+  const paidMap = approvedPaymentsMap ?? (await getAllApprovedPaymentsForSchool(db, schoolId));
+  const paidPeriods = paidMap.get(playerId);
+  const hasPaidRegistration = paidPeriods?.has(REGISTRATION_PERIOD) ?? false;
+
+  const pData = playerSnap.data()!;
+  const activatedAt = pData.createdAt ? toDate(pData.createdAt) : new Date();
+  const activationPeriod = periodFromDate(activatedAt);
+  const birthDate = pData.birthDate ? toDate(pData.birthDate) : null;
+  const category = birthDate ? getCategoryLabel(birthDate) : 'SUB-18';
+
+  const result: UnpaidPeriodItem[] = [];
+  const now = new Date();
+  const regDay = config.regularizationDayOfMonth ?? config.dueDayOfMonth;
+  const registrationCancelsMonthFee = config.registrationCancelsMonthFee !== false;
+  const activationDay = activatedAt.getDate();
+  const prorateDay = config.prorateDayOfMonth ?? 15;
+  const proratePct = (config.proratePercent ?? 50) / 100;
+
+  // Inscripción pendiente (va primero, es la más vieja)
+  const registrationAmount = getRegistrationAmountForCategory(config, category);
+  if (registrationAmount > 0 && !hasPaidRegistration) {
+    result.push({
+      period: REGISTRATION_PERIOD,
+      amount: registrationAmount,
+      currency: config.currency,
+      label: 'Inscripción',
+      sortKey: '00-inscripcion',
+    });
+  }
+
+  // Cuotas mensuales pendientes
+  const monthlyAmount = getAmountForCategory(config, category);
+  if (monthlyAmount > 0) {
+    const periodsToCheck =
+      config.moraFromActivationMonth !== false
+        ? periodsFromActivationToNow(activatedAt)
+        : (() => {
+            const now2 = new Date();
+            const curr = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`;
+            const prev = new Date(now2.getFullYear(), now2.getMonth() - 1);
+            return [curr, `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`];
+          })();
+
+    for (const period of periodsToCheck) {
+      const regDate = getDueDate(period, regDay);
+      if (regDate > now) continue;
+
+      const hasApproved = paidPeriods?.has(period) ?? false;
+      if (hasApproved) continue;
+
+      const isActivationMonth = period === activationPeriod;
+      if (isActivationMonth && registrationCancelsMonthFee && hasPaidRegistration) continue;
+
+      const prorated = prorateDay > 0 && isActivationMonth && activationDay > prorateDay;
+      const amount = prorated ? Math.round(monthlyAmount * proratePct) : monthlyAmount;
+      const [y, m] = period.split('-');
+      const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+      const monthName = date.toLocaleDateString('es-AR', { month: 'long' });
+      result.push({
+        period,
+        amount,
+        currency: config.currency,
+        label: `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${y}`,
+        sortKey: period,
+      });
+    }
+  }
+
+  return result.sort((a, b) => {
+    if (a.period === REGISTRATION_PERIOD) return -1;
+    if (b.period === REGISTRATION_PERIOD) return 1;
+    return a.sortKey.localeCompare(b.sortKey);
+  });
 }
 
 /**

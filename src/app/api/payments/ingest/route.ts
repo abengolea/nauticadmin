@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     }
 
     const role = schoolUserSnap.data()?.role;
-    if (role !== 'school_admin' && role !== 'coach') {
+    if (role !== 'school_admin' && role !== 'operador') {
       return NextResponse.json(
         { error: 'Solo admin o entrenador puede ingresar pagos' },
         { status: 403 }

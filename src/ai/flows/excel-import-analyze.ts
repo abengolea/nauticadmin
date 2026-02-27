@@ -31,6 +31,7 @@ const ColumnMappingSchema = z.object({
     'ubicacion',
     'clienteDesde',
     'medidas',
+    'lona',
     'observaciones',
     'personasAutorizadas',
   ]),
@@ -87,6 +88,7 @@ Eres un asistente de una plataforma de administración de náuticas (NauticAdmin
 - ubicacion: Ubicación (amarra, muelle, etc.)
 - clienteDesde: Fecha desde que es cliente
 - medidas: Medidas de la embarcación
+- lona: Lona (Sí/No/Tipo)
 - observaciones: Observaciones adicionales o demás datos
 - personasAutorizadas: Personas autorizadas a manejar la embarcación (pueden estar separadas por coma o en varias columnas)
 

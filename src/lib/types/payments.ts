@@ -19,8 +19,8 @@ export type PlayerStatus = 'active' | 'inactive' | 'suspended';
 
 // --- Modelos ---
 
-/** Tipo de pago: cuota mensual, derecho de inscripción, o pago de ropa (en cuotas). */
-export type PaymentType = 'monthly' | 'registration' | 'clothing';
+/** Tipo de pago: cuota mensual, derecho de inscripción, pago de ropa (en cuotas), o servicio/concepto esporádico. */
+export type PaymentType = 'monthly' | 'registration' | 'clothing' | 'service';
 
 export interface Payment {
   id: string;
@@ -48,6 +48,10 @@ export interface Payment {
   /** ID del caso de duplicado si está suspected/confirmed. */
   duplicateCaseId?: string | null;
   updatedAt?: Date;
+  /** true si se emitió factura para este pago (emit-batch). */
+  facturado?: boolean;
+  /** Fecha en que se facturó (si facturado). */
+  facturadoAt?: Date;
 }
 
 export interface PaymentIntent {

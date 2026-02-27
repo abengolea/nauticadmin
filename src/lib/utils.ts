@@ -139,6 +139,7 @@ export interface EmbarcacionForDisplay {
   nombre?: string;
   matricula?: string;
   medidas?: string;
+  lona?: string;
   datos?: string;
   claseId?: string;
 }
@@ -158,12 +159,14 @@ export function getPlayerEmbarcaciones(player: {
   const mat = (player.embarcacionMatricula ?? "").trim();
   const med = (player.embarcacionMedidas ?? "").trim();
   const dat = (player.embarcacionDatos ?? "").trim();
-  if (nom || mat || med || dat) {
+  const lona = ((player as { embarcacionLona?: string }).embarcacionLona ?? "").trim();
+  if (nom || mat || med || dat || lona) {
     return [{
       id: "legacy",
       nombre: nom || undefined,
       matricula: mat || undefined,
       medidas: med || undefined,
+      lona: lona || undefined,
       datos: dat || undefined,
     }];
   }

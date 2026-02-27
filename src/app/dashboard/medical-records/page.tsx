@@ -45,7 +45,7 @@ export default function MedicalRecordsPage() {
   const [refreshingPlayerId, setRefreshingPlayerId] = useState<string | null>(null);
 
   const schoolId = activeSchoolId;
-  const isStaff = profile?.role === "school_admin" || profile?.role === "coach";
+  const isStaff = profile?.role === "school_admin" || profile?.role === "operador";
   const canList = isReady && schoolId && isStaff;
 
   const { data: players, loading } = useCollection<Player>(

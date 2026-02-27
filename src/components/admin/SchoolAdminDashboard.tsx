@@ -84,7 +84,7 @@ export function SchoolAdminDashboard() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between space-y-2">
         <div>
-            <h1 className="text-3xl font-bold tracking-tight font-headline">Panel de {profile?.role === 'school_admin' ? 'Administración' : 'Entrenador'}</h1>
+            <h1 className="text-3xl font-bold tracking-tight font-headline">Panel de {profile?.role === 'school_admin' ? 'Administración' : 'Operador'}</h1>
             <p className="text-muted-foreground">Bienvenido, {profile?.displayName}.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

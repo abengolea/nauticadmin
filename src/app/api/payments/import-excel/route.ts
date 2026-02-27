@@ -12,6 +12,8 @@ import {
   createPayment,
   updatePlayerStatus,
   getOrCreatePaymentConfig,
+  getUnpaidPeriodsForPlayer,
+  getAllApprovedPaymentsForSchool,
 } from '@/lib/payments/db';
 import { sendEmailEvent } from '@/lib/payments/email-events';
 import { DEFAULT_CURRENCY } from '@/lib/payments/constants';
@@ -108,6 +110,7 @@ export async function POST(request: Request) {
     }
 
     const db = getAdminFirestore();
+    const approvedPaymentsMap = await getAllApprovedPaymentsForSchool(db, schoolId);
     const uid = auth.uid;
 
     const schoolUserSnap = await db.doc(`schools/${schoolId}/users/${uid}`).get();
@@ -316,11 +319,19 @@ export async function POST(request: Request) {
 
       const playerId = doc.id;
 
+      const unpaid = await getUnpaidPeriodsForPlayer(db, schoolId, playerId, approvedPaymentsMap);
+      const targetPeriod = unpaid.length > 0 ? unpaid[0].period : null;
+
+      if (!targetPeriod) {
+        skipped.push(`${apellido} ${nombre} (sin cuotas adeudadas)`);
+        continue;
+      }
+
       const now = new Date();
       await createPayment(db, {
         playerId,
         schoolId,
-        period,
+        period: targetPeriod,
         amount: importe,
         currency,
         provider: 'excel_import',
@@ -338,6 +349,13 @@ export async function POST(request: Request) {
       await updatePlayerStatus(db, schoolId, playerId, 'active');
       applied++;
 
+      let paidSet = approvedPaymentsMap.get(playerId);
+      if (!paidSet) {
+        paidSet = new Set();
+        approvedPaymentsMap.set(playerId, paidSet);
+      }
+      paidSet.add(targetPeriod);
+
       const d = doc.data() as { usuarioId?: string };
       if (usuarioId && !d.usuarioId) {
         playerUpdates.push({ ref: doc.ref, usuarioId });
@@ -353,7 +371,7 @@ export async function POST(request: Request) {
             type: 'payment_receipt',
             playerId,
             schoolId,
-            period,
+            period: targetPeriod,
             to: toEmail,
             playerName,
             amount: importe,
