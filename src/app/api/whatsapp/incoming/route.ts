@@ -130,6 +130,10 @@ export async function POST(request: Request) {
 
     const schoolId = tenantId?.trim() || '';
 
+    const hasReceiptMedia =
+      (type === 'image' && (imageBase64 || mediaUrl)) ||
+      (type === 'document' && (documentBase64 || mediaUrl));
+
     console.log('[whatsapp/incoming]', {
       from,
       contactName,
@@ -143,10 +147,6 @@ export async function POST(request: Request) {
     });
 
     let responseText: string;
-
-    const hasReceiptMedia =
-      (type === 'image' && (imageBase64 || mediaUrl)) ||
-      (type === 'document' && (documentBase64 || mediaUrl));
 
     if (hasReceiptMedia) {
       if (!schoolId) {
