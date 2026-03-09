@@ -61,6 +61,13 @@ function toPayment(docSnap: DocumentSnapshot): Payment {
     updatedAt: d.updatedAt ? toDate(d.updatedAt) : undefined,
     facturado: d.facturado === true,
     facturadoAt: d.facturadoAt ? toDate(d.facturadoAt) : undefined,
+    facturaNumero: d.facturaNumero,
+    facturaPtoVta: d.facturaPtoVta,
+    facturaFecha: d.facturaFecha,
+    facturaTipo: d.facturaTipo,
+    facturaStoragePath: d.facturaStoragePath,
+    chequeDueDate: d.chequeDueDate,
+    chequeStatus: d.chequeStatus,
   };
 }
 
@@ -248,7 +255,7 @@ export async function getAllApprovedPaymentsForSchool(
     let q = col
       .where('schoolId', '==', schoolId)
       .where('status', '==', 'approved')
-      .orderBy('createdAt', 'asc')
+      .orderBy('createdAt', 'desc')
       .limit(pageSize) as admin.firestore.Query;
     if (lastDoc) q = q.startAfter(lastDoc);
 

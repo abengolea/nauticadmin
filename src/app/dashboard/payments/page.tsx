@@ -4,28 +4,34 @@ import { useUserProfile, useFirebase } from "@/firebase";
 import { getAuth } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaymentsTab } from "@/components/payments/PaymentsTab";
 import { DelinquentsTab } from "@/components/payments/DelinquentsTab";
+import { ChequesCobrosPendientesAlert } from "@/components/payments/ChequesCobrosPendientesAlert";
+import { PagosPendientesVerificacionAlert } from "@/components/payments/PagosPendientesVerificacionAlert";
 import { UnappliedTab } from "@/components/payments/UnappliedTab";
 import { PaymentsSummaryCard } from "@/components/payments/PaymentsSummaryCard";
 import { PaymentConfigTab } from "@/components/payments/PaymentConfigTab";
 import { PlayerPaymentsView } from "@/components/payments/PlayerPaymentsView";
 import { SchoolAdminMensualidadView } from "@/components/payments/SchoolAdminMensualidadView";
+import { SchoolSwitcher, useSelectedSchool } from "@/components/layout/SchoolSwitcher";
+import { useDoc } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
-import { Banknote, AlertTriangle, Settings, FlaskConical, Building2, FileX, Copy } from "lucide-react";
+import type { School } from "@/lib/types";
+import { Banknote, AlertTriangle, Settings, Building2, FileX, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function PaymentsPage() {
   const { profile, isReady, isAdmin, isPlayer } = useUserProfile();
+  const { selectedSchoolId, setSelectedSchoolId } = useSelectedSchool(profile);
   const router = useRouter();
   const { app } = useFirebase();
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const schoolId = profile?.activeSchoolId;
+  const schoolId = selectedSchoolId ?? profile?.activeSchoolId;
+  const { data: school } = useDoc<School>(schoolId ? `schools/${schoolId}` : "");
   const tabFromUrl = searchParams.get("tab");
   const paymentResult = searchParams.get("payment");
   const schoolFeeResult = searchParams.get("schoolFee");
@@ -130,8 +136,8 @@ export default function PaymentsPage() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Ventas y pagos</CardTitle>
-          <CardDescription>Seleccioná una escuela para gestionar ventas y pagos</CardDescription>
+          <CardTitle>Cobros</CardTitle>
+          <CardDescription>Seleccioná una náutica para gestionar cobros de clientes</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -140,25 +146,35 @@ export default function PaymentsPage() {
   return (
     <div className="space-y-6 min-w-0">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          {isMensualidadTab ? (
-            <>
-              <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl flex items-center gap-2">
-                <Building2 className="h-6 w-6 sm:h-7 sm:w-7" />
-                Mensualidad a la plataforma
-              </h1>
-              <p className="text-muted-foreground text-sm sm:text-base">
-                Cuota mensual que tu NAUTICA le paga a Notificas SRL
-              </p>
-            </>
-          ) : (
-            <>
-              <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">Ventas y pagos</h1>
-              <p className="text-muted-foreground text-sm sm:text-base">
-                Gestioná cuotas, pagos ingresados y morosos de tu escuela
-              </p>
-            </>
+        <div className="min-w-0 flex flex-col gap-2">
+          {profile && schoolId && (
+            <SchoolSwitcher
+              profile={profile}
+              value={schoolId}
+              onChange={setSelectedSchoolId}
+              className="sm:self-start"
+            />
           )}
+          <div>
+            {isMensualidadTab ? (
+              <>
+                <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl flex items-center gap-2">
+                  <Building2 className="h-6 w-6 sm:h-7 sm:w-7" />
+                  Mensualidad a la plataforma
+                </h1>
+                <p className="text-muted-foreground text-sm sm:text-base">
+                  Cuota mensual que tu NAUTICA le paga a Notificas SRL
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">Cobros</h1>
+                <p className="text-muted-foreground text-sm sm:text-base">
+                  Cobros de clientes, cuotas ingresadas y morosos
+                </p>
+              </>
+            )}
+          </div>
         </div>
         {!isMensualidadTab && (
           <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -167,15 +183,8 @@ export default function PaymentsPage() {
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               <Banknote className="mr-2 h-4 w-4" />
-              Registrar pago manual
+              Registrar cobro manual
             </Button>
-            <Link
-              href="/dashboard/payments/test"
-              className="inline-flex items-center text-xs sm:text-sm text-muted-foreground hover:underline"
-            >
-              <FlaskConical className="mr-1 h-4 w-4" />
-              Pruebas de pagos
-            </Link>
           </div>
         )}
       </div>
@@ -184,13 +193,15 @@ export default function PaymentsPage() {
         <SchoolAdminMensualidadView schoolId={schoolId} getToken={getToken} refreshTrigger={schoolFeeResult} />
       ) : (
         <>
+        <ChequesCobrosPendientesAlert schoolId={schoolId} getToken={getToken} onUpdated={() => { /* refresh handled by tab */ }} />
+        <PagosPendientesVerificacionAlert schoolId={schoolId} getToken={getToken} onUpdated={() => { /* refresh handled by tab */ }} />
         <PaymentsSummaryCard schoolId={schoolId} getToken={getToken} refreshTrigger={paymentResult ?? schoolFeeResult} />
         <Tabs value={activeTab} onValueChange={onTabChange} key={tabFromUrl ?? "payments"}>
           <TabsList className="w-full grid grid-cols-5 gap-1 p-1 h-auto md:h-10 bg-card">
             <TabsTrigger value="payments" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
               <Banknote className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-              <span className="hidden sm:inline">Pagos ingresados</span>
-              <span className="sm:hidden truncate">Pagos</span>
+              <span className="hidden sm:inline">Cobros ingresados</span>
+              <span className="sm:hidden truncate">Cobros</span>
             </TabsTrigger>
             <TabsTrigger value="duplicates" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
               <Copy className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
@@ -199,8 +210,8 @@ export default function PaymentsPage() {
             </TabsTrigger>
             <TabsTrigger value="unapplied" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
               <FileX className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-              <span className="hidden sm:inline">No aplicados</span>
-              <span className="sm:hidden truncate">No apl.</span>
+              <span className="hidden sm:inline">Cobros rechazados</span>
+              <span className="sm:hidden truncate">Rechaz.</span>
             </TabsTrigger>
             <TabsTrigger value="delinquents" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
               <AlertTriangle className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
@@ -213,7 +224,14 @@ export default function PaymentsPage() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="payments" forceMount className="data-[state=inactive]:hidden">
-            <PaymentsTab schoolId={schoolId} getToken={getToken} manualOpen={manualOpen} onManualOpenChange={setManualOpen} />
+            <PaymentsTab
+              schoolId={schoolId}
+              getToken={getToken}
+              manualOpen={manualOpen}
+              onManualOpenChange={setManualOpen}
+              facturacionRazonSocial={school?.facturacion?.razonSocial}
+              gestionarNauticaHref={schoolId ? `/dashboard/schools/${schoolId}` : undefined}
+            />
           </TabsContent>
           <TabsContent value="unapplied">
             <UnappliedTab schoolId={schoolId} getToken={getToken} />
