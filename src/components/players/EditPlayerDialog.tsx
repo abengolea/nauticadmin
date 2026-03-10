@@ -302,6 +302,16 @@ export function EditPlayerDialog({
         throw new Error(data.error || data.detail || "Error al guardar");
       }
       showSuccess();
+      if (values.tutorPhone?.trim()) {
+        fetch(`/api/admin/schools/${schoolId}/register-whatsapp-phone`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ phone: values.tutorPhone.trim() }),
+        }).catch(() => {});
+      }
     } catch (err) {
       toast({
         variant: "destructive",

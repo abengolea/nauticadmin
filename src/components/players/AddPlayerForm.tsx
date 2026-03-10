@@ -283,6 +283,19 @@ export function AddPlayerForm() {
                 });
             }
 
+            if (values.tutorPhone?.trim()) {
+              mainAuth.currentUser?.getIdToken().then((token) => {
+                fetch(`/api/admin/schools/${activeSchoolId}/register-whatsapp-phone`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ phone: values.tutorPhone!.trim() }),
+                }).catch(() => {});
+              });
+            }
+
             router.push("/dashboard/players");
         } catch (err: unknown) {
             const code = (err as { code?: string })?.code;
