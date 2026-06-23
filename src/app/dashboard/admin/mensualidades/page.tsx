@@ -39,7 +39,7 @@ export default function MensualidadesPage() {
             Mensualidades
           </h1>
           <p className="text-muted-foreground">
-            Escuelas en mora, pagos ingresados y tarifas por escuela.
+            Escuelas en mora, pagos ingresados y tarifas por náutica.
           </p>
         </div>
       </div>

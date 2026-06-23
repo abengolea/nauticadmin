@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, CreditCard, ExternalLink, Receipt, Shirt } from "lucide-react";
+import { AlertTriangle, CheckCircle, CreditCard, ExternalLink, Receipt } from "lucide-react";
 import { AddServiceChargeDialog } from "@/components/payments/AddServiceChargeDialog";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
@@ -16,7 +16,7 @@ type ClothingPendingItem = { period: string; amount: number; installmentIndex: n
 
 function formatPeriodLabel(period: string): string {
   if (period === REGISTRATION_PERIOD) return "Inscripción";
-  if (period?.startsWith?.("ropa-")) return `Ropa (cuota ${period.replace("ropa-", "")})`;
+  if (period?.startsWith?.("ropa-")) return `Cargo adicional (cuota ${period.replace("ropa-", "")})`;
   if (!period || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return period;
   const [y, m] = period.split("-");
   const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -204,7 +204,7 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
             isAdminView ? (
               <>Al día con pagos.</>
             ) : (
-              <>Estado de tus cuotas, inscripción y ropa.</>
+              <>Estado de tus cuotas y pagos.</>
             )
           )}
         </CardDescription>
@@ -224,10 +224,7 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
               ))}
               {clothingPending.map((c) => (
                 <li key={c.period}>
-                  <span className="inline-flex items-center gap-1">
-                    <Shirt className="h-3.5 w-3.5" />
-                    Cuota {c.installmentIndex} de {c.totalInstallments}: {suggestedCurrency} {c.amount.toLocaleString("es-AR")}
-                  </span>
+                  Cargo adicional {c.installmentIndex}/{c.totalInstallments}: {suggestedCurrency} {c.amount.toLocaleString("es-AR")}
                 </li>
               ))}
             </ul>

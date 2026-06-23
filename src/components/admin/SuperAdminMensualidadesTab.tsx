@@ -326,7 +326,7 @@ export function SuperAdminMensualidadesTab({ schools }: SuperAdminMensualidadesT
         <TabsList>
           <TabsTrigger value="mora">En mora</TabsTrigger>
           <TabsTrigger value="payments">Pagos ingresados</TabsTrigger>
-          <TabsTrigger value="tarifas">Tarifas por escuela</TabsTrigger>
+          <TabsTrigger value="tarifas">Tarifas por náutica</TabsTrigger>
         </TabsList>
         <TabsContent value="mora">
           <Card>
@@ -453,20 +453,20 @@ export function SuperAdminMensualidadesTab({ schools }: SuperAdminMensualidadesT
         <TabsContent value="tarifas">
           <Card>
             <CardHeader>
-              <CardTitle>Tarifas por escuela</CardTitle>
+              <CardTitle>Tarifas por náutica</CardTitle>
               <CardDescription>
-                Definí la tarifa mensual de cada escuela. Marcá "Bonificada" para escuelas sin cargo (ej. San Nicolás).
+                Definí la tarifa mensual de cada náutica. Marcá "Bonificada" para náuticas sin cargo (ej. San Nicolás).
               </CardDescription>
             </CardHeader>
             <CardContent>
               {!schools?.length ? (
-                <p className="text-center text-muted-foreground py-8">No hay escuelas.</p>
+                <p className="text-center text-muted-foreground py-8">No hay náuticas.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Escuela</TableHead>
+                        <TableHead>Náutica</TableHead>
                         <TableHead>Ubicación</TableHead>
                         <TableHead>Tarifa mensual</TableHead>
                         <TableHead>Estado</TableHead>
@@ -515,7 +515,7 @@ export function SuperAdminMensualidadesTab({ schools }: SuperAdminMensualidadesT
           <DialogHeader>
             <DialogTitle>Tarifa de {schoolFeeDialog?.name}</DialogTitle>
             <DialogDescription>
-              Definí si la escuela paga mensualidad o está bonificada.
+              Definí si la náutica paga mensualidad o está bonificada.
             </DialogDescription>
           </DialogHeader>
           {schoolFeeForm && (
@@ -536,7 +536,7 @@ export function SuperAdminMensualidadesTab({ schools }: SuperAdminMensualidadesT
                   onChange={(e) => setSchoolFeeForm((f) => f ? { ...f, monthlyAmount: parseFloat(e.target.value) || 0 } : null)}
                   disabled={schoolFeeForm.isBonified}
                 />
-                {schoolFeeForm.isBonified && <p className="text-xs text-muted-foreground">Las escuelas bonificadas no tienen tarifa.</p>}
+                {schoolFeeForm.isBonified && <p className="text-xs text-muted-foreground">Las náuticas bonificadas no tienen tarifa.</p>}
               </div>
             </div>
           )}
@@ -584,7 +584,7 @@ export function SuperAdminMensualidadesTab({ schools }: SuperAdminMensualidadesT
           <DialogHeader>
             <DialogTitle>Configuración global de mensualidades</DialogTitle>
             <DialogDescription>
-              Parámetros que aplican a todas las escuelas. La tarifa por escuela se define al editar cada escuela.
+              Parámetros que aplican a todas las náuticas. La tarifa por náutica se define al editar cada una.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -635,7 +635,7 @@ export function SuperAdminMensualidadesTab({ schools }: SuperAdminMensualidadesT
                   value={configForm.defaultMonthlyAmount ?? 0}
                   onChange={(e) => setConfigForm((f) => ({ ...f, defaultMonthlyAmount: parseFloat(e.target.value) || 0 }))}
                 />
-                <p className="text-xs text-muted-foreground">Para escuelas sin tarifa específica</p>
+                <p className="text-xs text-muted-foreground">Para náuticas sin tarifa específica</p>
               </div>
             </div>
           </div>

@@ -78,6 +78,8 @@ export interface School {
   logoUrl?: string;
   status: 'active' | 'suspended';
   createdAt: Date;
+  /** Datos fiscales del emisor (náutica). Notificas opera la app con delegación AFIP. */
+  facturacion?: import('@/lib/school-facturacion').SchoolFacturacion;
 }
 
 export interface Category {

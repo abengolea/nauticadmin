@@ -9,6 +9,7 @@ import https from 'https';
 import { constants } from 'crypto';
 import axios from 'axios';
 import { getAfipToken } from './wsaa';
+import { getActiveAfipSession } from './session';
 
 /** Agente HTTPS para AFIP producción (usa OPENSSL_CONF=./openssl.cnf con SECLEVEL=0) */
 const afipAgent = new https.Agent({
@@ -21,7 +22,7 @@ const WSFE_URL_PROD = 'https://servicios1.afip.gov.ar/wsfev1/service.asmx';
 const NS = 'http://ar.gov.afip.dif.FEV1/';
 
 function getWsfeUrl(): string {
-  const production = String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
+  const production = getActiveAfipSession().production;
   return production ? WSFE_URL_PROD : WSFE_URL_HOMO;
 }
 
@@ -88,8 +89,8 @@ function parseSoapResponse<T>(xml: string, resultTag: string): T {
  */
 async function executeSoap<T>(operation: string, content: string): Promise<string> {
   const { token, sign } = await getAfipToken();
-  const cuit = process.env.AFIP_CUIT?.replace(/\D/g, '');
-  if (!cuit) throw new Error('AFIP_CUIT no configurado');
+  const cuit = getActiveAfipSession().cuit;
+  if (!cuit) throw new Error('CUIT emisor AFIP no configurado');
 
   const authBlock = `
       <Auth>
@@ -102,7 +103,7 @@ async function executeSoap<T>(operation: string, content: string): Promise<strin
   const body = buildSoapBody(operation, fullContent);
 
   const url = getWsfeUrl();
-  const isProduction = String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
+  const isProduction = getActiveAfipSession().production;
   const response = await axios.post(url, body, {
     headers: {
       'Content-Type': 'application/soap+xml; charset=utf-8',
