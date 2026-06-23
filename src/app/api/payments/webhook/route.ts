@@ -1,12 +1,8 @@
 /**
  * POST /api/payments/webhook
- * Webhook que recibe notificaciones de pago de MercadoPago/DLocal.
- *
- * TODO: Validar firma del payload según documentación de cada proveedor.
- * TODO: MercadoPago: x-signature, x-request-id
- * TODO: DLocal: validación de firma
- *
- * STUB: Acepta payload con provider, providerPaymentId, status para simular aprobación.
+ * Endpoint interno para simular aprobación de pago (testing/desarrollo).
+ * Requiere header x-webhook-secret con el valor de la env WEBHOOK_SECRET.
+ * Para producción real, usar /api/payments/webhook/mercadopago.
  */
 
 import { NextResponse } from 'next/server';
@@ -33,9 +29,14 @@ const WebhookPayloadSchema = {
 
 export async function POST(request: Request) {
   try {
-    // TODO: Validar firma del webhook según proveedor antes de procesar
-    // const signature = request.headers.get('x-signature') ?? request.headers.get('x-request-id');
-    // if (!validateWebhookSignature(signature, body)) return 401;
+    const expectedSecret = process.env.WEBHOOK_SECRET;
+    if (!expectedSecret) {
+      return NextResponse.json({ error: 'Endpoint no disponible: configurá WEBHOOK_SECRET en las variables de entorno' }, { status: 503 });
+    }
+    const providedSecret = request.headers.get('x-webhook-secret');
+    if (!providedSecret || providedSecret !== expectedSecret) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
 
     const body = await request.json();
 

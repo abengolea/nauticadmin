@@ -66,6 +66,10 @@ function toPayment(docSnap: DocumentSnapshot): Payment {
     facturaFecha: d.facturaFecha,
     facturaTipo: d.facturaTipo,
     facturaStoragePath: d.facturaStoragePath,
+    documentoAdjuntoStoragePath: d.documentoAdjuntoStoragePath,
+    documentoAdjuntoNombre: d.documentoAdjuntoNombre,
+    documentoAdjuntoDescripcion: d.documentoAdjuntoDescripcion,
+    documentoAdjuntoAt: d.documentoAdjuntoAt ? toDate(d.documentoAdjuntoAt) : undefined,
     chequeDueDate: d.chequeDueDate,
     chequeStatus: d.chequeStatus,
   };

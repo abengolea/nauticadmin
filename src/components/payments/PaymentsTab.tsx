@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Loader2, FileText } from "lucide-react";
+import { PaymentDocumentoAdjunto } from "@/components/payments/PaymentDocumentoAdjunto";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useCollection } from "@/firebase";
@@ -38,13 +39,22 @@ import { es } from "date-fns/locale";
 import type { Payment, Player } from "@/lib/types";
 
 /** Pago con nombre de jugador enriquecido por la API */
-type PaymentWithPlayerName = Payment & { playerName?: string; requiereFactura?: boolean; facturado?: boolean };
+type PaymentWithPlayerName = Payment & {
+  playerName?: string;
+  requiereFactura?: boolean;
+  facturado?: boolean;
+  documentoAdjuntoStoragePath?: string;
+  documentoAdjuntoNombre?: string;
+};
 
 interface PaymentsTabProps {
   schoolId: string;
   getToken: () => Promise<string | null>;
   manualOpen?: boolean;
   onManualOpenChange?: (open: boolean) => void;
+  /** Razón social del emisor fiscal (náutica) para mostrar en la UI */
+  facturacionRazonSocial?: string;
+  gestionarNauticaHref?: string;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -106,7 +116,13 @@ function getYears(): number[] {
   return years;
 }
 
-export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, onManualOpenChange }: PaymentsTabProps) {
+export function PaymentsTab({
+  schoolId,
+  getToken,
+  manualOpen: manualOpenProp,
+  onManualOpenChange,
+  facturacionRazonSocial,
+}: PaymentsTabProps) {
   const [payments, setPayments] = useState<PaymentWithPlayerName[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -510,6 +526,11 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
         </Select>
         {approvedFacturable.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:border-l sm:pl-4">
+            {facturacionRazonSocial && (
+              <span className="text-xs text-muted-foreground hidden lg:inline max-w-[180px] truncate" title={facturacionRazonSocial}>
+                Emisor: {facturacionRazonSocial}
+              </span>
+            )}
             <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
               <Checkbox
                 checked={modoSimulacion}
@@ -556,13 +577,14 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
                 <TableHead className="text-xs sm:text-sm">Proveedor</TableHead>
                 <TableHead className="text-xs sm:text-sm">Estado</TableHead>
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap">Facturado</TableHead>
+                <TableHead className="text-xs sm:text-sm whitespace-nowrap w-20">Adj.</TableHead>
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap">Fecha</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {payments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">
                     No hay pagos para mostrar
                   </TableCell>
                 </TableRow>
@@ -621,6 +643,20 @@ export function PaymentsTab({ schoolId, getToken, manualOpen: manualOpenProp, on
                         </Badge>
                       ) : (
                         <span className="text-muted-foreground text-sm">No</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {p.status === "approved" ? (
+                        <PaymentDocumentoAdjunto
+                          paymentId={p.id}
+                          schoolId={schoolId}
+                          getToken={getToken}
+                          hasAdjunto={!!(p as PaymentWithPlayerName).documentoAdjuntoStoragePath}
+                          adjuntoNombre={(p as PaymentWithPlayerName).documentoAdjuntoNombre}
+                          onUpdated={fetchPayments}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
                     <TableCell>

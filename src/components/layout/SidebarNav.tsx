@@ -21,6 +21,7 @@ import {
   FileSpreadsheet,
   Receipt,
   ClipboardCheck,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -50,6 +51,8 @@ const schoolUserMenuItems = [
 
 const superAdminMenuItems = [
     { href: "/dashboard", label: "Náuticas", icon: Building },
+    { href: "/dashboard?tab=users", label: "Usuarios", icon: Users },
+    { href: "/dashboard?tab=reports", label: "Reportes", icon: BarChart3 },
     { href: "/dashboard/support/operator", label: "Tickets de Soporte", icon: Headphones },
     { href: "/dashboard/admin/config", label: "Configuración global", icon: Sliders },
     { href: "/dashboard/admin/test-email", label: "Probar Trigger Email", icon: Mail },
@@ -177,7 +180,11 @@ export function SidebarNav() {
                         ? pathname === "/dashboard/payments" && searchParams.get("tab") === "mensualidad"
                         : item.href === "/dashboard/payments"
                           ? pathname === "/dashboard/payments" && searchParams.get("tab") !== "mensualidad"
-                          : pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href.split("?")[0]))
+                          : item.href === "/dashboard"
+                            ? pathname === "/dashboard" && (!searchParams.get("tab") || searchParams.get("tab") === "schools")
+                            : item.href.startsWith("/dashboard?tab=")
+                              ? pathname === "/dashboard" && searchParams.get("tab") === item.href.split("tab=")[1]
+                              : pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href.split("?")[0]))
                     }
                     tooltip={item.label}
                     className="font-headline w-full"

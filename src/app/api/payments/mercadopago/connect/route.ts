@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { verifyIdToken } from '@/lib/auth-server';
+import { verifyIdToken, isSchoolAdminOrSuperAdmin } from '@/lib/auth-server';
 import { getMercadoPagoAuthorizeUrl, signOAuthState } from '@/lib/payments/mercadopago-oauth';
 
 export async function GET(request: Request) {
@@ -21,7 +21,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'schoolId requerido' }, { status: 400 });
     }
 
-    // TODO: verificar que auth.uid sea admin de schoolId (isSchoolAdminOrSuperAdmin)
+    const isAdmin = await isSchoolAdminOrSuperAdmin(auth.uid, schoolId);
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'No tenés permisos para conectar esta náutica' }, { status: 403 });
+    }
+
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? request.headers.get('origin') ?? 'http://localhost:9002';
     const redirectUri = `${baseUrl}/api/payments/mercadopago/callback`;
     const state = signOAuthState(schoolId);

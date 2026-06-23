@@ -89,7 +89,7 @@ export async function generarFacturaPDF(datos: FacturaPdfDatos): Promise<string>
     fs.mkdirSync(FACTURAS_DIR, { recursive: true });
   }
 
-  const letra = datos.tipoComprobante.includes('B') ? 'B' : datos.tipoComprobante.includes('C') ? 'C' : 'B';
+  const letra = facturaLetra(datos.tipoComprobante);
   const ptoVtaStr = String(datos.puntoVenta).padStart(4, '0');
   const nroStr = String(datos.numero).padStart(8, '0');
   const filename = `factura-${letra}-${ptoVtaStr}-${nroStr}.pdf`;
@@ -230,4 +230,41 @@ export async function generarFacturaPDF(datos: FacturaPdfDatos): Promise<string>
   }
   console.log('[factura-pdf] PDF guardado:', absolutePath);
   return absolutePath;
+}
+
+export interface GenerarFacturaOptions {
+  datos: FacturaPdfDatos;
+  schoolId?: string;
+  facturacion?: import('@/lib/school-facturacion').SchoolFacturacion;
+}
+
+/**
+ * Genera factura PDF: usa plantilla Marinas (logo, fondo blanco) si hay templateFactura,
+ * sino el PDF genérico jsPDF.
+ */
+export async function generarFactura(opts: GenerarFacturaOptions): Promise<string> {
+  const { datos, schoolId, facturacion } = opts;
+  if (facturacion?.templateFactura && schoolId) {
+    const { generarFacturaConPlantilla, loadTemplateAssets } = await import(
+      '@/lib/factura-pdf-template'
+    );
+    const assets = await loadTemplateAssets(schoolId, facturacion);
+    let logoBytes = assets.logo;
+    if (!logoBytes) {
+      for (const name of ['logo.png', 'logo.jpg']) {
+        const localLogo = path.join(process.cwd(), 'afip/templates', name);
+        if (fs.existsSync(localLogo)) {
+          logoBytes = fs.readFileSync(localLogo);
+          break;
+        }
+      }
+    }
+    return generarFacturaConPlantilla({
+      datos,
+      facturacion,
+      template: facturacion.templateFactura,
+      logoBytes,
+    });
+  }
+  return generarFacturaPDF(datos);
 }

@@ -52,6 +52,18 @@ export interface Payment {
   facturado?: boolean;
   /** Fecha en que se facturó (si facturado). */
   facturadoAt?: Date;
+  /** PDF opcional adjunto al cobro (remito, nota, etc.), distinto de la factura. */
+  documentoAdjuntoStoragePath?: string;
+  documentoAdjuntoNombre?: string;
+  documentoAdjuntoDescripcion?: string;
+  documentoAdjuntoAt?: Date;
+  facturaNumero?: number;
+  facturaPtoVta?: number;
+  facturaFecha?: string;
+  facturaTipo?: string;
+  facturaStoragePath?: string;
+  facturaManual?: boolean;
+  CAE?: string;
 }
 
 export interface PaymentIntent {

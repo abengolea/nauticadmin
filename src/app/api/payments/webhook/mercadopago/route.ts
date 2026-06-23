@@ -8,6 +8,7 @@
  * Responder 200 rápido y procesar después para no agotar el timeout de MP.
  */
 
+import { createHmac } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getAdminFirestore } from '@/lib/firebase-admin';
 import {
@@ -18,6 +19,30 @@ import { ingestPayment } from '@/lib/duplicate-payments/payment-ingestion';
 import { sendEmailEvent } from '@/lib/payments/email-events';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import type admin from 'firebase-admin';
+
+/**
+ * Valida la firma HMAC-SHA256 que MercadoPago envía en el header x-signature.
+ * Formato: "ts=<timestamp>,v1=<hash>"
+ * El mensaje firmado es: "id:<paymentId>;request-id:<x-request-id>;ts:<timestamp>"
+ * Retorna true si la firma es válida o si no hay MERCADOPAGO_WEBHOOK_SECRET configurado
+ * (para no romper entornos de desarrollo sin la variable).
+ */
+function validateMercadoPagoSignature(request: Request, paymentId: string | null): boolean {
+  const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+  if (!secret) return true; // Sin secret configurado: no validar (dev/staging)
+
+  const xSignature = request.headers.get('x-signature');
+  const xRequestId = request.headers.get('x-request-id') ?? '';
+  if (!xSignature) return false;
+
+  const ts = xSignature.match(/ts=([^,]+)/)?.[1];
+  const v1 = xSignature.match(/v1=([^,]+)/)?.[1];
+  if (!ts || !v1) return false;
+
+  const message = `id:${paymentId};request-id:${xRequestId};ts:${ts}`;
+  const expected = createHmac('sha256', secret).update(message).digest('hex');
+  return expected === v1;
+}
 
 /** external_reference que guardamos al crear la preferencia: schoolId|playerId|period */
 function parseExternalReference(ref: string): { schoolId: string; playerId: string; period: string } | null {
@@ -33,6 +58,11 @@ export async function GET(request: Request) {
   const topic = url.searchParams.get('topic');
   const id = url.searchParams.get('id');
   const schoolId = url.searchParams.get('schoolId');
+
+  if (!validateMercadoPagoSignature(request, id)) {
+    return NextResponse.json({ ok: true }); // Responder 200 para que MP no reintente con firma inválida
+  }
+
   return processNotification({ topic, paymentId: id, schoolId });
 }
 
@@ -48,6 +78,11 @@ export async function POST(request: Request) {
   } catch {
     // body vacío o no JSON
   }
+
+  if (!validateMercadoPagoSignature(request, paymentId)) {
+    return NextResponse.json({ ok: true }); // Responder 200 para que MP no reintente con firma inválida
+  }
+
   return processNotification({ topic, paymentId, schoolId });
 }
 
