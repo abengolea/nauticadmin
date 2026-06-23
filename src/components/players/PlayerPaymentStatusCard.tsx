@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, CreditCard, ExternalLink, Shirt } from "lucide-react";
+import { AlertTriangle, CheckCircle, CreditCard, ExternalLink, Receipt } from "lucide-react";
+import { AddServiceChargeDialog } from "@/components/payments/AddServiceChargeDialog";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import type { DelinquentInfo } from "@/lib/types/payments";
@@ -15,7 +16,7 @@ type ClothingPendingItem = { period: string; amount: number; installmentIndex: n
 
 function formatPeriodLabel(period: string): string {
   if (period === REGISTRATION_PERIOD) return "Inscripción";
-  if (period?.startsWith?.("ropa-")) return `Ropa (cuota ${period.replace("ropa-", "")})`;
+  if (period?.startsWith?.("ropa-")) return `Cargo adicional (cuota ${period.replace("ropa-", "")})`;
   if (!period || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return period;
   const [y, m] = period.split("-");
   const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -27,10 +28,13 @@ interface PlayerPaymentStatusCardProps {
   /** Cuando el admin ve el perfil: playerId y schoolId para consultar morosos. */
   playerId?: string;
   schoolId?: string;
+  /** Nombre del cliente (para el diálogo de servicio). */
+  playerName?: string;
 }
 
-export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, schoolId: propSchoolId }: PlayerPaymentStatusCardProps) {
+export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, schoolId: propSchoolId, playerName }: PlayerPaymentStatusCardProps) {
   const [loading, setLoading] = useState(true);
+  const [serviceChargeOpen, setServiceChargeOpen] = useState(false);
   const [delinquents, setDelinquents] = useState<(DelinquentInfo & { dueDate?: string })[]>([]);
   const [clothingPending, setClothingPending] = useState<ClothingPendingItem[]>([]);
   const [suggestedCurrency, setSuggestedCurrency] = useState("ARS");
@@ -200,7 +204,7 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
             isAdminView ? (
               <>Al día con pagos.</>
             ) : (
-              <>Estado de tus cuotas, inscripción y ropa.</>
+              <>Estado de tus cuotas y pagos.</>
             )
           )}
         </CardDescription>
@@ -220,10 +224,7 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
               ))}
               {clothingPending.map((c) => (
                 <li key={c.period}>
-                  <span className="inline-flex items-center gap-1">
-                    <Shirt className="h-3.5 w-3.5" />
-                    Cuota {c.installmentIndex} de {c.totalInstallments}: {suggestedCurrency} {c.amount.toLocaleString("es-AR")}
-                  </span>
+                  Cargo adicional {c.installmentIndex}/{c.totalInstallments}: {suggestedCurrency} {c.amount.toLocaleString("es-AR")}
                 </li>
               ))}
             </ul>
@@ -242,19 +243,44 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
                 </Button>
               )}
               {isAdminView && (
-                <Button variant="outline" asChild>
-                  <Link href="/dashboard/payments?tab=delinquents">Ver en Pagos</Link>
-                </Button>
+                <>
+                  <Button variant="outline" onClick={() => setServiceChargeOpen(true)}>
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Agregar servicio facturado
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link href="/dashboard/payments?tab=delinquents">Ver en Pagos</Link>
+                  </Button>
+                </>
               )}
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-            <CheckCircle className="h-5 w-5 shrink-0" />
-            <span className="font-medium">Al día</span>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+              <CheckCircle className="h-5 w-5 shrink-0" />
+              <span className="font-medium">Al día</span>
+            </div>
+            {isAdminView && (
+              <Button variant="outline" size="sm" onClick={() => setServiceChargeOpen(true)}>
+                <Receipt className="h-4 w-4 mr-2" />
+                Agregar servicio facturado
+              </Button>
+            )}
           </div>
         )}
       </CardContent>
+      {isAdminView && propPlayerId && propSchoolId && (
+        <AddServiceChargeDialog
+          open={serviceChargeOpen}
+          onOpenChange={setServiceChargeOpen}
+          playerId={propPlayerId}
+          playerName={playerName}
+          schoolId={propSchoolId}
+          getToken={getToken}
+          onSuccess={fetchStatus}
+        />
+      )}
     </Card>
   );
 }

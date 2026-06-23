@@ -10,6 +10,7 @@ import { z } from 'genkit';
 import {
   getAvailableGeminiModel,
   hasGeminiApiKey,
+  getGeminiApiKeyMissingMessage,
 } from '@/ai/get-available-gemini-model';
 import type { ExcelFieldKey } from '@/lib/excel-import-types';
 
@@ -30,6 +31,7 @@ const ColumnMappingSchema = z.object({
     'ubicacion',
     'clienteDesde',
     'medidas',
+    'lona',
     'observaciones',
     'personasAutorizadas',
   ]),
@@ -86,6 +88,7 @@ Eres un asistente de una plataforma de administración de náuticas (NauticAdmin
 - ubicacion: Ubicación (amarra, muelle, etc.)
 - clienteDesde: Fecha desde que es cliente
 - medidas: Medidas de la embarcación
+- lona: Lona (Sí/No/Tipo)
 - observaciones: Observaciones adicionales o demás datos
 - personasAutorizadas: Personas autorizadas a manejar la embarcación (pueden estar separadas por coma o en varias columnas)
 
@@ -115,7 +118,7 @@ const analyzeExcelFlow = ai.defineFlow(
   async (input) => {
     if (!hasGeminiApiKey()) {
       throw new Error(
-        'Falta GEMINI_API_KEY en .env.local. Agregá la variable (sin #) y reiniciá el servidor. Obtenerla en: https://aistudio.google.com/apikey'
+        getGeminiApiKeyMissingMessage()
       );
     }
     const modelName = await getAvailableGeminiModel();

@@ -44,7 +44,7 @@ const addUserSchema = z
     email: z.string().email("El correo electrónico no es válido."),
     emailConfirm: z.string().email("El correo electrónico no es válido."),
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
-    role: z.enum(["school_admin", "coach"], { required_error: "El rol es requerido." }),
+    role: z.enum(["school_admin", "operador"], { required_error: "El rol es requerido." }),
   })
   .refine((data) => data.email === data.emailConfirm, {
     message: "Los correos electrónicos no coinciden.",
@@ -153,7 +153,7 @@ export function AddSchoolUserDialog({ schoolId }: { schoolId: string }) {
         <DialogHeader>
           <DialogTitle>Añadir Usuario a la Escuela</DialogTitle>
           <DialogDescription>
-            Crea un nuevo usuario y asígnalo como responsable (administrador o entrenador) a esta escuela.
+            Crea un nuevo usuario y asígnalo como responsable (administrador u operador) a esta escuela.
           </DialogDescription>
         </DialogHeader>
         
@@ -224,8 +224,8 @@ export function AddSchoolUserDialog({ schoolId }: { schoolId: string }) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="school_admin">Administrador de Escuela</SelectItem>
-                      <SelectItem value="coach">Entrenador</SelectItem>
+                      <SelectItem value="school_admin">Administrador</SelectItem>
+                      <SelectItem value="operador">Operador</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

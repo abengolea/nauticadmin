@@ -1,19 +1,27 @@
 /**
- * Emite una factura de prueba a AFIP (homologación).
+ * Emite una factura de prueba a AFIP.
  *
  * Uso:
- *   npx tsx scripts/emit-test-invoice.ts
+ *   npx tsx scripts/emit-test-invoice.ts        → usa .env.local
+ *   npx tsx scripts/emit-test-invoice.ts homo  → homologación
+ *   npx tsx scripts/emit-test-invoice.ts prod  → producción
  *
  * Requiere .env.local con AFIP_CUIT, certificados en afip/, etc.
- *
- * Por defecto emite: $100 + 21% IVA = $121 total, a Adrian Bengolea CUIT 20257159702, servicios varios.
+ * Por defecto emite: $100 + 21% IVA = $121 total, a Adrian Bengolea CUIT 20257159702.
  */
+import '../src/lib/afip/tls-patch'; // debe ser el primer import (parche DH para AFIP prod)
 
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+const cwd = process.cwd();
 dotenv.config();
+dotenv.config({ path: path.resolve(cwd, '.env.local'), override: true });
+
+const arg = process.argv[2]?.toLowerCase();
+if (arg === 'homo' || arg === 'prod') {
+  dotenv.config({ path: path.resolve(cwd, `.env.afip.${arg}`), override: true });
+}
 
 import { createNextVoucher } from '../src/lib/afip/wsfe';
 import { generarFacturaPDF } from '../src/lib/factura-pdf';

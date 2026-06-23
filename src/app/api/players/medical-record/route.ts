@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     const schoolUserData = schoolUserSnap.data() as { role?: string } | undefined;
     const isStaff =
       schoolUserSnap.exists &&
-      (schoolUserData?.role === "school_admin" || schoolUserData?.role === "coach");
+      (schoolUserData?.role === "school_admin" || schoolUserData?.role === "operador");
 
     if (!isPlayerSelf && !isStaff) {
       return NextResponse.json(

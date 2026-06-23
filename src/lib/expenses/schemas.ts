@@ -195,8 +195,23 @@ export const confirmExpenseSchema = z.object({
       categoryId: z.string().optional(),
       notes: z.string().optional(),
       status: expenseStatusSchema.optional(),
+      archivedAt: z.string().optional().nullable(),
     })
     .optional(),
+});
+
+/** Request para actualizar proveedor (PATCH vendor) */
+export const updateVendorSchema = z.object({
+  schoolId: z.string().min(1),
+  name: z.string().optional(),
+  cuit: z.string().optional(),
+  ivaCondition: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  address: z.string().optional(),
+  cuentaCorrienteHabilitada: z.boolean().optional(),
+  defaultCategoryId: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 /** Request para registrar pago */
@@ -208,10 +223,16 @@ export const registerPaymentSchema = z.object({
   date: z.string(),
   method: z.string().optional(),
   reference: z.string().optional(),
-  appliedTo: z.array(
-    z.object({
-      expenseId: z.string(),
-      amount: z.number().positive(),
-    })
-  ),
+  receiptType: z.enum(['cheque', 'transfer', 'credit_card']).optional(),
+  receiptStoragePath: z.string().optional(),
+  receiptDetails: z.record(z.union([z.string(), z.number()])).optional(),
+  appliedTo: z
+    .array(
+      z.object({
+        expenseId: z.string(),
+        amount: z.number().positive(),
+      })
+    )
+    .optional()
+    .default([]),
 });

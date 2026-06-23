@@ -63,7 +63,7 @@ const improveMassMessageFlow = ai.defineFlow(
     const modelName = await getAvailableGeminiModel();
     if (!modelName) {
       throw new Error(
-        'No se encontró ningún modelo Gemini disponible. Verificá que GEMINI_API_KEY (o GOOGLE_API_KEY) en .env.local sea una API key de Google AI Studio: https://aistudio.google.com/apikey'
+        'No se encontró ningún modelo Gemini disponible. Verificá GEMINI_API_KEY en las variables de entorno (local: .env.local; producción: App Hosting secrets). Obtenerla en: https://aistudio.google.com/apikey'
       );
     }
     const { output } = await improveMassMessagePrompt(input, {

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Ship, Percent, Plus, Trash2 } from "lucide-react";
+import { Loader2, Ship, Percent, Plus, Trash2, Search } from "lucide-react";
 import { useFirestore, useUserProfile, useDoc } from "@/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import type { BoatPricingConfig, BoatPricingItem } from "@/lib/types/boat-pricing";
@@ -129,6 +129,8 @@ export function BoatPricingConfigForm({ schoolId }: BoatPricingConfigFormProps) 
   const [items, setItems] = useState<BoatPricingItem[]>(() => buildDefaultItems());
   const [globalAdjustmentPercent, setGlobalAdjustmentPercent] = useState<number>(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterDescription, setFilterDescription] = useState("");
 
   useEffect(() => {
     if (config) {
@@ -148,6 +150,22 @@ export function BoatPricingConfigForm({ schoolId }: BoatPricingConfigFormProps) 
     }
     return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [items]);
+
+  const filteredGroupedItems = useMemo(() => {
+    const cat = filterCategory.trim().toLowerCase();
+    const desc = filterDescription.trim().toLowerCase();
+    if (!cat && !desc) return groupedItems;
+    return groupedItems
+      .map(([group, groupItems]) => {
+        const matchesCategory = !cat || group.toLowerCase().includes(cat);
+        const filteredItems = groupItems.filter((item) => {
+          const matchesDesc = !desc || item.label.toLowerCase().includes(desc);
+          return matchesCategory && matchesDesc;
+        });
+        return [group, filteredItems] as [string, BoatPricingItem[]];
+      })
+      .filter(([, groupItems]) => groupItems.length > 0);
+  }, [groupedItems, filterCategory, filterDescription]);
 
   const updateItemPrice = (id: string, price: number) => {
     setItems((prev) =>
@@ -281,6 +299,47 @@ export function BoatPricingConfigForm({ schoolId }: BoatPricingConfigFormProps) 
           </Button>
         </div>
 
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="space-y-2 min-w-[200px]">
+            <Label htmlFor="filter-category" className="flex items-center gap-2 text-sm">
+              <Search className="h-4 w-4" />
+              Filtrar por categoría
+            </Label>
+            <Input
+              id="filter-category"
+              placeholder="Ej: Cunas exteriores..."
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-2 min-w-[200px]">
+            <Label htmlFor="filter-description" className="flex items-center gap-2 text-sm">
+              <Search className="h-4 w-4" />
+              Filtrar por descripción
+            </Label>
+            <Input
+              id="filter-description"
+              placeholder="Ej: Cat. N°1..."
+              value={filterDescription}
+              onChange={(e) => setFilterDescription(e.target.value)}
+              className="h-9"
+            />
+          </div>
+          {(filterCategory || filterDescription) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFilterCategory("");
+                setFilterDescription("");
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+
         <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
@@ -292,7 +351,25 @@ export function BoatPricingConfigForm({ schoolId }: BoatPricingConfigFormProps) 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {groupedItems.map(([group, groupItems]) =>
+              {filteredGroupedItems.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    No se encontraron precios con los filtros aplicados. Probá con otros términos o{" "}
+                    <button
+                      type="button"
+                      className="underline hover:no-underline"
+                      onClick={() => {
+                        setFilterCategory("");
+                        setFilterDescription("");
+                      }}
+                    >
+                      limpiar filtros
+                    </button>
+                    .
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredGroupedItems.map(([group, groupItems]) =>
                 groupItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium text-muted-foreground whitespace-nowrap p-1">
@@ -335,7 +412,8 @@ export function BoatPricingConfigForm({ schoolId }: BoatPricingConfigFormProps) 
                     </TableCell>
                   </TableRow>
                 ))
-              )}
+              )
+            )}
             </TableBody>
           </Table>
         </div>

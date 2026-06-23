@@ -49,6 +49,8 @@ next-env.d.ts
 .genkit/*
 .env*
 !.env.example
+!.env.afip.homo.example
+!.env.afip.prod.example
 env.local
 
 # firebase

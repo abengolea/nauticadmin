@@ -17,7 +17,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { AlertCircle, Mail, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -58,6 +60,8 @@ export function UnappliedTab({ schoolId, getToken }: UnappliedTabProps) {
   const [loading, setLoading] = useState(true);
   const [filterPeriod, setFilterPeriod] = useState<string>("");
   const [filterObs, setFilterObs] = useState("");
+  const [sending, setSending] = useState(false);
+  const { toast } = useToast();
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -93,6 +97,43 @@ export function UnappliedTab({ schoolId, getToken }: UnappliedTabProps) {
 
   const periods = [...new Set(items.map((i) => i.period))].sort().reverse();
 
+  const handleSendEmailToAll = async () => {
+    if (filtered.length === 0) {
+      toast({ variant: "destructive", title: "No hay no aplicados para contactar." });
+      return;
+    }
+    setSending(true);
+    const token = await getToken();
+    if (!token) {
+      toast({ variant: "destructive", title: "No se pudo obtener sesión." });
+      setSending(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/payments/send-reminder", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ schoolId, type: "unapplied" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Error al enviar");
+      toast({
+        title: "Correos encolados",
+        description: data.message ?? `Se enviarán ${data.sent ?? 0} correos a clientes con pagos no aplicados.`,
+      });
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: e instanceof Error ? e.message : "Error al enviar correos",
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -116,6 +157,19 @@ export function UnappliedTab({ schoolId, getToken }: UnappliedTabProps) {
           onChange={(e) => setFilterObs(e.target.value)}
           className="rounded border px-2 py-1.5 text-sm w-56"
         />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSendEmailToAll}
+          disabled={sending || filtered.length === 0}
+        >
+          {sending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Mail className="mr-2 h-4 w-4" />
+          )}
+          Enviar mail a todos los no aplicados
+        </Button>
       </div>
 
       {loading ? (

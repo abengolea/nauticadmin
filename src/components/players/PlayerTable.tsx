@@ -22,6 +22,7 @@ import { FileDown, CreditCard, CheckCircle, Loader2, Search, Mail, FileX, FileCh
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useClientSearch } from "@/context/ClientSearchContext";
 
 type DelinquentInfo = {
   playerId: string;
@@ -35,16 +36,16 @@ type ClothingPendingItem = { period: string; amount: number; installmentIndex: n
 
 export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   const router = useRouter();
-  const { isReady, activeSchoolId: userActiveSchoolId, profile, user, isAdmin, isCoach } = useUserProfile();
-  const canInviteAccess = isAdmin || isCoach;
+  const { isReady, activeSchoolId: userActiveSchoolId, profile, user, isAdmin, isOperador } = useUserProfile();
+  const canInviteAccess = isAdmin || isOperador;
 
   const schoolId = propSchoolId || userActiveSchoolId;
   const canListPlayers = profile?.role !== "player";
   const canSeePaymentStatus = isAdmin && !!schoolId;
-  const canToggleStatus = (isAdmin || isCoach) && !!schoolId;
+  const canToggleStatus = (isAdmin || isOperador) && !!schoolId;
 
   const { toast } = useToast();
-  const [searchQuery, setSearchQuery] = useState("");
+  const { searchQuery, setSearchQuery } = useClientSearch();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [inviting, setInviting] = useState(false);
   const [updatingFactura, setUpdatingFactura] = useState(false);

@@ -48,4 +48,9 @@ env:
     value: "3983794964230965"
     availability:
       - RUNTIME
+  # IA (Gemini) para extracción de datos de facturas - crear con: firebase apphosting:secrets:set GEMINI_API_KEY
+  - variable: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+    availability:
+      - RUNTIME
 

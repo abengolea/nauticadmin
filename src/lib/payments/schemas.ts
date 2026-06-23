@@ -6,12 +6,28 @@ import { z } from 'zod';
 
 const PERIOD_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
 const CLOTHING_PERIOD_REGEX = /^ropa-\d+$/;
+/** Período para conceptos esporádicos: extra-YYYYMM-timestamp (generado en servidor) */
+const EXTRA_PERIOD_REGEX = /^extra-\d{6}-\d+$/;
 export const REGISTRATION_PERIOD = 'inscripcion';
 
 const periodSchema = z.string().refine(
-  (v) => v === REGISTRATION_PERIOD || PERIOD_REGEX.test(v) || CLOTHING_PERIOD_REGEX.test(v),
-  { message: 'Período: YYYY-MM, inscripcion o ropa-N' }
+  (v) =>
+    v === REGISTRATION_PERIOD ||
+    PERIOD_REGEX.test(v) ||
+    CLOTHING_PERIOD_REGEX.test(v) ||
+    EXTRA_PERIOD_REGEX.test(v),
+  { message: 'Período: YYYY-MM, inscripcion, ropa-N o extra-YYYYMM-timestamp' }
 );
+
+export const serviceChargeSchema = z.object({
+  playerId: z.string().min(1, 'Cliente requerido'),
+  schoolId: z.string().min(1, 'Escuela requerida'),
+  concept: z.string().min(1, 'Concepto requerido').max(200),
+  amount: z.number().positive('Monto debe ser positivo'),
+  currency: z.string().min(1).default('ARS'),
+  /** Mes a facturar YYYY-MM. Default: mes actual */
+  period: z.string().regex(PERIOD_REGEX).optional(),
+});
 
 export const createPaymentIntentSchema = z.object({
   provider: z.enum(['mercadopago', 'dlocal']),
@@ -40,6 +56,8 @@ export const listPaymentsSchema = z.object({
     status: z.enum(['pending', 'approved', 'rejected', 'refunded']).optional(),
     period: periodSchema.optional(),
     provider: z.enum(['mercadopago', 'dlocal', 'manual', 'excel_import']).optional(),
+    /** 'yes' = solo facturados, 'no' = solo no facturados, omitir = todos */
+    facturado: z.enum(['yes', 'no']).optional(),
   }).optional(),
   limit: z.number().int().min(1).max(500).default(200),
   offset: z.number().int().min(0).default(0),
@@ -55,9 +73,14 @@ export const paymentConfigSchema = z.object({
   dueDayOfMonth: z.number().int().min(1).max(31),
 });
 
-/** Valida formato YYYY-MM, inscripción o ropa-N. */
+/** Valida formato YYYY-MM, inscripción, ropa-N o extra-YYYYMM-timestamp. */
 export function isValidPeriod(period: string): boolean {
-  return period === REGISTRATION_PERIOD || PERIOD_REGEX.test(period) || CLOTHING_PERIOD_REGEX.test(period);
+  return (
+    period === REGISTRATION_PERIOD ||
+    PERIOD_REGEX.test(period) ||
+    CLOTHING_PERIOD_REGEX.test(period) ||
+    EXTRA_PERIOD_REGEX.test(period)
+  );
 }
 
 /** Indica si el período es el de inscripción. */
@@ -68,6 +91,11 @@ export function isRegistrationPeriod(period: string): boolean {
 /** Indica si el período es de pago de ropa (ropa-1, ropa-2, etc.). */
 export function isClothingPeriod(period: string): boolean {
   return CLOTHING_PERIOD_REGEX.test(period);
+}
+
+/** Indica si el período es un concepto/servicio esporádico (extra-YYYYMM-timestamp). */
+export function isServicePeriod(period: string): boolean {
+  return EXTRA_PERIOD_REGEX.test(period);
 }
 
 /** Obtiene la fecha de vencimiento para un período dado y día del mes. Para ropa-N usa el mes actual. */

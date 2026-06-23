@@ -47,7 +47,7 @@ type UserAction = {
 }
 
 type UserRoleInfo = {
-    role: 'school_admin' | 'coach' | 'player';
+    role: 'school_admin' | 'operador' | 'player';
     displayName?: string;
     schoolId: string;
     playerId?: string;
@@ -67,7 +67,7 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
     const [isUpdating, setIsUpdating] = useState(false);
     const [selectedSchoolId, setSelectedSchoolId] = useState<string>("all");
 
-    // Cuando hay un filtro por escuela, cargamos los usuarios de esa escuela (staff: admin, coach) con role y displayName
+    // Cuando hay un filtro por escuela, cargamos los usuarios de esa escuela (staff: admin, operador) con role y displayName
     const schoolUsersPath = selectedSchoolId && selectedSchoolId !== "all" ? `schools/${selectedSchoolId}/users` : "";
     const { data: schoolUsers } = useCollection<SchoolUser & { id: string }>(schoolUsersPath);
 
@@ -217,8 +217,8 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
                         const roleLabel =
                           info?.role === "school_admin"
                             ? "Admin"
-                            : info?.role === "coach"
-                              ? "Entrenador"
+                            : info?.role === "operador"
+                              ? "Operador"
                               : info?.role === "player"
                                 ? "Jugador"
                                 : "Usuario";

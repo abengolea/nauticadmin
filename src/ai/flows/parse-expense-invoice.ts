@@ -12,6 +12,7 @@ import { z } from 'zod';
 import {
   getAvailableGeminiModel,
   hasGeminiApiKey,
+  getGeminiApiKeyMissingMessage,
 } from '@/ai/get-available-gemini-model';
 import {
   aiExtractedExpenseSchema,
@@ -166,9 +167,7 @@ export async function parseExpenseFromImage(
   mimeType: string = 'image/jpeg'
 ): Promise<ParseExpenseResult> {
   if (!hasGeminiApiKey()) {
-    throw new Error(
-      'Falta GEMINI_API_KEY en .env.local. Agregá la variable y reiniciá el servidor.'
-    );
+    throw new Error(getGeminiApiKeyMissingMessage());
   }
 
   const modelName = await getAvailableGeminiModel();

@@ -45,8 +45,11 @@ export function SchoolUsersList({ schoolId }: { schoolId: string }) {
   const loading = usersLoading;
 
   const roleDisplay: { [key in SchoolUser['role']]: string } = {
-    school_admin: 'Admin. de Escuela',
-    coach: 'Entrenador'
+    school_admin: 'Administrador',
+    operador: 'Operador',
+    editor: 'Editor',
+    viewer: 'Visor',
+    player: 'Jugador',
   };
 
   const handleRevokeAccess = async () => {

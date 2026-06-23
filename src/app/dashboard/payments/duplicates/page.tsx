@@ -95,9 +95,9 @@ export default function DuplicatesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
           <AlertTriangle className="h-6 w-6 text-amber-500" />
           Duplicados detectados
         </h1>
@@ -123,7 +123,8 @@ export default function DuplicatesPage() {
               No hay casos de duplicado pendientes
             </div>
           ) : (
-            <Table>
+            <div className="overflow-x-auto -mx-1">
+            <Table className="min-w-[400px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
@@ -153,6 +154,7 @@ export default function DuplicatesPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

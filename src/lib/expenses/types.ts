@@ -88,6 +88,8 @@ export interface Expense {
   createdBy: string;
   createdAt: string; // ISO
   updatedAt?: string; // ISO
+  /** Si está definido, el gasto está en papelera (no se elimina) */
+  archivedAt?: string; // ISO
   source: ExpenseSource;
   status: ExpenseStatus;
   supplier: ExpenseSupplier;
@@ -106,6 +108,16 @@ export interface ExpenseVendor {
   schoolId: string;
   name: string;
   cuit?: string;
+  /** Condición frente al IVA (ej: IVA Responsable Inscripto, Monotributista) */
+  ivaCondition?: IvaCondition;
+  /** Teléfono de contacto */
+  phone?: string;
+  /** Email de contacto */
+  email?: string;
+  /** Dirección fiscal o de contacto */
+  address?: string;
+  /** Si la cuenta corriente está habilitada para este proveedor */
+  cuentaCorrienteHabilitada?: boolean;
   defaultCategoryId?: string;
   notes?: string;
   createdAt?: string;
@@ -127,6 +139,10 @@ export interface VendorAccountEntry {
   balanceAfter?: number;
   description: string;
   createdAt?: string;
+  /** Para type=payment: path del comprobante en Storage */
+  receiptStoragePath?: string;
+  /** Para type=payment: tipo de comprobante (cheque, transfer, credit_card) */
+  receiptType?: 'cheque' | 'transfer' | 'credit_card';
 }
 
 export interface ExpensePayment {
@@ -138,6 +154,12 @@ export interface ExpensePayment {
   date: string; // ISO
   method?: string;
   reference?: string;
+  /** Tipo de comprobante: cheque, transfer, credit_card */
+  receiptType?: 'cheque' | 'transfer' | 'credit_card';
+  /** Path en Storage del comprobante (imagen/PDF) */
+  receiptStoragePath?: string;
+  /** Datos extraídos del comprobante (banco, nº cheque, etc.) */
+  receiptDetails?: Record<string, string | number | undefined>;
   appliedTo: Array<{ expenseId: string; amount: number }>;
   createdAt: string;
   createdBy: string;

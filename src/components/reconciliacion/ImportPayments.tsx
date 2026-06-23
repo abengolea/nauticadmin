@@ -9,6 +9,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 import { Upload, Loader2 } from "lucide-react";
 import { parsePaymentsFile, getHeadersFromFile } from "@/lib/reconciliacion-excel/parser";
 import { ColumnMappingComponent } from "./ColumnMapping";
@@ -30,6 +37,7 @@ export function ImportPayments({
   onPaymentsLoaded,
   onMappingReady,
 }: ImportPaymentsProps) {
+  const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -68,7 +76,7 @@ export function ImportPayments({
   }, []);
 
   const handleApplyMapping = useCallback(async () => {
-    if (!file || !mapping.payer || !mapping.amount || !mapping.date) return;
+    if (!file || !mapping.payer || !mapping.amount) return;
     setLoading(true);
     setError(null);
     try {
@@ -78,17 +86,21 @@ export function ImportPayments({
       setTotalRows(result.totalRows);
       if (result.error) {
         setError(result.error);
+        toast({ variant: "destructive", title: "Error", description: result.error });
       } else {
         onPaymentsLoaded(result.payments);
         onMappingReady(mapping);
         setMappingDone(true);
+        toast({ title: "Pagos cargados", description: `${result.payments.length} pagos listos para conciliar` });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al parsear");
+      const msg = err instanceof Error ? err.message : "Error al parsear";
+      setError(msg);
+      toast({ variant: "destructive", title: "Error", description: msg });
     } finally {
       setLoading(false);
     }
-  }, [file, mapping, onPaymentsLoaded, onMappingReady]);
+  }, [file, mapping, onPaymentsLoaded, onMappingReady, toast]);
 
   return (
     <Card>
@@ -99,29 +111,49 @@ export function ImportPayments({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Subí el archivo de movimientos bancarios. Si las columnas no se detectan solas, asigná las manualmente y aplicá el mapeo.
+        </p>
         <div className="flex items-center gap-2">
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={handleFileChange}
-              disabled={loading}
-            />
-            <Button type="button" variant="outline" asChild>
-              <span>
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-2" />
-                )}
-                {file ? file.name : "Seleccionar archivo de pagos"}
-              </span>
-            </Button>
-          </label>
+          <TooltipProvider>
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={handleFileChange}
+                disabled={loading}
+              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="outline" asChild>
+                    <span>
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Upload className="h-4 w-4 mr-2" />
+                      )}
+                      {file ? file.name : "Seleccionar archivo de pagos"}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Subí el Excel/CSV con los movimientos bancarios.</p>
+                  <p className="text-xs mt-1">Pagador y Monto son obligatorios. Fecha y Referencia son opcionales.</p>
+                </TooltipContent>
+              </Tooltip>
+            </label>
+          </TooltipProvider>
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
+
+        {loading && (
+          <p className="text-sm text-muted-foreground flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Procesando archivo…
+          </p>
+        )}
 
         {headers.length > 0 && (
           <>
@@ -130,15 +162,25 @@ export function ImportPayments({
               mapping={mapping}
               onChange={setMapping}
             />
-            <Button
-              onClick={handleApplyMapping}
-              disabled={loading || !mapping.payer || !mapping.amount || !mapping.date}
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
-              Aplicar mapeo y cargar pagos
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleApplyMapping}
+                    disabled={loading || !mapping.payer || !mapping.amount}
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    {loading ? "Procesando…" : "Aplicar mapeo y cargar pagos"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Procesa el archivo con las columnas asignadas.</p>
+                  <p className="text-xs mt-1">Los pagos quedarán listos para conciliar.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </>
         )}
 

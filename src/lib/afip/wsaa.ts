@@ -5,17 +5,28 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import https from 'https';
+import { constants } from 'crypto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import axios from 'axios';
+import { getActiveAfipSession } from './session';
+
+/** Agente HTTPS para AFIP producción (usa OPENSSL_CONF=./openssl.cnf con SECLEVEL=0) */
+const afipAgent = new https.Agent({
+  minVersion: 'TLSv1',
+  secureOptions: constants.SSL_OP_LEGACY_SERVER_CONNECT,
+});
 
 const execAsync = promisify(exec);
 
 const WSAA_URL_HOMO = 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms';
 const WSAA_URL_PROD = 'https://wsaa.afip.gov.ar/ws/services/LoginCms';
-const WSAA_URL =
-  process.env.AFIP_WSAA_URL ??
-  (process.env.AFIP_PRODUCTION === 'true' ? WSAA_URL_PROD : WSAA_URL_HOMO);
+
+function getWsaaUrl(): string {
+  const production = getActiveAfipSession().production;
+  return process.env.AFIP_WSAA_URL ?? (production ? WSAA_URL_PROD : WSAA_URL_HOMO);
+}
 const CACHE_TTL_MS = 10 * 60 * 60 * 1000; // 10 horas
 const TA_MARGIN_MS = 10 * 60 * 1000; // 10 minutos de margen antes de expiración
 
@@ -24,9 +35,10 @@ let cacheExpiry = 0;
 
 /** Ruta del archivo de caché del TA (distinto para homo/prod) */
 function getTaFilePath(): string {
+  const session = getActiveAfipSession();
   const workDir = path.resolve(process.cwd(), process.env.AFIP_WORK_DIR ?? 'afip');
-  const suffix = process.env.AFIP_PRODUCTION === 'true' ? 'prod' : 'homo';
-  return path.join(workDir, `ta_wsfe_${suffix}.json`);
+  const suffix = session.production ? 'prod' : 'homo';
+  return path.join(workDir, `ta_wsfe_${session.cacheKey}_${suffix}.json`);
 }
 
 interface TaCache {
@@ -125,28 +137,20 @@ function getPaths(): {
   workDir: string;
   certPath: string;
   keyPath: string;
-  chainPath: string;
+  chainPath: string | undefined;
   xmlPath: string;
   cmsPath: string;
 } {
+  const session = getActiveAfipSession();
   const workDir = path.resolve(
     process.cwd(),
     process.env.AFIP_WORK_DIR ?? 'afip'
   );
-  const certPath = path.resolve(
-    process.cwd(),
-    process.env.AFIP_CERT_PATH ?? 'afip/certificado_homo.crt'
-  );
-  const keyPath = path.resolve(
-    process.cwd(),
-    process.env.AFIP_KEY_PATH ?? 'afip/privada_homo.key'
-  );
-  const chainPath = path.resolve(
-    process.cwd(),
-    process.env.AFIP_CHAIN_PATH ?? 'afip/chain.pem'
-  );
-  const xmlPath = path.join(workDir, 'loginTicketRequest.xml');
-  const cmsPath = path.join(workDir, 'loginTicketRequest.xml.cms');
+  const certPath = session.certPath;
+  const keyPath = session.keyPath;
+  const chainPath = session.chainPath;
+  const xmlPath = path.join(workDir, `loginTicketRequest_${session.cacheKey}.xml`);
+  const cmsPath = path.join(workDir, `loginTicketRequest_${session.cacheKey}.xml.cms`);
 
   return { workDir, certPath, keyPath, chainPath, xmlPath, cmsPath };
 }
@@ -177,16 +181,18 @@ async function signWithOpenSSL(
   cmsPath: string,
   certPath: string,
   keyPath: string,
-  chainPath: string
+  chainPath?: string
 ): Promise<string> {
   const openssl = getOpenSSLPath();
   console.log('[WSAA] Paso 3: Firmando con OpenSSL...');
   console.log('[WSAA]   OpenSSL:', openssl);
   console.log('[WSAA]   Certificado:', certPath);
   console.log('[WSAA]   Clave:', keyPath);
-  console.log('[WSAA]   Chain:', chainPath);
+  console.log('[WSAA]   Chain:', chainPath && fs.existsSync(chainPath) ? chainPath : '(omitido)');
 
-  const cmd = `"${openssl}" smime -sign -signer "${certPath}" -inkey "${keyPath}" -certfile "${chainPath}" -in "${xmlPath}" -out "${cmsPath}" -outform DER -nodetach`;
+  const chainArg =
+    chainPath && fs.existsSync(chainPath) ? `-certfile "${chainPath}" ` : '';
+  const cmd = `"${openssl}" smime -sign -signer "${certPath}" -inkey "${keyPath}" ${chainArg}-in "${xmlPath}" -out "${cmsPath}" -outform DER -nodetach`;
 
   try {
     const { stdout, stderr } = await execAsync(cmd);
@@ -283,10 +289,6 @@ export async function getAfipToken(): Promise<{ token: string; sign: string }> {
   if (!fs.existsSync(keyPath)) {
     throw new WsaaError(`Clave privada no encontrada: ${keyPath}`, 'KEY_NOT_FOUND');
   }
-  if (!fs.existsSync(chainPath)) {
-    throw new WsaaError(`Archivo chain no encontrado: ${chainPath}`, 'CHAIN_NOT_FOUND');
-  }
-
   console.log('[WSAA] Paso 1: Generando loginTicketRequest.xml...');
   const traXml = buildTraXml();
 
@@ -309,15 +311,18 @@ export async function getAfipToken(): Promise<{ token: string; sign: string }> {
    </soapenv:Body>
 </soapenv:Envelope>`;
 
-  console.log('[WSAA] Paso 5: Enviando SOAP a', WSAA_URL);
+  const wsaaUrl = getWsaaUrl();
+  const isProduction = getActiveAfipSession().production;
+  console.log('[WSAA] Paso 5: Enviando SOAP a', wsaaUrl);
   let response;
   try {
-    response = await axios.post(WSAA_URL, soapEnvelope, {
+    response = await axios.post(wsaaUrl, soapEnvelope, {
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
         SOAPAction: '',
       },
       timeout: 30000,
+      httpsAgent: isProduction ? afipAgent : undefined,
     });
   } catch (err) {
     if (axios.isAxiosError(err)) {

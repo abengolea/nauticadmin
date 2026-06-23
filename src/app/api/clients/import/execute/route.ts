@@ -163,6 +163,7 @@ export async function POST(request: Request) {
         ...(data.nombreEmbarcacion && { embarcacionNombre: data.nombreEmbarcacion }),
         ...(data.matricula && { embarcacionMatricula: data.matricula }),
         ...(data.medidas && { embarcacionMedidas: data.medidas }),
+        ...(data.lona && { embarcacionLona: data.lona }),
         ...(data.datosEmbarcacion && { embarcacionDatos: data.datosEmbarcacion }),
         ...(data.ubicacion && { ubicacion: data.ubicacion }),
         ...(data.clienteDesde && { clienteDesde: data.clienteDesde }),

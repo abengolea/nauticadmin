@@ -125,7 +125,7 @@ export default function PlayerProfilePage() {
     !!schoolId &&
     !player.archived &&
     !isViewingAsPlayer &&
-    (profile?.role === "school_admin" || profile?.role === "coach" || isSuperAdmin);
+    (profile?.role === "school_admin" || profile?.role === "operador" || isSuperAdmin);
 
   const handleToggleStatus = async () => {
     if (!user || !schoolId || statusUpdating) return;
@@ -341,6 +341,7 @@ export default function PlayerProfilePage() {
             getToken={getToken}
             playerId={isViewingAsPlayer ? undefined : id}
             schoolId={isViewingAsPlayer ? undefined : schoolId ?? undefined}
+            playerName={player ? `${player.firstName ?? ""} ${player.lastName ?? ""}`.trim() : undefined}
           />
         </div>
       </div>

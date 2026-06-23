@@ -18,11 +18,12 @@ import {
 import type { ColumnMapping } from "@/lib/reconciliacion-excel/types";
 
 const NONE_VALUE = "__none__";
+const EMPTY_HEADER_VALUE = "__empty__"; // Radix Select no permite value=""
 
 const FIELD_LABELS: Record<keyof ColumnMapping, string> = {
   payer: "Pagador",
   amount: "Monto",
-  date: "Fecha",
+  date: "Fecha (opcional)",
   reference: "Referencia (opcional)",
 };
 
@@ -40,7 +41,8 @@ export function ColumnMappingComponent({
   const options = [NONE_VALUE, ...headers];
 
   const handleChange = (field: keyof ColumnMapping, value: string) => {
-    onChange({ ...mapping, [field]: value === NONE_VALUE ? "" : value });
+    const actual = value === NONE_VALUE || value === EMPTY_HEADER_VALUE ? "" : value;
+    onChange({ ...mapping, [field]: actual });
   };
 
   return (
@@ -56,18 +58,21 @@ export function ColumnMappingComponent({
           <div key={field} className="space-y-2">
             <Label>{FIELD_LABELS[field]}</Label>
             <Select
-              value={mapping[field] || NONE_VALUE}
+              value={mapping[field] === "" ? NONE_VALUE : (mapping[field] || NONE_VALUE)}
               onValueChange={(v) => handleChange(field, v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar columna…" />
               </SelectTrigger>
               <SelectContent>
-                {options.map((h, i) => (
-                  <SelectItem key={`${i}-${h}`} value={h}>
-                    {h === NONE_VALUE ? "(ninguna)" : h}
-                  </SelectItem>
-                ))}
+                {options.map((h, i) => {
+                  const itemValue = h === "" ? EMPTY_HEADER_VALUE : h;
+                  return (
+                    <SelectItem key={`${i}-${itemValue}`} value={itemValue}>
+                      {h === NONE_VALUE ? "(ninguna)" : h === "" ? "(columna vacía)" : h}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

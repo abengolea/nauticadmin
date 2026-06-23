@@ -1,7 +1,7 @@
 /**
  * POST /api/registrations/on-approve
  * Envía por sistema el email "Fuiste aceptado" al jugador recién aprobado.
- * Solo admin o coach de la escuela puede llamar.
+ * Solo admin u operador de la escuela puede llamar.
  * Escribe en la colección `mail` para que la extensión Trigger Email (firestore-send-email) envíe el correo.
  * Usa plantilla con logo y tipografía River (email-template-server).
  */
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     const db = getAdminFirestore();
 
-    // Verificar que el usuario sea admin o coach de la escuela
+    // Verificar que el usuario sea admin u operador de la escuela
     const schoolUserSnap = await db
       .collection("schools")
       .doc(body.schoolId)
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     }
 
     const role = schoolUserSnap.data()?.role;
-    if (role !== "school_admin" && role !== "coach") {
+    if (role !== "school_admin" && role !== "operador") {
       return NextResponse.json(
         { error: "Solo admin o entrenador puede aprobar solicitudes" },
         { status: 403 }

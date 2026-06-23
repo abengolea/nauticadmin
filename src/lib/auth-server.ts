@@ -21,16 +21,22 @@ export async function verifyIdToken(authHeader: string | null): Promise<{ uid: s
 
 /**
  * Verifica que el usuario sea admin de la escuela (school_admin) o super admin.
- * Necesita consultar Firestore para el rol - por ahora retornamos true si hay token válido.
- * TODO: Consultar schools/{schoolId}/users/{uid} y platformUsers para super_admin
+ * Consulta schools/{schoolId}/users/{uid} y platformUsers/{uid}.
  */
-export async function isSchoolAdminOrSuperAdmin(
-  _uid: string,
-  _schoolId: string
-): Promise<boolean> {
-  // TODO: Implementar consulta a Firestore para verificar rol
-  // Por ahora asumimos que si pasó verifyIdToken, el cliente ya validó permisos
-  return true;
+export async function isSchoolAdminOrSuperAdmin(uid: string, schoolId: string): Promise<boolean> {
+  const { getAdminFirestore } = await import('./firebase-admin');
+  const db = getAdminFirestore();
+
+  const [platformSnap, schoolUserSnap] = await Promise.all([
+    db.collection('platformUsers').doc(uid).get(),
+    db.doc(`schools/${schoolId}/users/${uid}`).get(),
+  ]);
+
+  const platformData = platformSnap.data() as { super_admin?: boolean } | undefined;
+  if (platformData?.super_admin === true) return true;
+
+  const schoolUserData = schoolUserSnap.data() as { role?: string } | undefined;
+  return schoolUserData?.role === 'school_admin';
 }
 
 /**

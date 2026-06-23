@@ -59,7 +59,7 @@ export async function POST(
     }
 
     const role = schoolUserSnap.data()?.role;
-    if (role !== 'school_admin' && role !== 'coach') {
+    if (role !== 'school_admin' && role !== 'operador') {
       return NextResponse.json(
         { error: 'Solo admin o entrenador puede resolver duplicados' },
         { status: 403 }

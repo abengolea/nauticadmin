@@ -119,6 +119,7 @@ export async function PATCH(request: Request) {
       if (updates.categoryId !== undefined) updateData.categoryId = updates.categoryId;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
       if (updates.status) updateData.status = updates.status;
+      if (updates.archivedAt !== undefined) updateData.archivedAt = updates.archivedAt;
     }
 
     if (isConfirming && !updates?.status) {
@@ -126,6 +127,39 @@ export async function PATCH(request: Request) {
     }
 
     await expenseRef.update(updateData);
+
+    // Al marcar como pagado: crear entry de pago en cuenta corriente
+    if (updateData.status === 'paid' && expense.status !== 'paid') {
+      const vendorId =
+        expense.supplier?.vendorId ||
+        (expense.supplier?.cuit
+          ? expense.supplier.cuit.replace(/\D/g, '').slice(0, 20)
+          : `temp-${expenseId}`);
+
+      const entriesCol = db
+        .collection('schools')
+        .doc(schoolId)
+        .collection('vendorAccounts')
+        .doc(vendorId)
+        .collection('entries');
+
+      const entryRef = entriesCol.doc();
+      const entryId = entryRef.id;
+      const amount = expense.amounts?.total ?? 0;
+      const entry: Omit<VendorAccountEntry, 'id'> & { id: string } = {
+        id: entryId,
+        vendorId,
+        schoolId,
+        date: new Date().toISOString().slice(0, 10),
+        type: 'payment',
+        ref: { expenseId },
+        debit: 0,
+        credit: amount,
+        description: `Pago factura ${expense.invoice?.type || ''} ${expense.invoice?.number || ''}`,
+        createdAt: new Date().toISOString(),
+      };
+      await entryRef.set(entry);
+    }
 
     // Al confirmar: crear entry en cuenta corriente del proveedor
     if (updateData.status === 'confirmed' && expense.status === 'draft') {

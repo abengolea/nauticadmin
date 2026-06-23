@@ -80,12 +80,12 @@ export function SchoolFeeBanner() {
   if (status.isBonified || !status.inDebt) return null;
 
   return (
-    <Alert variant={status.riskSuspension ? "destructive" : "default"} className="mx-4 mb-4 md:mx-8 md:mb-6">
+    <Alert variant={status.riskSuspension ? "destructive" : "default"} className="mx-2 sm:mx-4 mb-4 md:mx-8 md:mb-6">
       <AlertTriangle className="h-4 w-4" />
       <AlertTitle>Mensualidad pendiente</AlertTitle>
       <AlertDescription>
         <span className="block mb-2">{status.message}</span>
-        <div className="flex flex-wrap gap-2 mt-2">
+        <div className="flex flex-wrap gap-2 mt-2 flex-col sm:flex-row sm:items-center">
           {status.unpaid && status.unpaid.length > 0 && (
             <Button
               size="sm"

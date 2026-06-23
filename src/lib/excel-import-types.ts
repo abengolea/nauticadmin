@@ -15,6 +15,7 @@ export const EXCEL_FIELD_MAP = {
   ubicacion: 'Ubicación',
   clienteDesde: 'Cliente Desde',
   medidas: 'Medidas',
+  lona: 'Lona',
   observaciones: 'Observaciones / Demás',
   personasAutorizadas: 'Personas autorizadas a manejar',
 } as const;

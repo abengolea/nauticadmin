@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       .get();
     const userInSchool =
       schoolUserSnap.exists &&
-      ["school_admin", "coach"].includes(
+      ["school_admin", "operador"].includes(
         (schoolUserSnap.data() as { role?: string })?.role ?? ""
       );
     const platformUserSnap = await db.doc(`platformUsers/${uid}`).get();

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -41,14 +41,38 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlatformUsersList } from "./PlatformUsersList";
 import { SuperAdminReportsTab } from "./SuperAdminReportsTab";
 
+const VALID_TABS = ["schools", "users", "reports"] as const;
+type TabValue = (typeof VALID_TABS)[number];
+
 export function SuperAdminDashboard() {
     const { data: schools, loading: schoolsLoading } = useCollection<School>('schools', { orderBy: ['createdAt', 'desc']});
     const { data: platformUsers, loading: usersLoading } = useCollection<PlatformUser>('platformUsers');
     const firestore = useFirestore();
     const { user } = useUserProfile();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { toast } = useToast();
     const [updatingSchoolId, setUpdatingSchoolId] = useState<string | null>(null);
+
+    const tabFromUrl = searchParams.get("tab");
+    const defaultTab = useMemo((): TabValue => {
+        return VALID_TABS.includes(tabFromUrl as TabValue) ? (tabFromUrl as TabValue) : "schools";
+    }, [tabFromUrl]);
+
+    const [activeTab, setActiveTab] = useState<TabValue>(defaultTab);
+
+    useEffect(() => {
+        setActiveTab(defaultTab);
+    }, [defaultTab]);
+
+    const onTabChange = useCallback((value: string) => {
+        const tab = value as TabValue;
+        setActiveTab(tab);
+        const url = new URL(window.location.href);
+        if (tab === "schools") url.searchParams.delete("tab");
+        else url.searchParams.set("tab", tab);
+        window.history.replaceState({}, "", url.pathname + url.search);
+    }, []);
 
     const isLoading = schoolsLoading || usersLoading;
 
@@ -85,9 +109,9 @@ export function SuperAdminDashboard() {
 
     return (
         <div className="flex flex-col gap-4 min-w-0">
-            <div className="flex items-center justify-between space-y-2">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight font-headline">Panel de Super Administrador</h1>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-headline">Panel de Super Administrador</h1>
                     <p className="text-muted-foreground">Gestiona todas las náuticas y usuarios de la plataforma.</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -96,7 +120,13 @@ export function SuperAdminDashboard() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Card>
+                <Card
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => onTabChange("schools")}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTabChange("schools"); } }}
+                >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Náuticas Totales</CardTitle>
                         <Building className="h-4 w-4 text-muted-foreground" />
@@ -108,7 +138,13 @@ export function SuperAdminDashboard() {
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
+                <Card
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => onTabChange("users")}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTabChange("users"); } }}
+                >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Usuarios Registrados</CardTitle>
                         <Users className="h-4 w-4 text-muted-foreground" />
@@ -120,7 +156,13 @@ export function SuperAdminDashboard() {
                         </div>
                     </CardContent>
                 </Card>
-                 <Card>
+                 <Card
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => onTabChange("users")}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTabChange("users"); } }}
+                >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Super Admins</CardTitle>
                         <ShieldCheck className="h-4 w-4 text-muted-foreground" />
@@ -134,7 +176,7 @@ export function SuperAdminDashboard() {
                 </Card>
             </div>
 
-             <Tabs defaultValue="schools" className="w-full">
+             <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
                 <TabsList className="w-full grid grid-cols-3 gap-1 p-1 h-auto md:h-10 bg-card">
                     <TabsTrigger value="schools" className="text-xs px-2 py-2 gap-1 md:text-sm md:px-3 md:py-1.5 md:gap-2">
                         <Building className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />

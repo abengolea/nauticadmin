@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
+import { Pencil, ExternalLink } from "lucide-react";
 import { EditCoachFeedbackDialog } from "@/components/players/EditCoachFeedbackDialog";
 import type { Player } from "@/lib/types";
 import { getPlayerEmbarcaciones } from "@/lib/utils";
@@ -51,7 +51,9 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
       player.ubicacion ||
       player.clienteDesde ||
       player.creditoActivo != null ||
-      (player.personasAutorizadas && player.personasAutorizadas.length > 0);
+      (player as { condicionIVA?: string }).condicionIVA ||
+      (player.personasAutorizadas && player.personasAutorizadas.length > 0) ||
+      (player as { documentacion?: string }).documentacion;
     const showEmbarcacionCard = hasNautico || onEditEmbarcacion;
 
     const displayFeedback =
@@ -149,6 +151,12 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                                     <TableCell className="text-right">{emb.medidas}</TableCell>
                                   </TableRow>
                                 )}
+                                {emb.lona && (
+                                  <TableRow key={`emb-${idx}-lona`}>
+                                    <TableCell className="font-medium text-muted-foreground">Lona</TableCell>
+                                    <TableCell className="text-right">{emb.lona}</TableCell>
+                                  </TableRow>
+                                )}
                                 {emb.claseId && (
                                   <TableRow key={`emb-${idx}-clase`}>
                                     <TableCell className="font-medium text-muted-foreground">Clase (canon)</TableCell>
@@ -188,6 +196,12 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                                     <TableCell className="text-right">{player.creditoActivo ? "Sí" : "No"}</TableCell>
                                 </TableRow>
                             )}
+                            {(player as { condicionIVA?: string }).condicionIVA && (
+                                <TableRow>
+                                    <TableCell className="font-medium text-muted-foreground">Condición IVA</TableCell>
+                                    <TableCell className="text-right">{(player as { condicionIVA: string }).condicionIVA}</TableCell>
+                                </TableRow>
+                            )}
                             {serviciosAdicionales.length > 0 && (
                                 <>
                                   <TableRow>
@@ -215,6 +229,22 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                                         {Array.isArray(player.personasAutorizadas)
                                           ? player.personasAutorizadas.join(", ")
                                           : String(player.personasAutorizadas)}
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {(player as { documentacion?: string }).documentacion && (
+                                <TableRow>
+                                    <TableCell className="font-medium text-muted-foreground">Documentación</TableCell>
+                                    <TableCell className="text-right">
+                                        <a
+                                            href={(player as { documentacion: string }).documentacion}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                                        >
+                                            Ver en Google Drive
+                                            <ExternalLink className="h-3.5 w-3.5" />
+                                        </a>
                                     </TableCell>
                                 </TableRow>
                             )}

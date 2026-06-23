@@ -5,7 +5,7 @@ import { useUserProfile, useUser } from "@/firebase";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { FileSpreadsheet, CheckCircle2, Banknote, Loader2, GitMerge } from "lucide-react";
+import { FileSpreadsheet, Banknote, Loader2, GitMerge, Info, ChevronDown, ChevronUp } from "lucide-react";
 import { ReconciliationImport } from "@/components/reconciliation/ReconciliationImport";
 import { ReconciliationReview } from "@/components/reconciliation/ReconciliationReview";
 import { ImportAliasesFromExcel } from "@/components/payments/ImportAliasesFromExcel";
@@ -24,6 +24,18 @@ import type {
   ColumnMapping,
 } from "@/lib/reconciliacion-excel/types";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ReconciliationPage() {
   const { profile, isReady, activeSchoolId } = useUserProfile();
@@ -37,6 +49,7 @@ export default function ReconciliationPage() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [results, setResults] = useState<ReconciliationResult[] | null>(null);
   const [reconciling, setReconciling] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const schoolId = activeSchoolId ?? "";
   const canAccess = profile?.role === "school_admin" && !!schoolId;
@@ -136,7 +149,7 @@ export default function ReconciliationPage() {
     if (!user) return;
     const token = await user.getIdToken();
     const res = await fetch(
-      `/api/reconciliacion-excel/relations?schoolId=${encodeURIComponent(schoolId)}`,
+      `/api/reconciliation/payer-mappings?schoolId=${encodeURIComponent(schoolId)}&targetType=account`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     if (res.ok) {
@@ -169,6 +182,54 @@ export default function ReconciliationPage() {
       <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">
         Conciliación de Pagos
       </h1>
+
+      <Collapsible open={infoOpen} onOpenChange={setInfoOpen}>
+        <Alert className="border-muted bg-muted/30">
+          <Info className="h-4 w-4" />
+          <div className="flex-1 space-y-1">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2 text-left font-medium hover:underline focus:outline-none focus:underline"
+              >
+                <span>¿Por qué hay dos opciones? (Excel/CSV vs Formato banco)</span>
+                {infoOpen ? (
+                  <ChevronUp className="h-4 w-4 shrink-0 opacity-70" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                )}
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <AlertDescription asChild>
+                <div className="mt-3 space-y-4 text-sm text-muted-foreground">
+                  <div>
+                    <p className="font-medium text-foreground">Excel / CSV</p>
+                    <p>
+                      Para archivos genéricos de cualquier origen: home banking, planillas propias, exportaciones de tarjetas, etc.
+                      Subís dos archivos: uno con relaciones (Cuenta ↔ Pagador) y otro con los pagos. Mapeás las columnas manualmente
+                      y el sistema concilia con matching exacto y fuzzy. Los resultados se guardan en auditoría. Ideal cuando cada
+                      banco o proveedor exporta en formato distinto.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Formato banco</p>
+                    <p>
+                      Para archivos en el formato estándar del banco: dos Excel (Clientes + Pagos) con estructura predefinida.
+                      El sistema importa, hace matching automático y te pide confirmar o asignar manualmente los casos dudosos.
+                      Los datos se persisten en Firestore. Ideal cuando ya tenés plantillas o exports recurrentes en ese formato.
+                    </p>
+                  </div>
+                  <p className="text-xs border-t pt-3">
+                    <strong>Auditoría:</strong> En Excel/CSV cada conciliación se registra en recExcelAudit. En Formato banco,
+                    los matches y alias se guardan en recMatches y recPayerAliases para trazabilidad.
+                  </p>
+                </div>
+              </AlertDescription>
+            </CollapsibleContent>
+          </div>
+        </Alert>
+      </Collapsible>
 
       <Tabs
         value={tab}
@@ -206,25 +267,46 @@ export default function ReconciliationPage() {
             onMappingReady={handleMappingReady}
           />
 
+          <p className="text-sm text-muted-foreground">
+            Con relaciones y pagos cargados, ejecutá la conciliación. Si ya tenés relaciones guardadas, podés cargarlas sin subir el archivo de nuevo.
+          </p>
           <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={handleConciliar}
-              disabled={
-                reconciling ||
-                relations.length === 0 ||
-                payments.length === 0
-              }
-            >
-              {reconciling ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <GitMerge className="h-4 w-4 mr-2" />
-              )}
-              Conciliar
-            </Button>
-            <Button variant="outline" size="sm" onClick={loadStoredRelations}>
-              Cargar relaciones guardadas
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleConciliar}
+                    disabled={
+                      reconciling ||
+                      relations.length === 0 ||
+                      payments.length === 0
+                    }
+                  >
+                    {reconciling ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <GitMerge className="h-4 w-4 mr-2" />
+                    )}
+                    Conciliar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Ejecuta el matching entre pagos y relaciones.</p>
+                  <p className="text-xs mt-1">Usa coincidencia exacta y fuzzy (Jaro-Winkler).</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={loadStoredRelations}>
+                    Cargar relaciones guardadas
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Trae las relaciones que guardaste antes.</p>
+                  <p className="text-xs mt-1">Útil si no subís el archivo de relaciones en esta sesión.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
           {results && results.length > 0 && (

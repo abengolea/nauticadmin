@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
-    const limit = Math.min(parseInt(searchParams.get('limit') ?? '100', 10) || 100, 500);
+    const limit = Math.min(parseInt(searchParams.get('limit') ?? '500', 10) || 500, 500);
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId requerido' }, { status: 400 });

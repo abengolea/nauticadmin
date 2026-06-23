@@ -187,10 +187,10 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="w-full max-w-sm shadow-2xl border-2">
+    <Card className="w-full max-w-sm min-w-0 shadow-2xl border-2 mx-auto">
       <CardHeader>
-        <div className="flex items-center justify-between">
-            <CardTitle className="text-2xl font-headline">Iniciar Sesión</CardTitle>
+        <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-xl sm:text-2xl font-headline truncate">Iniciar Sesión</CardTitle>
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>

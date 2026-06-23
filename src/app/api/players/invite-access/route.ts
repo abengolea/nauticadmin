@@ -1,7 +1,7 @@
 /**
  * POST /api/players/invite-access
  * Crea cuentas de Firebase Auth (si no existen) y envía email con link para crear contraseña.
- * Solo school_admin o coach de la escuela.
+ * Solo school_admin u operador de la escuela.
  */
 
 import { NextResponse } from "next/server";
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     const role = (schoolUserSnap.data() as { role?: string })?.role;
-    if (role !== "school_admin" && role !== "coach") {
+    if (role !== "school_admin" && role !== "operador") {
       return NextResponse.json(
         { error: "Solo el administrador o entrenador puede enviar invitaciones" },
         { status: 403 }

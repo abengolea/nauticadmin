@@ -10,7 +10,15 @@ import { NextResponse } from 'next/server';
 import { getAdminFirestore } from '@/lib/firebase-admin';
 import { verifyIdToken } from '@/lib/auth-server';
 import { createNextVoucher } from '@/lib/afip/wsfe';
-import { generarFacturaPDF } from '@/lib/factura-pdf';
+import { runWithAfipSession } from '@/lib/afip/session';
+import { generarFactura } from '@/lib/factura-pdf';
+import {
+  loadSchoolFacturacion,
+  facturacionToEmisor,
+  facturacionToAfipSession,
+  getPtoVta,
+  getCbteTipo,
+} from '@/lib/school-facturacion';
 import { COLLECTIONS } from '@/lib/payments/constants';
 import { z } from 'zod';
 
@@ -27,6 +35,14 @@ function toDate(val: unknown): Date {
   if (typeof t?.toDate === 'function') return t.toDate();
   if (typeof val === 'string') return new Date(val);
   return new Date();
+}
+
+/** Mapea condicionIVA del cliente a CondIVAReceptor AFIP (RG 5616). 5=Consumidor Final, 1=RI, 6=Monotributo */
+function condicionIVAtoAfipId(condicionIVA: string | undefined): number {
+  const v = (condicionIVA ?? '').trim();
+  if (v === 'Responsable Inscripto') return 1;
+  if (v === 'Monotributista') return 6;
+  return 5; // Consumidor Final por defecto
 }
 
 export async function POST(request: Request) {
@@ -49,6 +65,12 @@ export async function POST(request: Request) {
 
     const db = getAdminFirestore();
 
+    const facturacion = await loadSchoolFacturacion(db, schoolId);
+    const afipSession = facturacionToAfipSession(facturacion);
+    const emisor = facturacionToEmisor(facturacion);
+    const ptoVta = getPtoVta(facturacion);
+    const cbteTipo = getCbteTipo(facturacion);
+
     // Verificar acceso a la escuela
     const schoolUserSnap = await db
       .collection('schools')
@@ -60,10 +82,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Sin acceso a esta escuela' }, { status: 403 });
     }
 
-    console.log('[emit-batch] cwd:', process.cwd(), '| facturas:', path.resolve(process.cwd(), 'facturas'));
+    console.log('[emit-batch] emisor:', emisor.razonSocial, emisor.cuit, '| ptoVta:', ptoVta);
 
-    const ptoVta = parseInt(process.env.AFIP_PTO_VTA ?? '1', 10) || 1;
-    const cbteTipo = parseInt(process.env.AFIP_CBTE_TIPO ?? '6', 10) || 6;
     const fecha = new Date();
     const fechaStr = fecha.toISOString().slice(0, 10);
     const cbteFch =
@@ -71,12 +91,7 @@ export async function POST(request: Request) {
       (fecha.getMonth() + 1) * 100 +
       fecha.getDate();
 
-    const emisor = {
-      razonSocial: process.env.AFIP_RAZON_SOCIAL ?? 'NOTIFICAS S. R. L.',
-      cuit: process.env.AFIP_CUIT ?? '33-71729868-9',
-      domicilio: process.env.AFIP_DOMICILIO ?? 'Av. Corrientes 1234, CABA',
-      condicionIVA: 'Responsable Inscripto',
-    };
+    const cbteTipoLabel = cbteTipo === 11 ? 'FACTURA C' : 'FACTURA B';
 
     const results: Array<{
       paymentId: string;
@@ -84,17 +99,23 @@ export async function POST(request: Request) {
       voucherNumber?: number;
       CAE?: string;
       pdfPath?: string;
+      filename?: string;
       error?: string;
     }> = [];
 
     let nextVoucherNumber = 1;
     if (!simulation) {
       try {
-        const { getLastVoucher } = await import('@/lib/afip/wsfe');
-        nextVoucherNumber = (await getLastVoucher(ptoVta, cbteTipo)) + 1;
+        await runWithAfipSession(afipSession, async () => {
+          const { getLastVoucher } = await import('@/lib/afip/wsfe');
+          nextVoucherNumber = (await getLastVoucher(ptoVta, cbteTipo)) + 1;
+        });
       } catch {
         return NextResponse.json(
-          { error: 'No se pudo conectar con AFIP. ¿Configuraste certificados y AFIP_CUIT?' },
+          {
+            error:
+              'No se pudo conectar con AFIP. Verificá certificados de Notificas SRL y la delegación de Yaguaron en ARCA.',
+          },
           { status: 500 }
         );
       }
@@ -194,66 +215,94 @@ export async function POST(request: Request) {
             continue;
           }
 
-          const result = await createNextVoucher({
-            PtoVta: ptoVta,
-            CbteTipo: cbteTipo,
-            Concepto: 2,
-            DocTipo: isCuit ? 80 : 96,
-            DocNro: docNro,
-            CbteFch: cbteFch,
-            ImpTotal: impTotal,
-            ImpTotConc: 0,
-            ImpNeto: impNeto,
-            ImpOpEx: 0,
-            ImpIVA: impIva,
-            ImpTrib: 0,
-            MonId: currency === 'USD' ? 'DOL' : 'PES',
-            MonCotiz: 1,
-            CondIVAReceptor: 5,
-            Iva: [{ Id: 5, BaseImp: impNeto, Importe: impIva }],
-          });
+          const condIvaReceptor = condicionIVAtoAfipId(playerData?.condicionIVA);
+
+          const result = await runWithAfipSession(afipSession, () =>
+            createNextVoucher({
+              PtoVta: ptoVta,
+              CbteTipo: cbteTipo,
+              Concepto: 2,
+              DocTipo: isCuit ? 80 : 96,
+              DocNro: docNro,
+              CbteFch: cbteFch,
+              ImpTotal: impTotal,
+              ImpTotConc: 0,
+              ImpNeto: impNeto,
+              ImpOpEx: 0,
+              ImpIVA: impIva,
+              ImpTrib: 0,
+              MonId: currency === 'USD' ? 'DOL' : 'PES',
+              MonCotiz: 1,
+              CondIVAReceptor: condIvaReceptor,
+              Iva: [{ Id: 5, BaseImp: impNeto, Importe: impIva }],
+            })
+          );
           voucherNumber = result.voucherNumber;
           cae = result.CAE;
           caeVto = result.CAEFchVto;
         }
 
+        const metadata = (pData.metadata ?? {}) as { concept?: string };
         const concepto =
           period === 'inscripcion'
             ? 'Derecho de inscripción'
             : period.startsWith('ropa-')
               ? `Cuota de indumentaria (${period})`
-              : `Cuota ${period}`;
+              : period.startsWith('extra-') && metadata.concept
+                ? metadata.concept
+                : `Cuota ${period}`;
 
-        const pdfPath = await generarFacturaPDF({
-          emisor,
-          tipoComprobante: 'FACTURA B',
-          puntoVenta: ptoVta,
-          numero: voucherNumber,
-          fecha: fechaStr,
-          receptor: {
-            razonSocial: playerName,
-            cuit: String(docReceptor),
-            domicilio: '-',
-            condicionIVA: 'Consumidor Final',
-          },
-          items: [
-            {
-              descripcion: concepto,
-              cantidad: 1,
-              precioUnitario: impNeto,
-              importe: impNeto,
+        const pdfPath = await generarFactura({
+          datos: {
+            emisor,
+            tipoComprobante: cbteTipoLabel,
+            puntoVenta: ptoVta,
+            numero: voucherNumber,
+            fecha: fechaStr,
+            receptor: {
+              razonSocial: playerName,
+              cuit: String(docReceptor),
+              domicilio: '-',
+              condicionIVA: playerData?.condicionIVA?.trim() || 'Consumidor Final',
             },
-          ],
-          subtotal: impNeto,
-          iva21: impIva,
-          total: impTotal,
-          CAE: cae,
-          CAEFchVto: caeVto,
-          tipoDocReceptor,
-          simulacion: simulation,
+            items: [
+              {
+                descripcion: concepto,
+                cantidad: 1,
+                precioUnitario: impNeto,
+                importe: impNeto,
+              },
+            ],
+            subtotal: impNeto,
+            iva21: impIva,
+            total: impTotal,
+            CAE: cae,
+            CAEFchVto: caeVto,
+            tipoDocReceptor,
+            simulacion: simulation,
+          },
+          schoolId,
+          facturacion,
         });
 
         const filename = path.basename(pdfPath);
+
+        // Marcar pago como facturado
+        const now = new Date();
+        const paymentUpdate: Record<string, unknown> = {
+          facturado: true,
+          facturadoAt: now,
+          facturaNumero: voucherNumber,
+          facturaPtoVta: ptoVta,
+          facturaFecha: fechaStr,
+          facturaTipo: cbteTipoLabel,
+        };
+        if (!simulation && cae) {
+          paymentUpdate.CAE = cae;
+          paymentUpdate.CAEFchVto = caeVto;
+        }
+        await paymentsCol.doc(paymentId).update(paymentUpdate);
+
         results.push({
           paymentId,
           ok: true,
@@ -275,6 +324,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       simulation,
+      emisor: { razonSocial: emisor.razonSocial, cuit: emisor.cuit, ptoVta },
       total: results.length,
       processed: okCount,
       failed: failCount,

@@ -65,7 +65,7 @@ const improveFlow = ai.defineFlow(
     const modelName = await getAvailableGeminiModel();
     if (!modelName) {
       throw new Error(
-        'No se encontró ningún modelo Gemini disponible. Verificá GEMINI_API_KEY en .env.local (API key de https://aistudio.google.com/apikey).'
+        'No se encontró ningún modelo Gemini disponible. Verificá GEMINI_API_KEY en las variables de entorno (local: .env.local; producción: App Hosting secrets). Obtenerla en: https://aistudio.google.com/apikey'
       );
     }
     const { output } = await improvePrompt(input, {
@@ -127,7 +127,7 @@ const improveRubricFlow = ai.defineFlow(
     const modelName = await getAvailableGeminiModel();
     if (!modelName) {
       throw new Error(
-        'No se encontró ningún modelo Gemini disponible. Verificá GEMINI_API_KEY en .env.local.'
+        'No se encontró ningún modelo Gemini disponible. Verificá GEMINI_API_KEY en las variables de entorno.'
       );
     }
     const { output } = await improveRubricPrompt(input, {
