@@ -119,10 +119,24 @@ service cloud.firestore {
     }
 
     // Solicitudes de acceso: usuario logueado sin perfil pide ser dado de alta como jugador.
+    // Solo staff (platformUsers) y super admin pueden listar/revisar; el solicitante puede leer la suya.
+    function canReviewAccessRequests() {
+      return isSuperAdmin()
+        || (isSignedIn()
+          && exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid)));
+    }
+
     match /accessRequests/{requestId} {
-      allow create: if isSignedIn();
-      allow read, update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow get: if isSignedIn() && (
+        resource.data.uid == request.auth.uid
+        || canReviewAccessRequests()
+      );
+      allow list: if canReviewAccessRequests();
+      allow update: if canReviewAccessRequests();
+      allow delete: if isSuperAdmin();
     }
 
     // Jugadores: mapa email (doc id) -> schoolId + playerId para que el jugador pueda iniciar sesión sin collection group.

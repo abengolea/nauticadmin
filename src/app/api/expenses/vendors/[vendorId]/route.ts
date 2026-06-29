@@ -150,6 +150,8 @@ export async function PATCH(
         email: updates.email,
         address: updates.address,
         cuentaCorrienteHabilitada: updates.cuentaCorrienteHabilitada ?? true,
+        externalCode: updates.externalCode,
+        creditDays: updates.creditDays,
         defaultCategoryId: updates.defaultCategoryId,
         notes: updates.notes,
         createdAt: now,

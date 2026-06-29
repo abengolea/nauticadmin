@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExpenseCapture } from '@/components/expenses/ExpenseCapture';
 import { ExpenseConfirmDialog } from '@/components/expenses/ExpenseConfirmDialog';
 import { VendorPaymentDialog } from '@/components/expenses/VendorPaymentDialog';
-import { Pencil, Plus, List, TrendingUp, ExternalLink, Filter, Banknote, Trash2, Receipt, Wallet, Download, FileText, FileSpreadsheet, ChevronDown, Loader2 } from 'lucide-react';
+import { Pencil, Plus, List, ExternalLink, Filter, Banknote, Trash2, Receipt, Wallet, Download, FileText, FileSpreadsheet, ChevronDown, Loader2, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -30,6 +30,7 @@ import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Expense } from '@/lib/expenses/types';
 import type { AIExtractedExpense } from '@/lib/expenses/schemas';
+import { VendorsTab } from '@/components/expenses/VendorsTab';
 
 export default function ExpensesPage() {
   const { toast } = useToast();
@@ -243,9 +244,9 @@ export default function ExpensesPage() {
             <Plus className="h-4 w-4 mr-2" />
             Cargar factura
           </TabsTrigger>
-          <TabsTrigger value="accounts">
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Cuentas corrientes
+          <TabsTrigger value="vendors">
+            <Users className="h-4 w-4 mr-2" />
+            Proveedores
           </TabsTrigger>
         </TabsList>
 
@@ -262,6 +263,7 @@ export default function ExpensesPage() {
             supplierFilter={supplierFilter}
             onSupplierChange={setSupplierFilter}
             expenses={expenses}
+            schoolId={schoolId}
             onRefresh={fetchExpenses}
           />
 
@@ -299,11 +301,8 @@ export default function ExpensesPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="accounts" className="mt-4">
-          <p className="text-muted-foreground mb-4">
-            Seleccioná un proveedor para ver su cuenta corriente.
-          </p>
-          <VendorAccountsList schoolId={schoolId} />
+        <TabsContent value="vendors" className="mt-4">
+          <VendorsTab schoolId={schoolId} />
         </TabsContent>
       </Tabs>
 
@@ -461,6 +460,7 @@ function ExpenseListFilters({
   showArchived,
   onShowArchivedChange,
   expenses,
+  schoolId,
   onRefresh,
 }: {
   statusFilter: string;
@@ -474,14 +474,37 @@ function ExpenseListFilters({
   showArchived: boolean;
   onShowArchivedChange: (v: boolean) => void;
   expenses: Expense[];
+  schoolId: string;
   onRefresh: () => void;
 }) {
+  const [catalogSuppliers, setCatalogSuppliers] = useState<[string, string][]>([]);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    const load = async () => {
+      const user = getAuth().currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/expenses/vendors?schoolId=${schoolId}&limit=2000`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setCatalogSuppliers(
+        (data.vendors ?? [])
+          .filter((v: { name?: string }) => v.name?.trim())
+          .map((v: { name: string }) => [v.name.trim(), v.name.trim()] as [string, string])
+      );
+    };
+    load();
+  }, [schoolId]);
+
+  const expenseSuppliers = expenses
+    .filter((e) => e.supplier?.name?.trim())
+    .map((e) => [e.supplier!.name!.trim(), e.supplier!.name!.trim()] as [string, string]);
+
   const suppliers = Array.from(
-    new Map(
-      expenses
-        .filter((e) => e.supplier?.name?.trim())
-        .map((e) => [e.supplier!.name!.trim(), e.supplier!.name!.trim()])
-    ).entries()
+    new Map([...catalogSuppliers, ...expenseSuppliers]).entries()
   ).sort((a, b) => (a[1] ?? '').localeCompare(b[1] ?? ''));
 
   const years = Array.from(
@@ -997,54 +1020,5 @@ function ExpenseRow({
         </Button>
       </td>
     </tr>
-  );
-}
-
-function VendorAccountsList({ schoolId }: { schoolId: string }) {
-  const [vendors, setVendors] = useState<Array<{ id: string; name: string }>>([]);
-
-  // Por ahora extraemos proveedores únicos de los gastos
-  const loadVendors = async () => {
-    const user = getAuth().currentUser;
-    if (!user) return;
-    const token = await user.getIdToken();
-    const res = await fetch(`/api/expenses?schoolId=${schoolId}&limit=200`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    const seen = new Map<string, string>();
-    for (const e of data.expenses ?? []) {
-      const vid = e.supplier?.vendorId || e.supplier?.cuit?.replace(/\D/g, '') || e.supplier?.name;
-      if (vid && !seen.has(vid)) {
-        seen.set(vid, e.supplier?.name || vid);
-      }
-    }
-    setVendors(Array.from(seen.entries()).map(([id, name]) => ({ id, name })));
-  };
-
-  return (
-    <div className="space-y-2">
-      <Button variant="outline" size="sm" onClick={loadVendors}>
-        Cargar proveedores
-      </Button>
-      {vendors.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {vendors.map((v) => (
-            <Button
-              key={v.id}
-              variant="outline"
-              size="sm"
-              asChild
-            >
-              <a href={`/dashboard/expenses/vendor/${v.id}?schoolId=${schoolId}`}>
-                {v.name}
-                <ExternalLink className="h-3 w-3 ml-1" />
-              </a>
-            </Button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }

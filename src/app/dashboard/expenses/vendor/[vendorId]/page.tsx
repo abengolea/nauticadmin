@@ -117,6 +117,12 @@ export default function VendorAccountPage() {
   const [editMode, setEditMode] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
+  useEffect(() => {
+    if (searchParams.get('action') === 'payment') {
+      setPaymentDialogOpen(true);
+    }
+  }, [searchParams]);
+
   const loadAccount = useCallback(async () => {
     if (!schoolId || !vendorId) return;
     const user = getAuth().currentUser;

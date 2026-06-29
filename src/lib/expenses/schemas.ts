@@ -210,8 +210,30 @@ export const updateVendorSchema = z.object({
   email: z.string().optional(),
   address: z.string().optional(),
   cuentaCorrienteHabilitada: z.boolean().optional(),
+  externalCode: z.string().optional(),
+  creditDays: z.number().int().nonnegative().optional(),
   defaultCategoryId: z.string().optional(),
   notes: z.string().optional(),
+});
+
+/** Request para importar proveedores desde Excel */
+export const importVendorsSchema = z.object({
+  schoolId: z.string().min(1),
+  vendors: z
+    .array(
+      z.object({
+        vendorId: z.string().min(1),
+        name: z.string().min(1),
+        cuit: z.string().optional(),
+        address: z.string().optional(),
+        ivaCondition: z.string().optional(),
+        cuentaCorrienteHabilitada: z.boolean().optional(),
+        externalCode: z.string().optional(),
+        creditDays: z.number().int().nonnegative().optional(),
+      })
+    )
+    .min(1)
+    .max(2000),
 });
 
 /** Request para registrar pago */

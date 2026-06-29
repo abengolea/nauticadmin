@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useAuth, useUser, useUserProfile, useCollection } from "@/firebase";
+import { useAuth, useUserProfile, useCollection } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import Link from "next/link";
@@ -20,20 +20,20 @@ import { Badge } from "@/components/ui/badge";
 import { useClientSearch } from "@/context/ClientSearchContext";
 
 export function Header() {
-  const { user } = useUser();
   const auth = useAuth();
   const router = useRouter();
   const { searchQuery, setSearchQuery } = useClientSearch();
-  const { isReady, activeSchoolId, profile } = useUserProfile();
+  const { isReady, activeSchoolId, profile, isSuperAdmin, user } = useUserProfile();
   // Solo staff (school_admin u operador) puede listar jugadores y pendingPlayers; nunca listar si es jugador.
   const isStaff = profile?.role === "school_admin" || profile?.role === "operador";
   const canListSchoolCollections = isReady && activeSchoolId && isStaff;
+  const canListAccessRequests = isReady && !!user && (isStaff || isSuperAdmin);
   const { data: pendingPlayers } = useCollection(
     canListSchoolCollections ? `schools/${activeSchoolId}/pendingPlayers` : "",
     {}
   );
   const { data: accessRequests } = useCollection(
-    isReady ? "accessRequests" : "",
+    canListAccessRequests ? "accessRequests" : "",
     { where: ["status", "==", "pending"] }
   );
   const solicitudesCount = (pendingPlayers?.length ?? 0) + (accessRequests?.length ?? 0);

@@ -51,13 +51,16 @@ import { es } from "date-fns/locale";
 type ActionState = { type: "approving" | "rejecting"; requestId: string } | null;
 
 export function AccessRequestsList() {
-  const { profile, activeSchoolId, isReady } = useUserProfile();
+  const { profile, activeSchoolId, isReady, isSuperAdmin, user } = useUserProfile();
   const { toast } = useToast();
   const firestore = useFirestore();
 
+  const isStaff = profile?.role === "school_admin" || profile?.role === "operador";
+  const canListAccessRequests = isReady && !!user && (isStaff || isSuperAdmin);
+
   // Solo se muestran solicitudes pendientes; todas las registraciones son de tipo "player"
   const { data: requests, loading, error } = useCollection<AccessRequest>(
-    isReady ? "accessRequests" : "",
+    canListAccessRequests ? "accessRequests" : "",
     { where: ["status", "==", "pending"], limit: 50 }
   );
 

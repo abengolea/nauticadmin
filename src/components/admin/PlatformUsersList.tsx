@@ -20,7 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Loader2, Shield, ShieldOff, Building2 } from "lucide-react";
+import { MoreHorizontal, Loader2, Shield, ShieldOff, Building2, KeyRound } from "lucide-react";
+import { CreateSchoolAdminDialog } from "./CreateSchoolAdminDialog";
+import { ResetUserPasswordDialog } from "./ResetUserPasswordDialog";
 import { useCollection, useFirestore, useUserProfile } from "@/firebase";
 import { doc, updateDoc, collectionGroup, getDocs, collection } from "firebase/firestore";
 import type { PlatformUser, School, SchoolUser } from "@/lib/types";
@@ -64,6 +66,7 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
     const { toast } = useToast();
     
     const [actionToConfirm, setActionToConfirm] = useState<UserAction | null>(null);
+    const [passwordResetUser, setPasswordResetUser] = useState<PlatformUser | null>(null);
     const [isUpdating, setIsUpdating] = useState(false);
     const [selectedSchoolId, setSelectedSchoolId] = useState<string>("all");
 
@@ -171,21 +174,24 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
     return (
         <>
         <div className="flex flex-col gap-4 pb-4 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-                <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                <Select value={selectedSchoolId} onValueChange={setSelectedSchoolId}>
-                    <SelectTrigger className="w-full max-w-[280px] min-w-0">
-                        <SelectValue placeholder="Filtrar por escuela" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todas las escuelas</SelectItem>
-                        {schools?.map((school) => (
-                            <SelectItem key={school.id} value={school.id}>
-                                {school.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Select value={selectedSchoolId} onValueChange={setSelectedSchoolId}>
+                        <SelectTrigger className="w-full max-w-[280px] min-w-0">
+                            <SelectValue placeholder="Filtrar por escuela" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todas las escuelas</SelectItem>
+                            {schools?.map((school) => (
+                                <SelectItem key={school.id} value={school.id}>
+                                    {school.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <CreateSchoolAdminDialog schools={schools ?? []} defaultSchoolId={selectedSchoolId} />
             </div>
         </div>
         <Table className="min-w-[480px]">
@@ -259,7 +265,11 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuLabel>Acciones de Rol</DropdownMenuLabel>
+                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                        <DropdownMenuItem onSelect={() => setPasswordResetUser(user)}>
+                                            <KeyRound className="mr-2 h-4 w-4" />
+                                            Cambiar contraseña
+                                        </DropdownMenuItem>
                                         {user.super_admin ? (
                                             <DropdownMenuItem
                                                 className="text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -287,6 +297,12 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
                     {selectedSchoolId === "all" ? "No hay usuarios en la plataforma." : "No hay usuarios asignados a esta escuela."}
                 </p>
             )}
+
+            <ResetUserPasswordDialog
+                user={passwordResetUser}
+                open={!!passwordResetUser}
+                onOpenChange={(open) => !open && setPasswordResetUser(null)}
+            />
 
             <AlertDialog open={!!actionToConfirm} onOpenChange={(open) => !open && setActionToConfirm(null)}>
                 <AlertDialogContent>

@@ -21,7 +21,7 @@ Las variables de Firebase están definidas en `apphosting.yaml`. La API key se i
 
 ## Scripts
 
-- `npm run dev` — Desarrollo (puerto 9002)
+- `npm run dev` — Desarrollo (puerto 9003)
 - `npm run build` — Build de producción
 - `npm run lint` — Linter
 - `npm run typecheck` — Verificación TypeScript

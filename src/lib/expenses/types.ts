@@ -118,6 +118,10 @@ export interface ExpenseVendor {
   address?: string;
   /** Si la cuenta corriente está habilitada para este proveedor */
   cuentaCorrienteHabilitada?: boolean;
+  /** Código interno del sistema contable (ej. listado de proveedores) */
+  externalCode?: string;
+  /** Días de crédito acordados */
+  creditDays?: number;
   defaultCategoryId?: string;
   notes?: string;
   createdAt?: string;
