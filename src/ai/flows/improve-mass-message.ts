@@ -1,7 +1,7 @@
 'use server';
 /**
  * Flujo de Genkit para ayudar a redactar el asunto y el cuerpo de un mensaje masivo
- * a jugadores (chicos) de la escuela. Mejora tono, claridad y brevedad.
+ * a clientes de la náutica. Mejora tono, claridad y brevedad.
  * Usa el primer modelo Gemini disponible con tu API key (evita NOT_FOUND por región/cuenta).
  */
 
@@ -17,7 +17,7 @@ const ImproveMassMessageInputSchema = z.object({
 
 const ImproveMassMessageOutputSchema = z.object({
   subject: z.string().describe('Asunto mejorado, breve y claro.'),
-  body: z.string().describe('Cuerpo del mensaje mejorado: claro, cordial y apropiado para familias/jugadores.'),
+  body: z.string().describe('Cuerpo del mensaje mejorado: claro, cordial y apropiado para clientes.'),
 });
 
 export type ImproveMassMessageInput = z.infer<typeof ImproveMassMessageInputSchema>;
@@ -34,7 +34,7 @@ const improveMassMessagePrompt = ai.definePrompt({
   input: { schema: ImproveMassMessageInputSchema },
   output: { schema: ImproveMassMessageOutputSchema },
   prompt: `
-Eres un asistente de comunicación de la Escuela de Fútbol de River Plate. Tu tarea es redactar o mejorar un mensaje que el administrador de la escuela enviará por correo a los jugadores (chicos) y sus familias.
+Eres un asistente de comunicación de la NauticAdmin. Tu tarea es redactar o mejorar un mensaje que el administrador de la náutica enviará por correo a los clientes de la náutica.
 
 **Asunto actual (puede estar vacío):**
 {{subject}}
@@ -44,8 +44,8 @@ Eres un asistente de comunicación de la Escuela de Fútbol de River Plate. Tu t
 
 **Instrucciones:**
 - Genera un asunto breve (máximo una línea) y un cuerpo de mensaje claro y cordial.
-- Tono: cercano, profesional y apropiado para familias y chicos (evitar jerga administrativa).
-- Si el borrador está vacío, sugiere un mensaje genérico de novedades o recordatorio (por ejemplo próximo entrenamiento, aviso importante).
+- Tono: cercano, profesional y apropiado para clientes (evitar jerga administrativa).
+- Si el borrador está vacío, sugiere un mensaje genérico de novedades o recordatorio (por ejemplo aviso importante, mantenimiento o pagos).
 - Si ya hay texto, mejora redacción, ortografía y estructura sin cambiar el sentido; puedes acortar o expandir un poco si mejora la claridad.
 - El cuerpo debe ser texto plano, con párrafos separados por líneas en blanco; no uses listas con viñetas a menos que sea muy útil.
 - Responde únicamente en español.

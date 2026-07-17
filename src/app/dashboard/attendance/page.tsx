@@ -25,7 +25,7 @@ export default function AttendancePage() {
           Planilla de asistencia
         </h1>
         <p className="text-muted-foreground">
-          No tenés una escuela seleccionada. Elegí una sede en Ajustes.
+          No tenés una náutica seleccionada. Elegí una sede en Ajustes.
         </p>
       </div>
     );
@@ -40,7 +40,7 @@ export default function AttendancePage() {
             Planilla de asistencia
           </h1>
           <p className="text-muted-foreground">
-            Marcá los jugadores que faltaron al entrenamiento.
+            Marcá los clientes que faltaron al entrenamiento.
           </p>
         </div>
       </div>

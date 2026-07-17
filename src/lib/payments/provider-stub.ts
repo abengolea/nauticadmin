@@ -20,7 +20,7 @@ export interface CreateIntentParams {
   period: string;
   amount: number;
   currency: string;
-  /** Access token de Mercado Pago de la escuela (OAuth por escuela). Obligatorio si provider === 'mercadopago'. */
+  /** Access token de Mercado Pago de la náutica (OAuth por náutica). Obligatorio si provider === 'mercadopago'. */
   mercadopagoAccessToken?: string | null;
 }
 
@@ -34,7 +34,7 @@ export async function createPaymentIntentWithProvider(
 ): Promise<CreateIntentResult> {
   if (provider === 'mercadopago') {
     if (!params.mercadopagoAccessToken) {
-      throw new Error('La escuela no tiene Mercado Pago conectado. Conectá tu cuenta en Administración → Pagos → Configuración.');
+      throw new Error('La náutica no tiene Mercado Pago conectado. Conectá tu cuenta en Administración → Pagos → Configuración.');
     }
     const { init_point, preference_id } = await createMercadoPagoPreference(
       params.mercadopagoAccessToken,

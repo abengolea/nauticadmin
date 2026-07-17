@@ -15,7 +15,7 @@ import type { Firestore } from "firebase/firestore";
 import type { Attendance, Training } from "./types";
 import { format } from "date-fns";
 
-/** Obtiene el entrenamiento del día para una escuela */
+/** Obtiene el entrenamiento del día para una náutica */
 export async function getTrainingByDate(
   firestore: Firestore,
   schoolId: string,
@@ -40,7 +40,7 @@ export async function getTrainingByDate(
   };
 }
 
-/** Obtiene la asistencia de todos los jugadores para un entrenamiento */
+/** Obtiene la asistencia de todos los clientes para un entrenamiento */
 export async function getAttendanceForTraining(
   firestore: Firestore,
   schoolId: string,
@@ -106,7 +106,7 @@ export async function saveAttendance(
   return trainingId;
 }
 
-/** Historial de asistencia de un jugador (sin collectionGroup, evita índices compuestos) */
+/** Historial de asistencia de un cliente (sin collectionGroup, evita índices compuestos) */
 export async function getAttendanceHistoryForPlayer(
   firestore: Firestore,
   schoolId: string,

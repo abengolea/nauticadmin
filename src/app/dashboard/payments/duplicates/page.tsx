@@ -88,7 +88,7 @@ export default function DuplicatesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Duplicados detectados</CardTitle>
-          <CardDescription>Seleccioná una escuela para ver los casos de duplicado</CardDescription>
+          <CardDescription>Seleccioná una náutica para ver los casos de duplicado</CardDescription>
         </CardHeader>
       </Card>
     );

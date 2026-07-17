@@ -104,7 +104,7 @@ export function AddSchoolUserDialog({ schoolId }: { schoolId: string }) {
 
         toast({
             title: "¡Usuario añadido!",
-            description: `${values.displayName} ha sido añadido a la escuela como ${values.role}.`,
+            description: `${values.displayName} ha sido añadido a la náutica como ${values.role}.`,
         });
         form.reset();
         setOpen(false);
@@ -121,7 +121,7 @@ export function AddSchoolUserDialog({ schoolId }: { schoolId: string }) {
             }
         } else {
             title = "Error de Base de Datos";
-            description = "No se pudo asignar el rol al usuario en la escuela. Verifica los permisos.";
+            description = "No se pudo asignar el rol al usuario en la náutica. Verifica los permisos.";
             const permissionError = new FirestorePermissionError({
                 path: `schools/${schoolId}/users/NEW_USER_ID`,
                 operation: 'create',
@@ -151,9 +151,9 @@ export function AddSchoolUserDialog({ schoolId }: { schoolId: string }) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Añadir Usuario a la Escuela</DialogTitle>
+          <DialogTitle>Añadir Usuario a la náutica</DialogTitle>
           <DialogDescription>
-            Crea un nuevo usuario y asígnalo como responsable (administrador u operador) a esta escuela.
+            Crea un nuevo usuario y asígnalo como responsable (administrador u operador) a esta náutica.
           </DialogDescription>
         </DialogHeader>
         
@@ -179,7 +179,7 @@ export function AddSchoolUserDialog({ schoolId }: { schoolId: string }) {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="eperez@riverplate.com" {...field} />
+                    <Input type="email" placeholder="operador@ejemplo.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

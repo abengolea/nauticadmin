@@ -1,18 +1,15 @@
 /**
  * POST /api/registrations/on-approve
- * Envía por sistema el email "Fuiste aceptado" al jugador recién aprobado.
- * Solo admin u operador de la escuela puede llamar.
+ * Envía por sistema el email "Fuiste aceptado" al cliente recién aprobado.
+ * Solo admin u operador de la náutica puede llamar.
  * Escribe en la colección `mail` para que la extensión Trigger Email (firestore-send-email) envíe el correo.
- * Usa plantilla con logo y tipografía River (email-template-server).
+ * Usa plantilla NauticAdmin (email-template-server).
  */
 
 import { NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { verifyIdToken } from "@/lib/auth-server";
-import {
-  buildEmailHtmlServer,
-  LOGO_ATTACHMENT_SERVER,
-} from "@/lib/email-template-server";
+import { buildEmailHtmlServer } from "@/lib/email-template-server";
 
 const MAIL_COLLECTION = "mail";
 
@@ -43,7 +40,7 @@ export async function POST(request: Request) {
 
     const db = getAdminFirestore();
 
-    // Verificar que el usuario sea admin u operador de la escuela
+    // Verificar que el usuario sea admin u operador de la náutica
     const schoolUserSnap = await db
       .collection("schools")
       .doc(body.schoolId)
@@ -53,7 +50,7 @@ export async function POST(request: Request) {
 
     if (!schoolUserSnap.exists) {
       return NextResponse.json(
-        { error: "No tenés permiso para aprobar en esta escuela" },
+        { error: "No tenés permiso para aprobar en esta náutica" },
         { status: 403 }
       );
     }
@@ -61,13 +58,13 @@ export async function POST(request: Request) {
     const role = schoolUserSnap.data()?.role;
     if (role !== "school_admin" && role !== "operador") {
       return NextResponse.json(
-        { error: "Solo admin o entrenador puede aprobar solicitudes" },
+        { error: "Solo admin u operador puede aprobar solicitudes" },
         { status: 403 }
       );
     }
 
     const to = (body.playerEmail as string).trim().toLowerCase();
-    const subject = "Fuiste aceptado - Escuelas River SN";
+    const subject = "Fuiste aceptado - NauticAdmin";
     const contentHtml = `
       <p>Tu solicitud de registro fue <strong>aceptada</strong>.</p>
       <p>Ya podés ingresar al panel con tu email y la contraseña que elegiste al registrarte.</p>
@@ -79,14 +76,12 @@ export async function POST(request: Request) {
     });
     const text = "Tu solicitud de registro fue aceptada. Ya podés ingresar al panel con tu email y la contraseña que elegiste. Si olvidaste tu contraseña, usá Olvidé mi contraseña en la pantalla de inicio de sesión.";
 
-    // Formato esperado por la extensión Trigger Email (firestore-send-email), con adjunto del logo
     await db.collection(MAIL_COLLECTION).add({
       to,
       message: {
         subject,
         html,
         text,
-        attachments: [LOGO_ATTACHMENT_SERVER],
       },
     });
 

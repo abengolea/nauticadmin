@@ -268,9 +268,9 @@ export function SuperAdminMensualidadesTab({ schools }: SuperAdminMensualidadesT
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Mensualidades de Escuelas</h2>
+          <h2 className="text-lg font-semibold">Mensualidades de náuticas</h2>
           <p className="text-sm text-muted-foreground">
-            Control de pagos de escuelas adheridas a la plataforma.
+            Control de pagos de náuticas adheridas a la plataforma.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setConfigDialog(true)}>
@@ -340,7 +340,7 @@ export function SuperAdminMensualidadesTab({ schools }: SuperAdminMensualidadesT
               {loading ? (
                 <Skeleton className="h-32 w-full" />
               ) : delinquents.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No hay escuelas en mora.</p>
+                <p className="text-center text-muted-foreground py-8">No hay náuticas en mora.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -410,7 +410,7 @@ export function SuperAdminMensualidadesTab({ schools }: SuperAdminMensualidadesT
           <Card>
             <CardHeader>
               <CardTitle>Pagos de mensualidades</CardTitle>
-              <CardDescription>Historial de pagos ingresados por escuelas.</CardDescription>
+              <CardDescription>Historial de pagos ingresados por náuticas.</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (

@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const subject = "Prueba Trigger Email - Escuelas River SN";
+    const subject = "Prueba Trigger Email - NauticAdmin";
     const html = `<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="utf-8"><title>${subject}</title></head>

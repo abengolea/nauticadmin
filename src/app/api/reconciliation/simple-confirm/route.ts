@@ -55,14 +55,14 @@ export async function POST(request: Request) {
 
     const playerExists = await playerExistsInSchool(db, schoolId, playerId);
     if (!playerExists) {
-      return NextResponse.json({ error: "El jugador no existe en esta escuela" }, { status: 400 });
+      return NextResponse.json({ error: "El cliente no existe en esta náutica" }, { status: 400 });
     }
 
     const periodToUse = period ?? new Date().toISOString().slice(0, 7); // YYYY-MM
     const existing = await findApprovedPayment(db, playerId, periodToUse);
     if (existing) {
       return NextResponse.json(
-        { error: "Ya existe un pago aprobado para este jugador y período" },
+        { error: "Ya existe un pago aprobado para este cliente y período" },
         { status: 409 }
       );
     }

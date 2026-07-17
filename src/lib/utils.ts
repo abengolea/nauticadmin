@@ -42,7 +42,7 @@ export function compareCategory(a: string, b: string): number {
   return i - j;
 }
 
-/** Indica si la categoría del jugador está dentro del rango [categoryFrom, categoryTo] (inclusive). */
+/** Indica si la categoría del cliente está dentro del rango [categoryFrom, categoryTo] (inclusive). */
 export function isCategoryInRange(
   playerCategory: string,
   categoryFrom: string,
@@ -79,7 +79,7 @@ export function calculateIMC(weightKg: number, heightCm: number): number {
   return Math.round((weightKg / (heightM * heightM)) * 10) / 10;
 }
 
-/** Indica si el jugador tiene perfil completo (datos mínimos + foto + email) para poder ver evaluaciones, videos, etc. */
+/** Indica si el cliente tiene perfil completo (datos mínimos + foto + email) para poder ver evaluaciones, videos, etc. */
 export function isPlayerProfileComplete(player: { firstName?: string; lastName?: string; tutorContact?: { name?: string; phone?: string } | null; email?: string | null; photoUrl?: string | null }): boolean {
   const hasName = Boolean(player.firstName?.trim() && player.lastName?.trim());
   const tutor = player.tutorContact;
@@ -91,13 +91,13 @@ export function isPlayerProfileComplete(player: { firstName?: string; lastName?:
   return Boolean(hasName && hasTutor && hasEmail && hasPhoto);
 }
 
-/** Indica si la ficha médica del jugador está cargada y aprobada por admin/entrenador. */
+/** Indica si la ficha médica del cliente está cargada y aprobada por admin/operador. */
 export function isMedicalRecordApproved(player: { medicalRecord?: { approvedAt?: unknown } | null }): boolean {
   const mr = player.medicalRecord;
   return Boolean(mr && mr.approvedAt != null);
 }
 
-/** Indica si la ficha médica fue rechazada (incumplida) por admin/entrenador. */
+/** Indica si la ficha médica fue rechazada (incumplida) por admin/operador. */
 export function isMedicalRecordRejected(player: { medicalRecord?: { rejectedAt?: unknown } | null }): boolean {
   const mr = player.medicalRecord;
   return Boolean(mr && mr.rejectedAt != null);
@@ -106,13 +106,13 @@ export function isMedicalRecordRejected(player: { medicalRecord?: { rejectedAt?:
 const PROFILE_FIELD_LABELS: Record<string, string> = {
   firstName: "Nombre",
   lastName: "Apellido",
-  tutorName: "Nombre del tutor",
-  tutorPhone: "Teléfono del tutor",
+  tutorName: "Nombre de contacto",
+  tutorPhone: "Teléfono de contacto",
   email: "Email",
   photoUrl: "Foto de la embarcación",
 };
 
-/** Devuelve la lista de nombres de campos que faltan para considerar el perfil completo (para mostrar al jugador). */
+/** Devuelve la lista de nombres de campos que faltan para considerar el perfil completo (para mostrar al cliente). */
 export function getMissingProfileFieldLabels(values: {
   firstName?: string;
   lastName?: string;

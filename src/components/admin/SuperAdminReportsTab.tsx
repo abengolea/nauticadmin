@@ -154,7 +154,7 @@ export function SuperAdminReportsTab({
   const handleExportSchools = () => {
     if (!schools?.length) return;
     downloadCsv(
-      `escuelas-${format(new Date(), "yyyy-MM-dd")}.csv`,
+      `nauticas-${format(new Date(), "yyyy-MM-dd")}.csv`,
       ["Nombre", "Ciudad", "Provincia", "Dirección", "Estado", "Fecha creación"],
       schools.map((s) => [
         s.name,
@@ -184,8 +184,8 @@ export function SuperAdminReportsTab({
     if (!allPlayers.length || !schools?.length) return;
     const schoolNames = new Map(schools.map((s) => [s.id, s.name]));
     downloadCsv(
-      `jugadores-${format(new Date(), "yyyy-MM-dd")}.csv`,
-      ["Escuela", "Nombre", "Apellido", "Estado", "Archivado", "Fecha creación"],
+      `clientes-${format(new Date(), "yyyy-MM-dd")}.csv`,
+      ["Náutica", "Nombre", "Apellido", "Estado", "Archivado", "Fecha creación"],
       allPlayers.map((p) => [
         schoolNames.get(p.schoolId) ?? p.schoolId,
         p.firstName,
@@ -213,14 +213,14 @@ export function SuperAdminReportsTab({
             Métricas globales
           </CardTitle>
           <CardDescription>
-            Totales y distribución de jugadores por escuela.
+            Totales y distribución de clientes por náutica.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total jugadores</CardTitle>
+                <CardTitle className="text-sm font-medium">Total clientees</CardTitle>
                 <UserCircle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -264,13 +264,13 @@ export function SuperAdminReportsTab({
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ir a escuela</CardTitle>
+                <CardTitle className="text-sm font-medium">Ir a náutica</CardTitle>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <Select onValueChange={handleQuickAccess}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar escuela..." />
+                    <SelectValue placeholder="Seleccionar náutica..." />
                   </SelectTrigger>
                   <SelectContent>
                     {schoolList.map((s) => (
@@ -285,7 +285,7 @@ export function SuperAdminReportsTab({
           </div>
 
           <div>
-            <h3 className="text-sm font-medium mb-2">Jugadores por escuela</h3>
+            <h3 className="text-sm font-medium mb-2">Clientes por náutica</h3>
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
@@ -342,7 +342,7 @@ export function SuperAdminReportsTab({
             onClick={handleExportSchools}
             disabled={!schools?.length}
           >
-            Exportar escuelas
+            Exportar náuticas
           </Button>
           <Button
             variant="outline"
@@ -358,7 +358,7 @@ export function SuperAdminReportsTab({
             onClick={handleExportPlayers}
             disabled={!allPlayers.length}
           >
-            Exportar jugadores
+            Exportar clientes
           </Button>
         </CardContent>
       </Card>

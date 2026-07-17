@@ -10,6 +10,7 @@ import { isPlayerProfileComplete } from "@/lib/utils";
 import { useDoc, useUserProfile, useCollection, useUser, useFirebase } from "@/firebase";
 import { getAuth } from "firebase/auth";
 import type { Player } from "@/lib/types";
+import { formatPlayerName } from "@/lib/format-player-name";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SummaryTab } from "@/components/players/PlayerProfile/SummaryTab";
 import { useState } from "react";
@@ -239,7 +240,7 @@ export default function PlayerProfilePage() {
         <Avatar className="h-32 w-32 border-4 border-card">
           <AvatarImage src={player.photoUrl || undefined} data-ai-hint="person portrait" />
           <AvatarFallback className="text-4xl">
-            {(player.firstName?.[0] || '')}{(player.lastName?.[0] || '')}
+            {(player.lastName?.[0] || '')}{(player.firstName?.[0] || '')}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
@@ -272,7 +273,7 @@ export default function PlayerProfilePage() {
               {player.status === "active" ? "Activo" : player.status === "suspended" ? "Mora" : "Desactivado"}
             </Badge>
           )}
-          <h1 className="text-4xl font-bold font-headline">{player.firstName || ''} {player.lastName || ''}</h1>
+          <h1 className="text-4xl font-bold font-headline">{formatPlayerName(player)}</h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
              {player.tutorContact?.name && <div className="flex items-center gap-1"><User className="h-4 w-4" /> Contacto: {player.tutorContact.name}</div>}
              {player.tutorContact?.phone?.trim() && <div className="flex items-center gap-1"><Contact className="h-4 w-4" /> {player.tutorContact.phone}</div>}
@@ -341,7 +342,7 @@ export default function PlayerProfilePage() {
             getToken={getToken}
             playerId={isViewingAsPlayer ? undefined : id}
             schoolId={isViewingAsPlayer ? undefined : schoolId ?? undefined}
-            playerName={player ? `${player.firstName ?? ""} ${player.lastName ?? ""}`.trim() : undefined}
+            playerName={player ? formatPlayerName(player) : undefined}
           />
         </div>
       </div>

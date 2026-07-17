@@ -1,7 +1,7 @@
 /**
  * POST /api/issuer-worker/process
  * Procesa InvoiceOrders pendientes (emitir AFIP, PDF, email).
- * Protegido: solo admin de escuela o super admin.
+ * Protegido: solo admin de náutica o super admin.
  * Ejecutar vía cron (Vercel Cron, Cloud Scheduler) o manual.
  */
 
@@ -33,10 +33,10 @@ export async function POST(request: Request) {
         .get();
 
       if (!schoolUserSnap.exists) {
-        return NextResponse.json({ error: 'Sin acceso a esta escuela' }, { status: 403 });
+        return NextResponse.json({ error: 'Sin acceso a esta náutica' }, { status: 403 });
       }
     }
-    // Si no schoolId: procesar todas (requeriría super admin - por ahora permitir si tiene al menos una escuela)
+    // Si no schoolId: procesar todas (requeriría super admin - por ahora permitir si tiene al menos una náutica)
 
     const { processed, failed } = await processPendingOrders(db, schoolId, limit);
 

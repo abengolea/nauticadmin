@@ -13,10 +13,10 @@ export const COLLECTIONS = {
 /** Documento de config global de mensualidades: platformConfig/platformFeeConfig */
 export const PLATFORM_FEE_CONFIG_DOC = 'platformFeeConfig';
 
-/** Documento de config de mensualidad por escuela: schools/{schoolId}/schoolFeeConfig/default */
+/** Documento de config de mensualidad por náutica: schools/{schoolId}/schoolFeeConfig/default */
 export const SCHOOL_FEE_CONFIG_DOC = 'default';
 
-/** Documento de conexión MP por escuela: schools/{schoolId}/mercadopagoConnection/default */
+/** Documento de conexión MP por náutica: schools/{schoolId}/mercadopagoConnection/default */
 export const MERCADOPAGO_CONNECTION_DOC = 'default';
 
 export const DEFAULT_CURRENCY = 'ARS';

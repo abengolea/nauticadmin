@@ -88,7 +88,7 @@ interface EditPlayerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
-  /** Si es true, el jugador edita su propio perfil: no puede cambiar el campo Estado. */
+  /** Si es true, el cliente edita su propio perfil: no puede cambiar el campo Estado. */
   isPlayerEditing?: boolean;
   /** Pestaña inicial al abrir (por defecto "personal"). */
   initialTab?: "personal" | "nautica";
@@ -354,7 +354,7 @@ export function EditPlayerDialog({
                       <FormItem>
                         <FormLabel>Nombre</FormLabel>
                         <FormControl>
-                          <Input placeholder="Lionel" {...field} />
+                          <Input placeholder="Juan" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -367,7 +367,7 @@ export function EditPlayerDialog({
                       <FormItem>
                         <FormLabel>Apellido</FormLabel>
                         <FormControl>
-                          <Input placeholder="Messi" {...field} />
+                          <Input placeholder="Pérez" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

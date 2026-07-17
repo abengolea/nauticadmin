@@ -35,7 +35,7 @@ export async function GET(
       .get();
 
     if (!schoolUserSnap.exists) {
-      return NextResponse.json({ error: 'Sin acceso a esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin acceso a esta náutica' }, { status: 403 });
     }
 
     const duplicateCase = await getDuplicateCase(db, caseId);
@@ -44,7 +44,7 @@ export async function GET(
     }
 
     if (duplicateCase.schoolId !== schoolId) {
-      return NextResponse.json({ error: 'Caso no pertenece a esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Caso no pertenece a esta náutica' }, { status: 403 });
     }
 
     // Obtener datos de pagos

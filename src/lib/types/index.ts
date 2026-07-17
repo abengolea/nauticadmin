@@ -11,7 +11,7 @@ export interface PlatformConfig {
   maintenanceMessage?: string;
   /** Si true, se muestra el mensaje de mantenimiento y se limita el acceso. */
   maintenanceMode?: boolean;
-  /** Si el registro web de nuevos jugadores está habilitado globalmente. */
+  /** Si el registro web de nuevos clientes está habilitado globalmente. */
   registrationEnabled?: boolean;
   updatedAt?: Date;
   updatedBy?: string;
@@ -19,7 +19,7 @@ export interface PlatformConfig {
 
 /** Plantilla básica global de evaluaciones físicas (super admin). Tests predefinidos + los aceptados desde propuestas de entrenadores. */
 export interface PhysicalAssessmentTemplate {
-  /** Tests aceptados por super admin por grupo etario; una vez aceptados forman parte de la plantilla para todas las escuelas. */
+  /** Tests aceptados por super admin por grupo etario; una vez aceptados forman parte de la plantilla para todas las náuticas. */
   acceptedFieldsByAgeGroup?: Partial<Record<PhysicalAgeGroup, PhysicalFieldDef[]>>;
   updatedAt?: Date;
   updatedBy?: string;
@@ -89,7 +89,7 @@ export interface Category {
   createdAt: Date;
 }
 
-// Representa la membresía y el rol de un usuario en una escuela específica.
+// Representa la membresía y el rol de un usuario en una náutica específica.
 export interface SchoolUser {
   id: string; // auth uid
   displayName: string;
@@ -128,7 +128,7 @@ export interface Player {
   lastName: string;
   dni?: string;
   healthInsurance?: string;
-  /** Email para que el jugador pueda iniciar sesión en el panel (opcional). */
+  /** Email para que el cliente pueda iniciar sesión en el panel (opcional). */
   email?: string;
   tutorContact: {
     name: string;
@@ -137,7 +137,7 @@ export interface Player {
   status: 'active' | 'inactive' | 'suspended';
   photoUrl?: string;
   observations?: string;
-  /** Devolución/comentario del entrenador (editable por admin/entrenador con un botón). */
+  /** Devolución/comentario del operador (editable por admin/operador con un botón). */
   coachFeedback?: string;
   /** Altura en cm (datos físicos de referencia). */
   altura_cm?: number;
@@ -157,11 +157,11 @@ export interface Player {
   talle_camiseta?: string;
   createdAt: Date;
   createdBy: string; // uid
-  /** Si true, el jugador está archivado: no aparece en listados ni cuenta en totales/cantidades. Útil para jugadores de prueba. */
+  /** Si true, el cliente está archivado: no aparece en listados ni cuenta en totales/cantidades. Útil para clientes de prueba. */
   archived?: boolean;
   archivedAt?: Date;
   archivedBy?: string;
-  /** Ficha médica (PDF): subida por el jugador o por staff; aprobada cuando admin/entrenador marca cumplido. */
+  /** Ficha médica (PDF): subida por el cliente o por staff; aprobada cuando admin/operador marca cumplido. */
   medicalRecord?: MedicalRecord;
   // No está en el modelo de Firestore, se añade en el frontend.
   escuelaId?: string;
@@ -201,7 +201,7 @@ export interface Player {
   documentacion?: string;
 }
 
-/** Ficha médica del jugador (PDF). Subida por jugador o staff; aprobada o rechazada por admin/entrenador. */
+/** Ficha médica del cliente (PDF). Subida por jugador o staff; aprobada o rechazada por admin/operador. */
 export interface MedicalRecord {
   /** URL pública del PDF en Storage. */
   url: string;
@@ -210,10 +210,10 @@ export interface MedicalRecord {
   uploadedAt: Date;
   /** UID de quien subió (jugador o staff). */
   uploadedBy: string;
-  /** Si está definido, la ficha fue revisada y marcada cumplida por admin/entrenador. */
+  /** Si está definido, la ficha fue revisada y marcada cumplida por admin/operador. */
   approvedAt?: Date;
   approvedBy?: string;
-  /** Si está definido, la ficha fue rechazada (incumplida); el jugador debe subir una nueva. */
+  /** Si está definido, la ficha fue rechazada (incumplida); el cliente debe subir una nueva. */
   rejectedAt?: Date;
   rejectedBy?: string;
   /** Motivo del rechazo (ej. mal impresa, faltan datos). */
@@ -287,13 +287,13 @@ export interface TrainingSlot {
   categoryFrom: string;
   /** Categoría final del rango (ej. "SUB-10") */
   categoryTo: string;
-  /** Cupo máximo de jugadores en este slot */
+  /** Cupo máximo de clientes en este slot */
   maxQuota: number;
-  /** UID del entrenador asignado (SchoolUser con role coach) */
+  /** UID del operador asignado (SchoolUser con role coach) */
   coachId: string;
 }
 
-/** Configuración de horarios de entrenamiento por escuela. Almacenada en schools/{schoolId}/trainingConfig/default */
+/** Configuración de horarios de entrenamiento por náutica. Almacenada en schools/{schoolId}/trainingConfig/default */
 export interface TrainingConfig {
   id: string;
   slots: TrainingSlot[];
@@ -311,7 +311,7 @@ export interface Attendance {
     trainingDate?: Date;
 }
 
-/** Posición del jugador calificada por el entrenador. */
+/** Posición del cliente calificada por el entrenador. */
 export type PlayerPosition = 'delantero' | 'mediocampo' | 'defensor' | 'arquero';
 
 // Unifica todas las evaluaciones en un solo documento por fecha.
@@ -319,7 +319,7 @@ export interface Evaluation {
   id:string;
   playerId: string;
   date: Date;
-  /** Posición que el entrenador califica como la más adecuada para el jugador. */
+  /** Posición que el entrenador califica como la más adecuada para el cliente. */
   position?: PlayerPosition;
   coachComments: string;
   /** Comentarios opcionales por rubro (ej. control, pase, respect). */
@@ -349,7 +349,7 @@ export interface Evaluation {
   };
   createdAt: Date;
   createdBy: string; // uid
-  /** Nombre del entrenador que realizó la evaluación (quien la hizo). */
+  /** Nombre del operador que realizó la evaluación (quien la hizo). */
   evaluatedByName?: string;
 }
 
@@ -360,7 +360,7 @@ export interface UserProfile extends SchoolUser {
     isSuperAdmin: boolean;
     activeSchoolId?: string;
     memberships: SchoolMembership[];
-    /** ID del jugador en la escuela cuando el rol es 'player'. */
+    /** ID del cliente en la náutica cuando el rol es 'player'. */
     playerId?: string;
 }
 
@@ -369,7 +369,7 @@ export interface SchoolMembership {
     role: 'school_admin' | 'operador' | 'editor' | 'viewer' | 'player';
 }
 
-/** Evaluación física del jugador. Campos varían según edad. */
+/** Evaluación física del cliente. Campos varían según edad. */
 export type PhysicalAgeGroup = '5-8' | '9-12' | '13-15' | '16-18';
 
 /** Tests para 5–8 años */
@@ -434,7 +434,7 @@ export interface PhysicalFieldOverride {
   placeholder?: string;
 }
 
-/** Configuración de qué tests medir por escuela (coach puede activar/desactivar, agregar y editar). */
+/** Configuración de qué tests medir por náutica (coach puede activar/desactivar, agregar y editar). */
 export interface PhysicalAssessmentConfig {
   id: string;
   /** Por grupo etario: array de keys de campos habilitados. Si vacío/ausente, se usan todos por defecto. */
@@ -463,7 +463,7 @@ export interface PhysicalAssessment {
   createdBy: string;
 }
 
-/** Video subido o grabado por el entrenador, asociado a un jugador (videoteca). */
+/** Video subido o grabado por el entrenador, asociado a un cliente (videoteca). */
 export interface PlayerVideo {
   id: string;
   playerId: string;
@@ -471,9 +471,9 @@ export interface PlayerVideo {
   storagePath: string;
   /** URL pública de descarga/reproducción */
   url: string;
-  /** Título opcional, ej. "Control de balón", "Entrenamiento 12/01" */
+  /** Título opcional, ej. "Maniobra / práctica", "Actividad 12/01" */
   title?: string;
-  /** Descripción o notas del entrenador */
+  /** Descripción o notas del operador */
   description?: string;
   /** Habilidades/categorías: dribling, pegada, definicion, estirada, etc. */
   skills?: string[];

@@ -7,9 +7,9 @@ export default function RegistrationsPage() {
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-headline">Solicitudes</h1>
       </div>
       <div>
-        <h2 className="text-lg sm:text-xl font-semibold mb-2">Solicitudes de registro (nuevos jugadores)</h2>
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">Solicitudes de registro (nuevos clientes)</h2>
         <p className="text-muted-foreground text-sm mb-4">
-          Formularios de preinscripción de jugadores para que se unan a tu escuela.
+          Formularios de preinscripción de clientes para que se unan a tu náutica.
         </p>
         <PendingRegistrations />
       </div>

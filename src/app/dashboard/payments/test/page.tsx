@@ -142,7 +142,7 @@ export default function PaymentsTestPage() {
         <Card>
           <CardHeader>
             <CardTitle>Pruebas de pagos</CardTitle>
-            <CardDescription>Seleccioná una escuela activa para probar (desde Ajustes o perfil)</CardDescription>
+            <CardDescription>Seleccioná una náutica activa para probar (desde Ajustes o perfil)</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -171,7 +171,7 @@ export default function PaymentsTestPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">1. Lo que ve la app (frontend)</CardTitle>
-          <CardDescription>Datos que usa esta pantalla: escuela activa y jugadores desde Firestore (cliente)</CardDescription>
+          <CardDescription>Datos que usa esta pantalla: escuela activa y clientes desde Firestore (cliente)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
@@ -187,7 +187,7 @@ export default function PaymentsTestPage() {
             </Button>
           </div>
           <div>
-            <Label className="text-muted-foreground text-xs">Jugadores en esta escuela (colección cliente):</Label>
+            <Label className="text-muted-foreground text-xs">Clientes en esta náutica (colección cliente):</Label>
             <ul className="mt-1 text-sm font-mono space-y-0.5">
               {activePlayers.length === 0 && <li className="text-muted-foreground">Ninguno cargado</li>}
               {activePlayers.map((p) => (
@@ -209,7 +209,7 @@ export default function PaymentsTestPage() {
         <CardContent className="space-y-3">
           <Button variant="outline" size="sm" onClick={runVerify} disabled={verifyLoading}>
             <Search className="mr-2 h-4 w-4" />
-            {verifyLoading ? "Verificando…" : "Consultar verify-school para esta escuela"}
+            {verifyLoading ? "Verificando…" : "Consultar verify-school para esta náutica"}
           </Button>
           {verifyError && (
             <p className="text-sm text-destructive">Error: {verifyError}</p>
@@ -238,7 +238,7 @@ export default function PaymentsTestPage() {
             <Label>Jugador (playerId)</Label>
             <Select value={manualPlayerId} onValueChange={setManualPlayerId}>
               <SelectTrigger>
-                <SelectValue placeholder="Elegir jugador" />
+                <SelectValue placeholder="Elegir cliente" />
               </SelectTrigger>
               <SelectContent>
                 {[
@@ -294,7 +294,7 @@ export default function PaymentsTestPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">4. Para webhook o script de simulación</CardTitle>
-          <CardDescription>Usá exactamente estos valores. Si el backend vio 0 jugadores, el webhook fallará hasta que proyecto/DB coincidan.</CardDescription>
+          <CardDescription>Usá exactamente estos valores. Si el backend vio 0 clientes, el webhook fallará hasta que proyecto/DB coincidan.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-xs font-mono">
           <p><strong>schoolId:</strong> {schoolId}</p>

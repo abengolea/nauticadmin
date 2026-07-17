@@ -1,6 +1,6 @@
 'use server';
 /**
- * Flujo de Genkit para mejorar los comentarios del entrenador.
+ * Flujo de Genkit para mejorar los comentarios del operador.
  * Usa el primer modelo Gemini disponible con tu API key.
  */
 
@@ -10,13 +10,13 @@ import { z } from 'genkit';
 import { getAvailableGeminiModel } from '@/ai/get-available-gemini-model';
 
 const ImproveCoachCommentsInputSchema = z.object({
-  playerName: z.string().describe('Nombre del jugador.'),
+  playerName: z.string().describe('Nombre del cliente.'),
   previousEvaluationsSummary: z.string().describe('Resumen en texto de evaluaciones anteriores: fecha y comentarios.'),
   currentDraft: z.string().describe('Borrador actual del comentario (puede ser transcripción de voz o texto escrito).'),
 });
 
 const ImproveCoachCommentsOutputSchema = z.object({
-  improvedText: z.string().describe('Texto mejorado, coherente y bien redactado para los comentarios del entrenador.'),
+  improvedText: z.string().describe('Texto mejorado, coherente y bien redactado para los comentarios del operador.'),
 });
 
 export type ImproveCoachCommentsInput = z.infer<typeof ImproveCoachCommentsInputSchema>;
@@ -33,22 +33,22 @@ const improvePrompt = ai.definePrompt({
   input: { schema: ImproveCoachCommentsInputSchema },
   output: { schema: ImproveCoachCommentsOutputSchema },
   prompt: `
-Eres un entrenador experto de la Escuela de River Plate. Tu tarea es redactar un único párrafo para la sección "Comentarios del Entrenador" de una evaluación del jugador {{playerName}}.
+Eres un asistente de comunicación de NauticAdmin. Tu tarea es redactar un único párrafo para la sección "Comentarios del operador" de una evaluación del cliente {{playerName}}.
 
-**Contexto:** Tienes acceso al historial de comentarios de evaluaciones anteriores de este jugador y al borrador actual que el entrenador escribió o dictó (puede tener errores de transcripción o estar en bruto).
+**Contexto:** Tienes acceso al historial de comentarios de evaluaciones anteriores de este cliente y al borrador actual que el operador escribió o dictó (puede tener errores de transcripción o estar en bruto).
 
 **Historial de evaluaciones anteriores:**
 {{previousEvaluationsSummary}}
 
-**Borrador actual del entrenador (texto o transcripción de voz):**
+**Borrador actual del operador (texto o transcripción de voz):**
 {{currentDraft}}
 
 **Instrucciones:**
 - Genera UN solo párrafo (o dos cortos si es necesario), en español, que resuma de forma clara y profesional el rendimiento, actitud y áreas de mejora.
 - Incorpora la información del borrador actual y, si es útil, la continuidad con evaluaciones anteriores (evolución, consistencia).
 - Corrige errores de transcripción, une ideas sueltas y mejora la redacción sin inventar datos.
-- Tono: profesional, constructivo y alineado con la formación juvenil de River Plate.
-- No uses listas con viñetas; el resultado debe ser texto corrido para pegar en el campo "Comentarios del Entrenador".
+- Tono: profesional, constructivo y alineado con la comunicación profesional de NauticAdmin.
+- No uses listas con viñetas; el resultado debe ser texto corrido para pegar en el campo "Comentarios del operador".
 - Si el borrador está vacío o es muy breve, genera igualmente un comentario coherente basado solo en el historial si hay datos; si no hay nada, devuelve un párrafo genérico y alentador.
 
 Devuelve únicamente el texto mejorado, sin títulos ni prefijos.
@@ -81,7 +81,7 @@ const improveFlow = ai.defineFlow(
 // --- Comentario por rubro (una frase corta) ---
 
 const ImproveRubricCommentInputSchema = z.object({
-  playerName: z.string().describe('Nombre del jugador.'),
+  playerName: z.string().describe('Nombre del cliente.'),
   rubricLabel: z.string().describe('Nombre del rubro, ej. Control de Balón, Pase.'),
   currentDraft: z.string().describe('Borrador del comentario para este rubro (puede ser voz o texto).'),
 });
@@ -104,9 +104,9 @@ const improveRubricPrompt = ai.definePrompt({
   input: { schema: ImproveRubricCommentInputSchema },
   output: { schema: ImproveRubricCommentOutputSchema },
   prompt: `
-Eres un entrenador experto de la Escuela de River Plate. Tu tarea es redactar UNA FRASE CORTA para el comentario opcional del rubro "{{rubricLabel}}" en la evaluación del jugador {{playerName}}.
+Eres un asistente de comunicación de NauticAdmin. Tu tarea es redactar UNA FRASE CORTA para el comentario opcional del rubro "{{rubricLabel}}" en la evaluación del cliente {{playerName}}.
 
-**Borrador del entrenador (puede ser transcripción de voz o texto suelto):**
+**Borrador del operador (puede ser transcripción de voz o texto suelto):**
 {{currentDraft}}
 
 **Instrucciones:**

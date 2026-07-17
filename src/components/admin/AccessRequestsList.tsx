@@ -116,7 +116,7 @@ export function AccessRequestsList() {
         });
         toast({
           title: "Solicitud aprobada",
-          description: `Se creó el jugador y ${request.email} ya puede iniciar sesión.`,
+          description: `Se creó el cliente y ${request.email} ya puede iniciar sesión.`,
         });
       } else {
         const playerRef = doc(firestore, `schools/${activeSchoolId}/players`, linkToPlayerId);
@@ -133,7 +133,7 @@ export function AccessRequestsList() {
         });
         toast({
           title: "Solicitud aprobada",
-          description: `Se vinculó ${request.email} al jugador. Ya puede iniciar sesión.`,
+          description: `Se vinculó ${request.email} al cliente. Ya puede iniciar sesión.`,
         });
       }
       setApproveDialog(null);
@@ -210,10 +210,10 @@ export function AccessRequestsList() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
-            Solicitudes de acceso (jugadores)
+            Solicitudes de acceso (clientes)
           </CardTitle>
           <CardDescription>
-            Usuarios que ya tienen cuenta y pidieron poder entrar como jugador. Aprobá para vincular su email a un jugador de tu escuela.
+            Usuarios que ya tienen cuenta y pidieron poder entrar como cliente. Aprobá para vincular su email a un cliente de tu náutica.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -275,7 +275,7 @@ export function AccessRequestsList() {
             <DialogTitle>Aprobar solicitud de acceso</DialogTitle>
             <DialogDescription>
               {approveDialog && (
-                <>Vincular <strong>{approveDialog.request.email}</strong> a un jugador de tu escuela.</>
+                <>Vincular <strong>{approveDialog.request.email}</strong> a un cliente de tu náutica.</>
               )}
             </DialogDescription>
           </DialogHeader>
@@ -288,10 +288,10 @@ export function AccessRequestsList() {
                   onValueChange={(v) => setApproveDialog({ ...approveDialog, linkToPlayerId: v })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Elegir jugador" />
+                    <SelectValue placeholder="Elegir cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="new">Crear nuevo jugador con este email</SelectItem>
+                    <SelectItem value="new">Crear nuevo cliente con este email</SelectItem>
                     {activePlayers.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.firstName} {p.lastName}

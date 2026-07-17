@@ -70,11 +70,11 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
     const [isUpdating, setIsUpdating] = useState(false);
     const [selectedSchoolId, setSelectedSchoolId] = useState<string>("all");
 
-    // Cuando hay un filtro por escuela, cargamos los usuarios de esa escuela (staff: admin, operador) con role y displayName
+    // Cuando hay un filtro por náutica, cargamos los usuarios de esa escuela (staff: admin, operador) con role y displayName
     const schoolUsersPath = selectedSchoolId && selectedSchoolId !== "all" ? `schools/${selectedSchoolId}/users` : "";
     const { data: schoolUsers } = useCollection<SchoolUser & { id: string }>(schoolUsersPath);
 
-    // Para vista "Todas las escuelas": cargar roles desde collectionGroup + playerLogins
+    // Para vista "Todas las náuticas": cargar roles desde collectionGroup + playerLogins
     const [allRolesMap, setAllRolesMap] = useState<Map<string, UserRoleInfo>>(new Map());
     const [playerMap, setPlayerMap] = useState<Map<string, { schoolId: string; playerId: string }>>(new Map());
 
@@ -179,10 +179,10 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
                     <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                     <Select value={selectedSchoolId} onValueChange={setSelectedSchoolId}>
                         <SelectTrigger className="w-full max-w-[280px] min-w-0">
-                            <SelectValue placeholder="Filtrar por escuela" />
+                            <SelectValue placeholder="Filtrar por náutica" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Todas las escuelas</SelectItem>
+                            <SelectItem value="all">Todas las náuticas</SelectItem>
                             {schools?.map((school) => (
                                 <SelectItem key={school.id} value={school.id}>
                                     {school.name}
@@ -226,7 +226,7 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
                             : info?.role === "operador"
                               ? "Operador"
                               : info?.role === "player"
-                                ? "Jugador"
+                                ? "Cliente"
                                 : "Usuario";
                         return (
                         <TableRow key={user.id}>
@@ -294,7 +294,7 @@ export function PlatformUsersList({ schools = [] }: PlatformUsersListProps) {
             </Table>
             {(!isLoading && !filteredUsers?.length) && (
                 <p className="text-center text-muted-foreground py-8">
-                    {selectedSchoolId === "all" ? "No hay usuarios en la plataforma." : "No hay usuarios asignados a esta escuela."}
+                    {selectedSchoolId === "all" ? "No hay usuarios en la plataforma." : "No hay usuarios asignados a esta náutica."}
                 </p>
             )}
 

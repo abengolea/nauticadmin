@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         }
       }
 
-      const subject = 'Pago sin aplicar - Escuelas River SN';
+      const subject = 'Pago sin aplicar - NauticAdmin';
       const sentEmails = new Set<string>();
       for (const [, { email, name }] of playerEmails) {
         const emailNorm = email.toLowerCase();
@@ -94,8 +94,8 @@ export async function POST(request: Request) {
         sentEmails.add(emailNorm);
         const contentHtml = `
           <p>Hola <strong>${escapeHtml(name)}</strong>,</p>
-          <p>Hemos detectado un pago que no pudo aplicarse a tu cuenta. Por favor contactá a la administración de la escuela para regularizar tu situación.</p>
-          <p><a href="${escapeHtml(baseUrl)}/dashboard" style="color: #d4002a; font-weight: bold;">Ir al panel</a></p>
+          <p>Hemos detectado un pago que no pudo aplicarse a tu cuenta. Por favor contactá a la administración de la náutica para regularizar tu situación.</p>
+          <p><a href="${escapeHtml(baseUrl)}/dashboard" style="color: #1a4a73; font-weight: bold;">Ir al panel</a></p>
         `;
         const html = buildEmailHtml(contentHtml, {
           title: subject,
@@ -121,12 +121,12 @@ export async function POST(request: Request) {
         sentEmails.add(emailNorm);
         const email = d.playerEmail!.trim();
         const amountStr = `${d.currency} ${d.amount.toLocaleString('es-AR')}`;
-        const subject = `Aviso de mora - Cuota ${d.period} - Escuelas River SN`;
+        const subject = `Aviso de mora - Cuota ${d.period} - NauticAdmin`;
         const contentHtml = `
           <p>Hola <strong>${escapeHtml(d.playerName)}</strong>,</p>
           <p>Te recordamos que la cuota correspondiente al período <strong>${d.period}</strong> (${amountStr}) se encuentra en mora.</p>
           <p>Por favor regularizá tu situación de pago lo antes posible para continuar participando en las actividades.</p>
-          <p><a href="${escapeHtml(baseUrl)}/dashboard/payments" style="color: #d4002a; font-weight: bold;">Ir a pagos</a></p>
+          <p><a href="${escapeHtml(baseUrl)}/dashboard/payments" style="color: #1a4a73; font-weight: bold;">Ir a pagos</a></p>
           <p>Si ya realizaste el pago, ignora este mensaje.</p>
         `;
         const html = buildEmailHtml(contentHtml, {

@@ -277,7 +277,7 @@ export function DelinquentsTab({ schoolId, getToken }: DelinquentsTabProps) {
         <Skeleton className="h-64 w-full" />
       ) : delinquents.length === 0 ? (
         <div className="rounded-lg border bg-muted/30 p-8 text-center text-muted-foreground">
-          No hay morosos en esta escuela
+          No hay morosos en esta náutica
         </div>
       ) : (
         <div className="overflow-x-auto rounded-md border min-w-0">

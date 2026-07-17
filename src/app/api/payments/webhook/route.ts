@@ -77,13 +77,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Regla: solo crear pago si el jugador existe en esa escuela (playerId = ID del doc en schools/{schoolId}/players)
+    // Regla: solo crear pago si el cliente existe en esa escuela (playerId = ID del doc en schools/{schoolId}/players)
     const playerExists = await playerExistsInSchool(db, schoolId, playerId);
     if (!playerExists) {
       return NextResponse.json(
         {
           error:
-            'El jugador no existe en esta escuela. El playerId debe ser el ID del documento del jugador en la escuela (schools/{schoolId}/players/{playerId}).',
+            'El cliente no existe en esta náutica. El playerId debe ser el ID del documento del cliente en la náutica (schools/{schoolId}/players/{playerId}).',
         },
         { status: 400 }
       );
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     const playerData = playerSnap.data();
     const playerName = playerData
       ? `${playerData.firstName ?? ''} ${playerData.lastName ?? ''}`.trim()
-      : 'Jugador';
+      : 'Cliente';
     const toEmail = playerData?.email;
     if (toEmail) {
       try {

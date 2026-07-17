@@ -85,7 +85,7 @@ export function Header() {
           <DropdownMenuSeparator />
           {!activeSchoolId ? (
             <p className="px-2 py-3 text-sm text-muted-foreground">
-              Selecciona una escuela para ver novedades.
+              Selecciona una náutica para ver novedades.
             </p>
           ) : solicitudesCount === 0 ? (
             <p className="px-2 py-3 text-sm text-muted-foreground">

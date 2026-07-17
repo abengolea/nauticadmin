@@ -7,23 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Pencil, ExternalLink } from "lucide-react";
 import { EditCoachFeedbackDialog } from "@/components/players/EditCoachFeedbackDialog";
 import type { Player } from "@/lib/types";
+import { formatPlayerName } from "@/lib/format-player-name";
 import { getPlayerEmbarcaciones } from "@/lib/utils";
 import { useDoc } from "@/firebase";
 import type { BoatPricingConfig } from "@/lib/types/boat-pricing";
 import { getDefaultBoatPricingItems } from "@/lib/types/boat-pricing";
-
-const POSICION_LABELS: Record<string, string> = {
-  delantero: "Delantero",
-  mediocampo: "Mediocampo",
-  defensor: "Defensor",
-  arquero: "Arquero",
-};
-
-const PIE_LABELS: Record<string, string> = {
-  derecho: "Derecho",
-  izquierdo: "Izquierdo",
-  ambidiestro: "Ambidiestro",
-};
 
 interface SummaryTabProps {
   player: Player;
@@ -44,7 +32,6 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
     const pricingItems = boatPricing?.items?.length ? boatPricing.items : getDefaultBoatPricingItems();
     const pricingMap = new Map(pricingItems.map((i) => [i.id, i]));
     const serviciosAdicionales = (player as { serviciosAdicionales?: { id: string; claseId: string }[] }).serviciosAdicionales ?? [];
-    const hasDeportivo = player.posicion_preferida || player.pie_dominante || player.altura_cm || player.peso_kg;
     const hasNautico =
       embarcaciones.length > 0 ||
       serviciosAdicionales.length > 0 ||
@@ -71,7 +58,7 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                         <TableBody>
                             <TableRow>
                                 <TableCell className="font-medium text-muted-foreground">Nombre Completo</TableCell>
-                                <TableCell className="text-right">{player.firstName} {player.lastName}</TableCell>
+                                <TableCell className="text-right">{formatPlayerName(player)}</TableCell>
                             </TableRow>
                             {player.dni && (
                                 <TableRow>
@@ -253,43 +240,6 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                 </CardContent>
             </Card>
             )}
-            {hasDeportivo && (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="font-headline">Perfil deportivo</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableBody>
-                            {player.posicion_preferida && (
-                                <TableRow>
-                                    <TableCell className="font-medium text-muted-foreground">Posición</TableCell>
-                                    <TableCell className="text-right">{POSICION_LABELS[player.posicion_preferida] || player.posicion_preferida}</TableCell>
-                                </TableRow>
-                            )}
-                            {player.pie_dominante && (
-                                <TableRow>
-                                    <TableCell className="font-medium text-muted-foreground">Pie predominante</TableCell>
-                                    <TableCell className="text-right">{PIE_LABELS[player.pie_dominante] || player.pie_dominante}</TableCell>
-                                </TableRow>
-                            )}
-                            {player.altura_cm != null && (
-                                <TableRow>
-                                    <TableCell className="font-medium text-muted-foreground">Altura</TableCell>
-                                    <TableCell className="text-right">{player.altura_cm} cm</TableCell>
-                                </TableRow>
-                            )}
-                            {player.peso_kg != null && (
-                                <TableRow>
-                                    <TableCell className="font-medium text-muted-foreground">Peso</TableCell>
-                                    <TableCell className="text-right">{player.peso_kg} kg</TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-            )}
              <Card className="lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="font-headline">Notas y observaciones</CardTitle>
@@ -317,7 +267,7 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                 onOpenChange={setEditFeedbackOpen}
                 schoolId={schoolId}
                 playerId={playerId}
-                playerName={`${player.firstName ?? ""} ${player.lastName ?? ""}`.trim()}
+                playerName={formatPlayerName(player)}
                 initialValue={player.coachFeedback ?? lastCoachComment ?? player.observations ?? ""}
               />
             )}

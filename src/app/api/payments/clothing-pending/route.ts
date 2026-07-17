@@ -1,7 +1,7 @@
 /**
  * GET /api/payments/clothing-pending?schoolId=...&playerId=...
- * Devuelve las cuotas de ropa pendientes para un jugador (admin de escuela).
- * Usa la config de la escuela: cuántas cuotas hay y cuáles ya pagó el jugador.
+ * Devuelve las cuotas de ropa pendientes para un cliente (admin de náutica).
+ * Usa la config de la náutica: cuántas cuotas hay y cuáles ya pagó el cliente.
  */
 
 import { NextResponse } from 'next/server';

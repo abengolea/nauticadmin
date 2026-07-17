@@ -1,6 +1,6 @@
 /**
  * GET /api/solicitud-embarcacion/sugerencias?q=xxx&tipo=nombre|embarcacion&nombreCliente=yyy
- * Sugerencias de nombres de clientes y embarcaciones desde los players de la escuela.
+ * Sugerencias de nombres de clientes y embarcaciones desde los players de la náutica.
  * Público (sin auth) - usa la primera escuela activa.
  */
 

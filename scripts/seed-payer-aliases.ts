@@ -170,7 +170,7 @@ async function main() {
   console.log(`\nEscuela ${SCHOOL_ID}: ${playersSnap.size} jugadores en la base.\n`);
 
   if (playersSnap.size === 0) {
-    console.error('No hay jugadores en esta escuela. Verificá que SCHOOL_ID sea correcto.');
+    console.error('No hay clientes en esta náutica. Verificá que SCHOOL_ID sea correcto.');
     console.error('El ID está en la URL: /dashboard/schools/[este-es-el-id]');
     process.exit(1);
   }
@@ -316,7 +316,7 @@ async function main() {
   if (notFound.length > 0) {
     console.log(`\n⚠ Clientes no encontrados: ${notFound.length}`);
     console.log('  El Excel tiene "APELLIDO NOMBRE" (ej: ACKERMAN CARLOS R.). La base debe tener el mismo formato.');
-    console.log('  Verificá que los jugadores tengan firstName/lastName o tutorContact.name correctos.\n');
+    console.log('  Verificá que los clientes tengan firstName/lastName o tutorContact.name correctos.\n');
     notFound.slice(0, 15).forEach((n) => console.log(`  - ${n}`));
     if (notFound.length > 15) console.log(`  ... y ${notFound.length - 15} más`);
   }

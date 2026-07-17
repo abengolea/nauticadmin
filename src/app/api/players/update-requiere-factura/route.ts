@@ -1,7 +1,7 @@
 /**
  * POST /api/players/update-requiere-factura
  * Actualiza requiereFactura en lote para varios jugadores.
- * Solo staff de la escuela (admin/coach).
+ * Solo personal de la náutica (admin/coach).
  */
 
 import { NextResponse } from "next/server";
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const role = (schoolUserSnap.data() as { role?: string })?.role;
     if (role !== "school_admin" && role !== "operador") {
       return NextResponse.json(
-        { error: "Solo el administrador o entrenador puede modificar facturación" },
+        { error: "Solo el administrador o operador puede modificar facturación" },
         { status: 403 }
       );
     }

@@ -1,5 +1,5 @@
 /**
- * Creación de preferencia en Mercado Pago para cobro de mensualidad de escuela a la plataforma.
+ * Creación de preferencia en Mercado Pago para cobro de mensualidad de náutica a la plataforma.
  * Usa MERCADOPAGO_PLATFORM_ACCESS_TOKEN (cuenta Notificassrl - titular de la plataforma).
  */
 
@@ -34,7 +34,7 @@ export function parsePlatformFeeExternalRef(ref: string): { schoolId: string; pe
 }
 
 /**
- * Crea una preferencia en Mercado Pago para pagar la mensualidad de la escuela a la plataforma.
+ * Crea una preferencia en Mercado Pago para pagar la mensualidad de la náutica a la plataforma.
  * Requiere MERCADOPAGO_PLATFORM_ACCESS_TOKEN en variables de entorno.
  */
 export async function createPlatformFeePreference(

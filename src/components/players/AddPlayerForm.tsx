@@ -155,7 +155,7 @@ export function AddPlayerForm() {
             toast({
                 variant: "destructive",
                 title: "Error de Perfil",
-                description: "Tu perfil de usuario no está asociado a una escuela. No puedes añadir jugadores.",
+                description: "Tu perfil de usuario no está asociado a una náutica. No puedes añadir clientes.",
             });
             return;
         }
@@ -258,14 +258,14 @@ export function AddPlayerForm() {
                     await sendPasswordResetEmail(mainAuth, emailNorm);
                     toast({
                         title: "Jugador añadido",
-                        description: `Se creó la cuenta y se envió un correo a ${emailNorm} para que el jugador cree su contraseña.`,
+                        description: `Se creó la cuenta y se envió un correo a ${emailNorm} para que el cliente cree su contraseña.`,
                         duration: 8000,
                     });
                 } catch (emailErr) {
                     toast({
                         title: "Jugador añadido",
                         variant: "destructive",
-                        description: `Cuenta creada, pero no se pudo enviar el correo para crear contraseña. El jugador puede usar "¿Olvidaste tu contraseña?" en el login.`,
+                        description: `Cuenta creada, pero no se pudo enviar el correo para crear contraseña. El cliente puede usar "¿Olvidaste tu contraseña?" en el login.`,
                         duration: 10000,
                     });
                 }
@@ -273,7 +273,7 @@ export function AddPlayerForm() {
                 const loginUrl = typeof window !== "undefined" ? `${window.location.origin}/auth/login` : "";
                 toast({
                     title: "Jugador añadido",
-                    description: `Comunicale la contraseña al jugador por un canal seguro. Puede iniciar sesión en ${loginUrl}`,
+                    description: `Comunicale la contraseña al cliente por un canal seguro. Puede iniciar sesión en ${loginUrl}`,
                     duration: 10000,
                 });
             } else {
@@ -303,7 +303,7 @@ export function AddPlayerForm() {
                 toast({
                     variant: "destructive",
                     title: "Email en uso",
-                    description: "Ese correo ya tiene una cuenta. Si debe acceder como jugador, usá otro email o que use «¿Olvidaste tu contraseña?» en el login.",
+                    description: "Ese correo ya tiene una cuenta. Si debe acceder como cliente, usá otro email o que use «¿Olvidaste tu contraseña?» en el login.",
                     duration: 8000,
                 });
                 return;
@@ -327,8 +327,8 @@ export function AddPlayerForm() {
                 variant: "destructive",
                 title: "Error",
                 description: authUserCreated
-                    ? "No se pudo guardar el jugador. Revisá en Firebase Auth si se creó un usuario con ese email y eliminarlo si hace falta."
-                    : "No se pudo añadir al jugador. Revisá permisos o intentá de nuevo.",
+                    ? "No se pudo guardar el cliente. Revisá en Firebase Auth si se creó un usuario con ese email y eliminarlo si hace falta."
+                    : "No se pudo añadir al cliente. Revisá permisos o intentá de nuevo.",
             });
         } finally {
             await deleteApp(tempApp);
@@ -346,7 +346,7 @@ export function AddPlayerForm() {
                     <FormItem>
                         <FormLabel>Nombre</FormLabel>
                         <FormControl>
-                        <Input placeholder="Lionel" {...field} />
+                        <Input placeholder="Juan" {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -359,7 +359,7 @@ export function AddPlayerForm() {
                     <FormItem>
                         <FormLabel>Apellido</FormLabel>
                         <FormControl>
-                        <Input placeholder="Messi" {...field} />
+                        <Input placeholder="Pérez" {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -372,7 +372,7 @@ export function AddPlayerForm() {
                     <FormItem>
                         <FormLabel>Email (acceso al panel)</FormLabel>
                         <FormControl>
-                        <Input type="email" placeholder="jugador@ejemplo.com" {...field} />
+                        <Input type="email" placeholder="cliente@ejemplo.com" {...field} />
                         </FormControl>
                         <FormDescription>Opcional. Si lo completas, podés crearle la cuenta para que entre al panel (con contraseña que vos definís o por correo para que la cree).</FormDescription>
                         <FormMessage />
@@ -390,7 +390,7 @@ export function AddPlayerForm() {
                           <Input type="password" placeholder="Mín. 6 caracteres" {...field} autoComplete="new-password" />
                         </FormControl>
                         <FormDescription>
-                          Si la dejás en blanco, le enviaremos un correo al jugador para que cree su propia contraseña.
+                          Si la dejás en blanco, le enviaremos un correo al cliente para que cree su propia contraseña.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

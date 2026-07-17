@@ -1,6 +1,6 @@
 /**
  * GET /api/payments/mercadopago/status?schoolId=...
- * Devuelve si la escuela tiene Mercado Pago conectado (para mostrar estado en la UI).
+ * Devuelve si la náutica tiene Mercado Pago conectado (para mostrar estado en la UI).
  * No expone tokens.
  */
 

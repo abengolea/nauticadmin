@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { Player } from "@/lib/types";
+import { formatPlayerName, playerNameSearchText } from "@/lib/format-player-name";
 import { getPlayerEmbarcaciones } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -158,7 +159,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     return sortedAndFilteredPlayers.filter((p) => {
       const embarcaciones = getPlayerEmbarcaciones(p);
       const embarcacionText = embarcaciones.map((e) => [e.nombre, e.matricula].filter(Boolean).join(" ")).join(" ").toLowerCase();
-      const fullName = `${p.firstName ?? ""} ${p.lastName ?? ""}`.toLowerCase();
+      const fullName = playerNameSearchText(p);
       const ubicacion = (p.ubicacion ?? "").toLowerCase();
       const dni = (p.dni ?? "").toLowerCase();
       const email = (p.email ?? "").toLowerCase();
@@ -278,7 +279,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
           summary?.sent > 0
             ? `Se enviaron ${summary.sent} invitación${summary.sent !== 1 ? "es" : ""}. Los clientes recibirán un correo para crear su contraseña.`
             : summary?.skipped > 0
-              ? "Los jugadores seleccionados no tienen email cargado."
+              ? "Los clientes seleccionados no tienen email cargado."
               : undefined,
         duration: 6000,
       });
@@ -341,7 +342,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `jugadores-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -365,11 +366,11 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   }
 
   if (error) {
-    return <div className="text-destructive p-4">Error al cargar los jugadores. Es posible que no tengas permisos para verlos.</div>
+    return <div className="text-destructive p-4">Error al cargar los clientes. Es posible que no tengas permisos para verlos.</div>
   }
   
   if (!players || activePlayers.length === 0) {
-      return <div className="text-center text-muted-foreground p-4">No hay jugadores para mostrar en esta náutica.</div>
+      return <div className="text-center text-muted-foreground p-4">No hay clientes para mostrar en esta náutica.</div>
   }
 
   return (
@@ -487,12 +488,10 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
             ) : (
               filteredBySearch.map((player) => {
                 const playerDelinquents = paymentStatus?.delinquents?.filter((d) => d.playerId === player.id) ?? [];
-                const clothingPending = paymentStatus?.clothingPendingByPlayer?.[player.id] ?? [];
-                const hasPending = playerDelinquents.length > 0 || clothingPending.length > 0;
+                const hasPending = playerDelinquents.length > 0;
                 const pendingLabels: string[] = [];
                 if (playerDelinquents.some((d) => d.period === "inscripcion")) pendingLabels.push("inscripción");
                 if (playerDelinquents.some((d) => d.period !== "inscripcion" && !d.period?.startsWith?.("ropa-"))) pendingLabels.push("cuota");
-                if (clothingPending.length > 0) pendingLabels.push("ropa");
                 return (
                 <TableRow
                   key={player.id}
@@ -505,17 +504,17 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                     checked={selectedIds.has(player.id)}
                     onCheckedChange={() => toggleSelect(player.id)}
                     disabled={!canSeePaymentStatus && !(player.email ?? "").trim().includes("@")}
-                    aria-label={player.email ? `Seleccionar ${player.firstName} ${player.lastName}` : "Sin email"}
+                    aria-label={player.email ? `Seleccionar ${formatPlayerName(player)}` : "Sin email"}
                   />
                 </TableCell>
               )}
               <TableCell className="font-medium py-2 sm:py-3">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   <Avatar className="h-8 w-8 sm:h-9 sm:w-9 shrink-0">
-                    <AvatarImage src={player.photoUrl} alt={player.firstName} data-ai-hint="person portrait" />
-                    <AvatarFallback className="text-xs">{(player.firstName?.[0] || '')}{(player.lastName?.[0] || '')}</AvatarFallback>
+                    <AvatarImage src={player.photoUrl} alt={formatPlayerName(player)} data-ai-hint="person portrait" />
+                    <AvatarFallback className="text-xs">{(player.lastName?.[0] || '')}{(player.firstName?.[0] || '')}</AvatarFallback>
                   </Avatar>
-                  <span className="truncate text-sm sm:text-base">{player.firstName} {player.lastName}</span>
+                  <span className="truncate text-sm sm:text-base">{formatPlayerName(player)}</span>
                   {canSeePaymentStatus && player.requiereFactura === false && (
                     <Badge variant="secondary" className="text-[10px] shrink-0">No factura</Badge>
                   )}

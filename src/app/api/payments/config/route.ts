@@ -1,6 +1,6 @@
 /**
  * GET /api/payments/config?schoolId=...
- * Obtiene configuración de cuotas de la escuela.
+ * Obtiene configuración de cuotas de la náutica.
  *
  * PUT /api/payments/config
  * Actualiza configuración (admin).

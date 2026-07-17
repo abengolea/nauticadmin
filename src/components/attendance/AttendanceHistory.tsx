@@ -82,7 +82,7 @@ export function AttendanceHistory({ schoolId, playerId }: Props) {
           <ClipboardCheck className="mx-auto h-12 w-12 mb-4 opacity-50" />
           <h3 className="font-semibold text-foreground">Historial de asistencia</h3>
           <p className="mt-2">
-            Aún no hay registros de asistencia para este jugador.
+            Aún no hay registros de asistencia para este cliente.
           </p>
         </CardContent>
       </Card>

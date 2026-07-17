@@ -51,9 +51,9 @@ export default function AuditLogPage() {
   }
 
   const actionLabels: Record<string, string> = {
-    "school.create": "Crear escuela",
-    "school.update": "Actualizar escuela",
-    "school.status_change": "Cambiar estado escuela",
+    "school.create": "Crear náutica",
+    "school.update": "Actualizar náutica",
+    "school.status_change": "Cambiar estado náutica",
     "platform_user.promote_super_admin": "Dar super admin",
     "platform_user.demote_super_admin": "Quitar super admin",
     "platform_config.update": "Actualizar configuración",

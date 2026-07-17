@@ -5,7 +5,7 @@ const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB para PDF
 const ALLOWED_TYPE = "application/pdf";
 
 /**
- * Sube la ficha médica (PDF) del jugador a Storage y devuelve { url, storagePath }.
+ * Sube la ficha médica (PDF) del cliente a Storage y devuelve { url, storagePath }.
  * Ruta: schools/{schoolId}/players/{playerId}/medical-record.pdf
  * Reemplaza el archivo anterior si existe.
  */

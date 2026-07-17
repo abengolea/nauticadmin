@@ -36,7 +36,7 @@ export async function processInvoiceOrder(db: Firestore, order: InvoiceOrder): P
 
     // 1) Emitir en AFIP
     const afipResult = await emitAfipComprobante({
-      ptoVta: 1, // TODO: config por escuela
+      ptoVta: 1, // TODO: config por náutica
       cbteTipo: 1, // Factura B
       concept: order.concept,
       amount: order.amount,

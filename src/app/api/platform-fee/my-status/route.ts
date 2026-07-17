@@ -1,7 +1,7 @@
 /**
  * GET /api/platform-fee/my-status?schoolId=xxx
- * Obtiene el estado de mensualidad de la escuela (para mostrar aviso si está en mora).
- * Acceso: admin/coach de la escuela o super admin.
+ * Obtiene el estado de mensualidad de la náutica (para mostrar aviso si está en mora).
+ * Acceso: admin/coach de la náutica o super admin.
  */
 
 import { NextResponse } from 'next/server';
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
     const db = getAdminFirestore();
 
-    // Verificar que el usuario pertenece a la escuela o es super admin
+    // Verificar que el usuario pertenece a la náutica o es super admin
     const platformSnap = await db.collection('platformUsers').doc(auth.uid).get();
     const isSuperAdmin = (platformSnap.data() as { super_admin?: boolean })?.super_admin === true;
 
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     const userData = userInSchool.data() as { role?: string } | undefined;
     const isSchoolAdmin = userData?.role === 'school_admin';
     if (!isSuperAdmin && (!userInSchool.exists || !isSchoolAdmin)) {
-      return NextResponse.json({ error: 'Solo el administrador de la escuela puede ver el estado de mensualidad' }, { status: 403 });
+      return NextResponse.json({ error: 'Solo el administrador de la náutica puede ver el estado de mensualidad' }, { status: 403 });
     }
 
     const schoolConfig = await getOrCreateSchoolFeeConfig(db, schoolId);
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         isBonified: true,
         inDebt: false,
-        message: 'Tu escuela está bonificada.',
+        message: 'Tu náutica está bonificada.',
       });
     }
 

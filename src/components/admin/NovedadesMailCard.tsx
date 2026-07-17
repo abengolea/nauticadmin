@@ -46,7 +46,7 @@ export function NovedadesMailCard({ schoolId, schoolName }: NovedadesMailCardPro
       toast({
         variant: "destructive",
         title: "Sin destinatarios",
-        description: "Ningún jugador tiene email cargado. Agregá emails en los perfiles.",
+        description: "Ningún cliente tiene email cargado. Agregá emails en los perfiles.",
       });
       return;
     }
@@ -56,7 +56,7 @@ export function NovedadesMailCard({ schoolId, schoolName }: NovedadesMailCardPro
     try {
       for (const player of withEmail) {
         try {
-          const firstName = player.firstName ?? "jugador";
+          const firstName = player.firstName ?? "cliente";
           const contentHtml = `<p>Hola <strong>${escapeHtml(firstName)}</strong>,</p><p>${escapeHtml(text).replace(/\n/g, "</p><p>")}</p>`;
           const html = buildEmailHtml(contentHtml, {
             title: schoolName,
@@ -99,11 +99,11 @@ export function NovedadesMailCard({ schoolId, schoolName }: NovedadesMailCardPro
           Novedades por correo
         </CardTitle>
         <CardDescription>
-          Escribí un mensaje y enviá un correo a todos los jugadores de la escuela que tengan email cargado.
+          Escribí un mensaje y enviá un correo a todos los clientes de la náutica que tengan email cargado.
           {playersLoading ? (
-            " Cargando jugadores..."
+            " Cargando clientes..."
           ) : (
-            <> {withEmail.length} jugadores con email{withoutEmail > 0 ? ` (${withoutEmail} sin email)` : ""}.</>
+            <> {withEmail.length} clientes con email{withoutEmail > 0 ? ` (${withoutEmail} sin email)` : ""}.</>
           )}
         </CardDescription>
       </CardHeader>
@@ -122,7 +122,7 @@ export function NovedadesMailCard({ schoolId, schoolName }: NovedadesMailCardPro
           <Label htmlFor="novedad-body">Mensaje</Label>
           <Textarea
             id="novedad-body"
-            placeholder="Escribí el texto que quieras comunicar a todos los chicos..."
+            placeholder="Escribí el texto que quieras comunicar a todos los clientes..."
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={5}
@@ -139,7 +139,7 @@ export function NovedadesMailCard({ schoolId, schoolName }: NovedadesMailCardPro
           ) : (
             <Mail className="mr-2 h-4 w-4" />
           )}
-          {sending ? "Enviando…" : `Enviar a ${withEmail.length} jugadores`}
+          {sending ? "Enviando…" : `Enviar a ${withEmail.length} clientes`}
         </Button>
       </CardContent>
     </Card>

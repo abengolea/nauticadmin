@@ -1,6 +1,6 @@
 /**
  * POST /api/platform-fee/payment-link
- * Genera link de pago para que la escuela pague su mensualidad (admin/coach de la escuela).
+ * Genera link de pago para que la náutica pague su mensualidad (admin/coach de la náutica).
  * Retorna checkoutUrl para redirigir a Mercado Pago.
  */
 
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     const userData = userInSchool.data() as { role?: string } | undefined;
     const isSchoolAdmin = userData?.role === 'school_admin';
     if (!isSuperAdmin && (!userInSchool.exists || !isSchoolAdmin)) {
-      return NextResponse.json({ error: 'Solo el administrador de la escuela puede pagar la mensualidad' }, { status: 403 });
+      return NextResponse.json({ error: 'Solo el administrador de la náutica puede pagar la mensualidad' }, { status: 403 });
     }
 
     const existing = await findApprovedSchoolFeePayment(db, schoolId, period);
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 
     if (schoolConfig.isBonified) {
       return NextResponse.json(
-        { error: 'Tu escuela está bonificada' },
+        { error: 'Tu náutica está bonificada' },
         { status: 400 }
       );
     }
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     const totalAmount = baseAmount + lateFeeAmount;
 
     const schoolSnap = await db.collection('schools').doc(schoolId).get();
-    const schoolName = schoolSnap.exists ? (schoolSnap.data()?.name ?? 'Escuela') : 'Escuela';
+    const schoolName = schoolSnap.exists ? (schoolSnap.data()?.name ?? 'Náutica') : 'Náutica';
 
     const { init_point } = await createPlatformFeePreference(platformToken, {
       schoolId,

@@ -108,7 +108,7 @@ export function SidebarNav() {
         { href: profileHref, label: "Mi perfil", icon: Users },
         { href: "/dashboard/appointments", label: "Sacar turno", icon: CalendarClock },
         { href: tab("attendance"), label: "Asistencia", icon: ClipboardCheck },
-        { href: tab("videoteca"), label: "Videoteca", icon: Video },
+        { href: tab("videoteca"), label: "Galería", icon: Video },
         { href: "/dashboard/payments", label: "Mis pagos", icon: Banknote, badgeOverdue: true },
       ];
     } else {
@@ -117,7 +117,7 @@ export function SidebarNav() {
         { href: "/dashboard", label: "Panel Principal", icon: Home },
         { href: profileHref, label: "Mi perfil", icon: Users },
         { href: "/dashboard/appointments", label: "Sacar turno", icon: CalendarClock },
-        { href: tab("videoteca"), label: "Videoteca", icon: Video },
+        { href: tab("videoteca"), label: "Galería", icon: Video },
         { href: "/dashboard/payments", label: "Mis pagos", icon: Banknote, badgeOverdue: true },
         { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
       ];

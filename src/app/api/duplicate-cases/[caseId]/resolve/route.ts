@@ -55,13 +55,13 @@ export async function POST(
       .get();
 
     if (!schoolUserSnap.exists) {
-      return NextResponse.json({ error: 'Sin acceso a esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin acceso a esta náutica' }, { status: 403 });
     }
 
     const role = schoolUserSnap.data()?.role;
     if (role !== 'school_admin' && role !== 'operador') {
       return NextResponse.json(
-        { error: 'Solo admin o entrenador puede resolver duplicados' },
+        { error: 'Solo admin u operador puede resolver duplicados' },
         { status: 403 }
       );
     }
@@ -72,7 +72,7 @@ export async function POST(
     }
 
     if (duplicateCase.schoolId !== schoolId) {
-      return NextResponse.json({ error: 'Caso no pertenece a esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Caso no pertenece a esta náutica' }, { status: 403 });
     }
 
     if (duplicateCase.status !== 'open') {

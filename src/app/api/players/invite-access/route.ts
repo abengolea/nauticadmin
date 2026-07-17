@@ -1,17 +1,14 @@
 /**
  * POST /api/players/invite-access
  * Crea cuentas de Firebase Auth (si no existen) y envía email con link para crear contraseña.
- * Solo school_admin u operador de la escuela.
+ * Solo school_admin u operador de la náutica.
  */
 
 import { NextResponse } from "next/server";
 import { getAdminFirestore, getAdminAuth } from "@/lib/firebase-admin";
 import { verifyIdToken } from "@/lib/auth-server";
 import { Timestamp } from "firebase-admin/firestore";
-import {
-  buildEmailHtmlServer,
-  LOGO_ATTACHMENT_SERVER,
-} from "@/lib/email-template-server";
+import { buildEmailHtmlServer } from "@/lib/email-template-server";
 
 const MAIL_COLLECTION = "mail";
 
@@ -66,7 +63,7 @@ export async function POST(request: Request) {
     const role = (schoolUserSnap.data() as { role?: string })?.role;
     if (role !== "school_admin" && role !== "operador") {
       return NextResponse.json(
-        { error: "Solo el administrador o entrenador puede enviar invitaciones" },
+        { error: "Solo el administrador o operador puede enviar invitaciones" },
         { status: 403 }
       );
     }
@@ -85,7 +82,7 @@ export async function POST(request: Request) {
         .get();
 
       if (!playerSnap.exists) {
-        results.push({ playerId, email: "", status: "skipped", detail: "Jugador no encontrado" });
+        results.push({ playerId, email: "", status: "skipped", detail: "Cliente no encontrado" });
         continue;
       }
 
@@ -150,7 +147,7 @@ export async function POST(request: Request) {
           <p>Hola <strong>${firstName}</strong>,</p>
           <p>Te damos acceso al panel de tu náutica. Hacé clic en el enlace de abajo para crear tu contraseña e iniciar sesión:</p>
           <p style="margin: 20px 0;">
-            <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background-color: #d4002a; color: white; text-decoration: none; font-weight: bold; border-radius: 6px;">Crear mi contraseña</a>
+            <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background-color: #1a4a73; color: white; text-decoration: none; font-weight: bold; border-radius: 6px;">Crear mi contraseña</a>
           </p>
           <p style="font-size: 14px; color: #6b7280;">El enlace es válido por 1 hora. Si no podés hacer clic, copiá y pegá este enlace en tu navegador:</p>
           <p style="font-size: 12px; word-break: break-all; color: #6b7280;">${resetLink}</p>
@@ -169,7 +166,6 @@ export async function POST(request: Request) {
             subject: "Acceso al panel de tu náutica - Creá tu contraseña",
             html,
             text,
-            attachments: [LOGO_ATTACHMENT_SERVER],
           },
         });
 
@@ -205,7 +201,7 @@ export async function POST(request: Request) {
           ? `Se enviaron ${sent} invitación${sent !== 1 ? "es" : ""} correctamente.`
           : errors > 0
             ? "No se pudo enviar ninguna invitación."
-            : "No hay jugadores con email para enviar.",
+            : "No hay clientes con email para enviar.",
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

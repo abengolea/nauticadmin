@@ -50,10 +50,10 @@ export default function SettingsPage() {
     }
     setSendingTest(true);
     try {
-      const subject = "Prueba Trigger Email - Escuela River";
+      const subject = "Prueba Trigger Email - NauticAdmin";
       const contentHtml = "<p>Este es un <strong>email de prueba</strong> desde la extensión Trigger Email.</p><p>Si lo recibiste, la configuración está correcta.</p>";
       const html = buildEmailHtml(contentHtml, {
-        title: "Escuelas River SN",
+        title: "NauticAdmin",
         baseUrl: typeof window !== "undefined" ? window.location.origin : "",
       });
       const text = htmlToPlainText(contentHtml);

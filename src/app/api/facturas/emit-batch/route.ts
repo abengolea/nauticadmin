@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     const ptoVta = getPtoVta(facturacion);
     const cbteTipo = getCbteTipo(facturacion);
 
-    // Verificar acceso a la escuela
+    // Verificar acceso a la náutica
     const schoolUserSnap = await db
       .collection('schools')
       .doc(schoolId)
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       .doc(auth.uid)
       .get();
     if (!schoolUserSnap.exists) {
-      return NextResponse.json({ error: 'Sin acceso a esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin acceso a esta náutica' }, { status: 403 });
     }
 
     console.log('[emit-batch] emisor:', emisor.razonSocial, emisor.cuit, '| ptoVta:', ptoVta);
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
 
         const pData = paymentSnap.data()!;
         if (pData.schoolId !== schoolId) {
-          results.push({ paymentId, ok: false, error: 'Pago no pertenece a esta escuela' });
+          results.push({ paymentId, ok: false, error: 'Pago no pertenece a esta náutica' });
           continue;
         }
         if (pData.status !== 'approved') {

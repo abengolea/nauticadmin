@@ -37,7 +37,7 @@ export interface ManualPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schoolId: string;
-  /** Lista de jugadores activos */
+  /** Lista de clientes activos */
   activePlayers: { id: string; firstName?: string; lastName?: string }[];
   /** Cuotas adeudadas por jugador (se carga al seleccionar jugador) */
   unpaidPeriods: { period: string; amount: number; currency: string; label: string }[];

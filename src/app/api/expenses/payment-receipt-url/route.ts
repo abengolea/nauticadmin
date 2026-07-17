@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'storagePath es requerido' }, { status: 400 });
     }
 
-    // Validar que el path pertenece a esta escuela
+    // Validar que el path pertenece a esta náutica
     const expectedPrefix = `schools/${schoolId}/paymentReceipts/`;
     if (!storagePath.startsWith(expectedPrefix)) {
       return NextResponse.json({ error: 'Path de comprobante inválido' }, { status: 403 });
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
     const canAccess = await isSchoolAdminOrSuperAdmin(auth.uid, schoolId);
     if (!canAccess) {
-      return NextResponse.json({ error: 'Sin permisos para esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin permisos para esta náutica' }, { status: 403 });
     }
 
     const storage = getAdminStorage();

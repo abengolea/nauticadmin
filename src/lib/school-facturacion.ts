@@ -1,5 +1,5 @@
 /**
- * Configuración de facturación electrónica por escuela (emisor fiscal = la náutica).
+ * Configuración de facturación electrónica por náutica (emisor fiscal = la náutica).
  */
 
 import type { Firestore } from 'firebase-admin/firestore';
@@ -80,12 +80,12 @@ export async function loadSchoolFacturacion(
 ): Promise<SchoolFacturacion> {
   const snap = await db.collection('schools').doc(schoolId).get();
   if (!snap.exists) {
-    throw new Error('Escuela no encontrada');
+    throw new Error('Náutica no encontrada');
   }
   const facturacion = parseSchoolFacturacion(snap.data()?.facturacion);
   if (!facturacion) {
     throw new Error(
-      'La escuela no tiene configuración de facturación. Completá la pestaña Facturación.'
+      'La náutica no tiene configuración de facturación. Completá la pestaña Facturación.'
     );
   }
   return facturacion;

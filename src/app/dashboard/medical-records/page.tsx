@@ -87,7 +87,7 @@ export default function MedicalRecordsPage() {
       <div className="flex flex-col items-center justify-center gap-4 py-16">
         <UserX className="h-12 w-12 text-muted-foreground" />
         <p className="text-muted-foreground text-center">
-          Solo el administrador o el entrenador de la escuela pueden ver la lista de fichas médicas.
+          Solo el administrador o el operador de la náutica pueden ver la lista de fichas médicas.
         </p>
         <Button variant="outline" asChild>
           <Link href="/dashboard">Volver al panel</Link>
@@ -103,7 +103,7 @@ export default function MedicalRecordsPage() {
           Fichas médicas
         </h1>
         <p className="text-muted-foreground mt-1">
-          Jugadores que aún no cargaron ficha médica o tienen una ficha pendiente de revisión. Podés subir la ficha por ellos o marcar como cumplido tras revisar el PDF.
+          Clientes que aún no cargaron ficha médica o tienen una ficha pendiente de revisión. Podés subir la ficha por ellos o marcar como cumplido tras revisar el PDF.
         </p>
       </div>
 
@@ -137,8 +137,8 @@ export default function MedicalRecordsPage() {
           <CardTitle className="text-lg">Listado de pendientes</CardTitle>
           <CardDescription>
             {pendingCount === 0
-              ? "Todos los jugadores activos tienen ficha médica cumplida."
-              : "Hacé clic en «Ver PDF» para revisar y luego «Marcar cumplido» si está correcta. También podés subir la ficha por el jugador."}
+              ? "Todos los clientes activos tienen ficha médica cumplida."
+              : "Hacé clic en «Ver PDF» para revisar y luego «Marcar cumplido» si está correcta. También podés subir la ficha por el cliente."}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -151,7 +151,7 @@ export default function MedicalRecordsPage() {
           ) : pendingCount === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               <CheckCircle className="h-12 w-12 mx-auto mb-2 text-green-500" />
-              <p>No hay jugadores pendientes de ficha médica.</p>
+              <p>No hay clientes pendientes de ficha médica.</p>
             </div>
           ) : (
             <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 min-w-0">
@@ -307,7 +307,7 @@ function PendingReviewRowActions({
       toast({
         variant: "destructive",
         title: "Motivo requerido",
-        description: "Explicá qué está mal con la ficha para que el jugador pueda corregirlo.",
+        description: "Explicá qué está mal con la ficha para que el cliente pueda corregirlo.",
       });
       return;
     }
@@ -331,9 +331,9 @@ function PendingReviewRowActions({
         const safeReason = escapeHtml(reason).replace(/\n/g, "<br>");
         const contentHtml = `<p>Hola,</p><p>Tu ficha médica no fue aprobada. Motivo:</p><p><strong>${safeReason}</strong></p><p>Por favor subí una nueva ficha médica corregida desde tu perfil en el panel.</p>`;
         const html = buildEmailHtml(contentHtml, {
-          title: "Escuelas River SN",
+          title: "NauticAdmin",
           baseUrl: typeof window !== "undefined" ? window.location.origin : "",
-          greeting: "Mensaje de tu escuela:",
+          greeting: "Mensaje de tu náutica:",
         });
         await sendMailDoc(firestore, {
           to: emailTo,
@@ -346,7 +346,7 @@ function PendingReviewRowActions({
       toast({
         title: "Ficha marcada como incumplida",
         description: emailTo
-          ? "Se envió un correo al jugador con el motivo."
+          ? "Se envió un correo al cliente con el motivo."
           : `${playerName} quedó marcado. Avisale el motivo ya que no tiene email cargado.`,
       });
       setRejectDialogOpen(false);
@@ -430,7 +430,7 @@ function PendingReviewRowActions({
           <DialogHeader>
             <DialogTitle>Marcar ficha como incumplida</DialogTitle>
             <DialogDescription>
-              Explicá qué está mal con la ficha (ej. mal impresa, faltan datos, no es legible). El jugador recibirá un correo automático con este motivo para que pueda corregirla.
+              Explicá qué está mal con la ficha (ej. mal impresa, faltan datos, no es legible). El cliente recibirá un correo automático con este motivo para que pueda corregirla.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -459,7 +459,7 @@ function PendingReviewRowActions({
   );
 }
 
-/** Botón + diálogo para subir ficha médica en nombre del jugador (solo en lista). */
+/** Botón + diálogo para subir ficha médica en nombre del cliente (solo en lista). */
 function MedicalRecordInlineUpload({
   schoolId,
   playerId,

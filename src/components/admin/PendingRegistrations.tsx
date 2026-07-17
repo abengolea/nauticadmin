@@ -89,7 +89,7 @@ export function PendingRegistrations() {
       batch.delete(pendingByEmailRef);
     }
 
-    // 1. Define el nuevo documento del jugador
+    // 1. Define el nuevo documento del cliente
     const newPlayerRef = doc(collection(firestore, `schools/${activeSchoolId}/players`));
     const newPlayerData = {
       firstName: pendingPlayer.firstName,
@@ -117,7 +117,7 @@ export function PendingRegistrations() {
       });
     }
 
-    // 2. Define la eliminación del jugador pendiente
+    // 2. Define la eliminación del cliente pendiente
     const pendingPlayerRef = doc(
       firestore,
       `schools/${activeSchoolId}/pendingPlayers`,
@@ -159,12 +159,12 @@ export function PendingRegistrations() {
         }
       }
       toast({
-        title: "¡Jugador Aprobado!",
+        title: "¡Cliente aprobado!",
         description: emailNorm
           ? emailSent
-            ? `${pendingPlayer.firstName} ${pendingPlayer.lastName} ahora es parte de la escuela. Se envió un email al jugador.`
-            : `${pendingPlayer.firstName} ${pendingPlayer.lastName} ahora es parte de la escuela. No se pudo enviar el email de aviso (revisá la extensión Trigger Email o la consola).`
-          : `${pendingPlayer.firstName} ${pendingPlayer.lastName} ahora es parte de la escuela.`,
+            ? `${pendingPlayer.firstName} ${pendingPlayer.lastName} ahora es parte de la náutica. Se envió un email al cliente.`
+            : `${pendingPlayer.firstName} ${pendingPlayer.lastName} ahora es parte de la náutica. No se pudo enviar el email de aviso (revisá la extensión Trigger Email o la consola).`
+          : `${pendingPlayer.firstName} ${pendingPlayer.lastName} ahora es parte de la náutica.`,
       });
     } catch (err) {
       errorEmitter.emit(
@@ -178,7 +178,7 @@ export function PendingRegistrations() {
         variant: "destructive",
         title: "Error de Permisos",
         description:
-          "No se pudo aprobar al jugador. Revisa tus permisos de escritura.",
+          "No se pudo aprobar al cliente. Revisa tus permisos de escritura.",
       });
     } finally {
       setActionState(null);
@@ -353,7 +353,7 @@ export function PendingRegistrations() {
           </div>
           <CardTitle className="mt-4">No hay solicitudes pendientes</CardTitle>
           <CardDescription>
-            Cuando un nuevo jugador se registre, su solicitud aparecerá aquí
+            Cuando un nuevo cliente se registre, su solicitud aparecerá aquí
             para ser aprobada.
           </CardDescription>
         </CardHeader>
@@ -393,8 +393,8 @@ export function PendingRegistrations() {
                   <p><strong>Email:</strong> {(player as { email?: string }).email}</p>
                 )}
                 {player.dni && <p><strong>DNI:</strong> {player.dni}</p>}
-                <p><strong>Tutor:</strong> {player.tutorContact.name}</p>
-                <p><strong>Tel. Tutor:</strong> {player.tutorContact.phone}</p>
+                <p><strong>Contacto:</strong> {player.tutorContact.name}</p>
+                <p><strong>Tel. contacto:</strong> {player.tutorContact.phone}</p>
             </CardContent>
             <CardFooter className="flex gap-2">
               <Button
@@ -436,7 +436,7 @@ export function PendingRegistrations() {
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
               {playerToConfirm?.action === "approve"
-                ? `Estás a punto de añadir a ${playerToConfirm?.player.firstName} a la lista oficial de jugadores de la escuela.`
+                ? `Estás a punto de añadir a ${playerToConfirm?.player.firstName} a la lista oficial de clientes de la náutica.`
                 : `Esta acción eliminará la solicitud de ${playerToConfirm?.player.firstName} permanentemente. No se podrá deshacer.`}
             </AlertDialogDescription>
           </AlertDialogHeader>

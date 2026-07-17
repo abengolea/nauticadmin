@@ -279,7 +279,7 @@ export function SuperAdminDashboard() {
                             </Table>
                             </div>
                             {(!schoolsLoading && !schools?.length) && (
-                                <p className="text-center text-muted-foreground py-8">No hay escuelas para mostrar.</p>
+                                <p className="text-center text-muted-foreground py-8">No hay náuticas para mostrar.</p>
                             )}
                         </CardContent>
                     </Card>

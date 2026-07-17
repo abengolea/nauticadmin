@@ -1,40 +1,33 @@
 import { collection, addDoc } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
-import { EMAIL_LOGO_BASE64 } from "./email-logo-base64";
 
 /** Colección que usa la extensión Trigger Email (firestore-send-email). */
 export const MAIL_COLLECTION = "mail";
 
-const BRAND_RED = "#d4002a";
+const BRAND_NAVY = "#1a4a73";
 const BODY_BG = "#f5f5f5";
 const CARD_BG = "#ffffff";
 const TEXT_COLOR = "#1a1a1a";
 const MUTED_COLOR = "#6b7280";
-const HEADER_BG = "#0a0a0a";
-
-/** CID del logo como adjunto inline (compatible con clientes que bloquean data: URI). */
-const LOGO_CID = "logo@river";
+const HEADER_BG = "#0f2a42";
 
 /**
- * Genera HTML de correo con tipografía y estilo Escuela River: cabecera negra,
- * logo de River (adjunto inline por CID) + "ESCUELAS" (rojo) "RIVER" (blanco) "SN" (rojo).
+ * Genera HTML de correo con tipografía y estilo NauticAdmin.
  */
 export function buildEmailHtml(
   contentHtml: string,
   options?: { title?: string; greeting?: string; baseUrl?: string }
 ): string {
-  const title = options?.title ?? "Escuelas River SN";
+  const title = options?.title ?? "NauticAdmin";
   const greeting = options?.greeting ?? "";
 
   const headerContent = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 0 auto;">
         <tr>
-          <td style="padding-right: 16px; vertical-align: middle;">
-            <img src="cid:${LOGO_CID}" alt="River" width="48" height="48" style="display: block; width: 48px; height: 48px; object-fit: contain;" />
+          <td style="padding-right: 12px; vertical-align: middle;">
+            <div style="width: 40px; height: 40px; background-color: ${BRAND_NAVY}; border-radius: 8px; text-align: center; line-height: 40px; color: #ffffff; font-weight: 800; font-size: 14px; letter-spacing: 0.02em;">NA</div>
           </td>
           <td style="vertical-align: middle;">
-            <span style="color: ${BRAND_RED}; font-weight: 800; font-size: 20px; letter-spacing: 0.04em; text-transform: uppercase;">ESCUELAS</span>
-            <span style="color: #ffffff; font-weight: 800; font-size: 20px; letter-spacing: 0.04em; text-transform: uppercase;"> RIVER </span>
-            <span style="color: ${BRAND_RED}; font-weight: 800; font-size: 20px; letter-spacing: 0.04em; text-transform: uppercase;">SN</span>
+            <span style="color: #ffffff; font-weight: 800; font-size: 22px; letter-spacing: 0.02em;">NauticAdmin</span>
           </td>
         </tr>
       </table>`;
@@ -63,7 +56,7 @@ export function buildEmailHtml(
                 ${contentHtml}
               </div>
               <p style="margin: 24px 0 0 0; padding-top: 16px; border-top: 1px solid #eee; font-size: 13px; color: ${MUTED_COLOR};">
-                Este correo fue enviado por Escuelas River SN. No responder a este mensaje.
+                Este correo fue enviado por NauticAdmin. No responder a este mensaje.
               </p>
             </td>
           </tr>
@@ -75,7 +68,7 @@ export function buildEmailHtml(
 </html>`;
 }
 
-/** Escapa HTML para evitar XSS en contenido controlado (ej. nombre del jugador). */
+/** Escapa HTML para evitar XSS en contenido controlado (ej. nombre del cliente). */
 export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -108,17 +101,8 @@ export interface MailPayload {
   text?: string;
 }
 
-/** Adjunto inline del logo para que los clientes de correo lo muestren (evita data: URI bloqueados). */
-const LOGO_ATTACHMENT = {
-  filename: "logo-river.png",
-  content: EMAIL_LOGO_BASE64,
-  encoding: "base64" as const,
-  cid: LOGO_CID,
-};
-
 /**
  * Encola un correo creando un documento en la colección mail (Trigger Email).
- * Incluye el logo como adjunto inline (CID) para que se vea en todos los clientes.
  */
 export async function sendMailDoc(
   firestore: Firestore,
@@ -132,7 +116,6 @@ export async function sendMailDoc(
       subject: payload.subject,
       html: payload.html,
       text,
-      attachments: [LOGO_ATTACHMENT],
     },
   });
 }

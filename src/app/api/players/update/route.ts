@@ -1,7 +1,7 @@
 /**
  * POST /api/players/update
- * Actualiza el documento de un jugador usando Admin SDK (evita reglas del cliente).
- * Autorizado si: el usuario es el jugador (su email coincide con updateData.email) o es staff de la escuela.
+ * Actualiza el documento de un cliente usando Admin SDK (evita reglas del cliente).
+ * Autorizado si: el usuario es el cliente (su email coincide con updateData.email) o es personal de la náutica.
  */
 
 import { NextResponse } from "next/server";
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
 
     if (!isPlayerSelf && !userInSchool) {
       return NextResponse.json(
-        { error: "No tenés permiso para actualizar este jugador" },
+        { error: "No tenés permiso para actualizar este cliente" },
         { status: 403 }
       );
     }
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[players/update POST]", e);
     return NextResponse.json(
-      { error: "Error al actualizar el jugador", detail: message },
+      { error: "Error al actualizar el cliente", detail: message },
       { status: 500 }
     );
   }

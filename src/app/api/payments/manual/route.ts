@@ -1,6 +1,6 @@
 /**
  * POST /api/payments/manual
- * Marca un pago como aprobado manualmente (admin de escuela).
+ * Marca un pago como aprobado manualmente (admin de náutica).
  */
 
 import { NextResponse } from 'next/server';
@@ -35,11 +35,11 @@ export async function POST(request: Request) {
     const { playerId, schoolId, period, amount, currency } = parsed.data;
     const db = getAdminFirestore();
 
-    // Regla: solo crear pago si el jugador existe en esta escuela (así el nombre siempre se resuelve)
+    // Regla: solo crear pago si el cliente existe en esta náutica (así el nombre siempre se resuelve)
     const playerExists = await playerExistsInSchool(db, schoolId, playerId);
     if (!playerExists) {
       return NextResponse.json(
-        { error: 'El jugador no existe en esta escuela. Verificá que el jugador pertenezca a la escuela seleccionada.' },
+        { error: 'El cliente no existe en esta náutica. Verificá que el cliente pertenezca a la náutica seleccionada.' },
         { status: 400 }
       );
     }
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const existing = await findApprovedPayment(db, playerId, period);
     if (existing) {
       return NextResponse.json(
-        { error: isRegistration ? 'Ya existe un pago aprobado de inscripción para este jugador' : 'Ya existe un pago aprobado para este jugador y período' },
+        { error: isRegistration ? 'Ya existe un pago aprobado de inscripción para este cliente' : 'Ya existe un pago aprobado para este cliente y período' },
         { status: 409 }
       );
     }
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     const playerData = playerSnap.data();
     const playerName = playerData
       ? `${playerData.firstName ?? ''} ${playerData.lastName ?? ''}`.trim()
-      : 'Jugador';
+      : 'Cliente';
     const toEmail = playerData?.email;
     if (toEmail) {
       await sendEmailEvent({

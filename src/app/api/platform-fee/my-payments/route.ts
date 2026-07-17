@@ -1,6 +1,6 @@
 /**
  * GET /api/platform-fee/my-payments?schoolId=xxx
- * Lista pagos de mensualidad de la escuela a la plataforma (para admin/coach de la escuela).
+ * Lista pagos de mensualidad de la náutica a la plataforma (para admin/coach de la náutica).
  */
 
 import { NextResponse } from 'next/server';
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     const userData = userInSchool.data() as { role?: string } | undefined;
     const isSchoolAdmin = userData?.role === 'school_admin';
     if (!isSuperAdmin && (!userInSchool.exists || !isSchoolAdmin)) {
-      return NextResponse.json({ error: 'Solo el administrador de la escuela puede ver el historial de mensualidades' }, { status: 403 });
+      return NextResponse.json({ error: 'Solo el administrador de la náutica puede ver el historial de mensualidades' }, { status: 403 });
     }
 
     const payments = await listSchoolFeePayments(db, { schoolId, limit: 100 });

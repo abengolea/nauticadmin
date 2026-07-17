@@ -1,7 +1,7 @@
 /**
  * POST /api/players/coach-feedback
- * Actualiza solo la devolución del entrenador (coachFeedback) del jugador.
- * Solo administrador o entrenador de la escuela.
+ * Actualiza solo la devolución del operador (coachFeedback) del cliente.
+ * Solo administrador o operador de la náutica.
  */
 
 import { NextResponse } from "next/server";
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
     if (!userInSchool && !isSuperAdmin) {
       return NextResponse.json(
-        { error: "Solo el administrador o entrenador puede editar la devolución" },
+        { error: "Solo el administrador o operador puede editar la devolución" },
         { status: 403 }
       );
     }
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     const playerSnap = await playerRef.get();
     if (!playerSnap.exists) {
       return NextResponse.json(
-        { error: "Jugador no encontrado en esta escuela" },
+        { error: "Cliente no encontrado en esta náutica" },
         { status: 404 }
       );
     }

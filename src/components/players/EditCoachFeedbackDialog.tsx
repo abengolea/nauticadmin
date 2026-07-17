@@ -78,7 +78,7 @@ export function EditCoachFeedbackDialog({
       }
       toast({
         title: "Devolución guardada",
-        description: `La devolución del entrenador para ${playerName} se guardó correctamente.`,
+        description: `La devolución del operador para ${playerName} se guardó correctamente.`,
       });
       onOpenChange(false);
       onSuccess?.();
@@ -97,16 +97,16 @@ export function EditCoachFeedbackDialog({
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Editar devolución del entrenador</DialogTitle>
+          <DialogTitle>Editar devolución del operador</DialogTitle>
           <DialogDescription>
-            Comentarios o devolución para {playerName}. Solo visible para staff de la escuela.
+            Comentarios o devolución para {playerName}. Solo visible para personal de la náutica.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <Textarea
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Escribí la devolución o comentarios del entrenador para este jugador..."
+            placeholder="Escribí la devolución o comentarios del operador para este cliente..."
             className="min-h-[120px] resize-y"
             disabled={isSubmitting}
           />

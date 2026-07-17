@@ -33,6 +33,13 @@ export async function POST(request: Request) {
     const { provider, playerId, schoolId, period, currency } = parsed.data;
     const db = getAdminFirestore();
 
+    if (isClothingPeriod(period)) {
+      return NextResponse.json(
+        { error: 'El pago de ropa ya no está disponible' },
+        { status: 400 }
+      );
+    }
+
     const config = await getOrCreatePaymentConfig(db, schoolId);
 
     // Verificar que lo que quiere pagar no esté ya pagado
@@ -50,10 +57,10 @@ export async function POST(request: Request) {
     const amount = await getExpectedAmountForPeriod(db, schoolId, playerId, period, config);
     if (amount <= 0) {
       const errMsg = isRegistrationPeriod(period)
-        ? 'La escuela no tiene configuración de cuota de inscripción para esta categoría'
+        ? 'La náutica no tiene configuración de cuota de inscripción para esta categoría'
         : isClothingPeriod(period)
-          ? 'La escuela no tiene configuración de pago de ropa'
-          : 'La escuela no tiene configuración de cuotas mensuales para esta categoría';
+          ? 'La náutica no tiene configuración de pago de ropa'
+          : 'La náutica no tiene configuración de cuotas mensuales para esta categoría';
       return NextResponse.json({ error: errMsg }, { status: 400 });
     }
 
@@ -63,7 +70,7 @@ export async function POST(request: Request) {
 
     if (provider === 'mercadopago' && !mercadopagoAccessToken) {
       return NextResponse.json(
-        { error: 'Tu escuela no tiene Mercado Pago conectado. Andá a Administración → Pagos → Configuración y tocá "Conectar Mercado Pago".' },
+        { error: 'Tu náutica no tiene Mercado Pago conectado. Andá a Administración → Pagos → Configuración y tocá "Conectar Mercado Pago".' },
         { status: 400 }
       );
     }

@@ -1,6 +1,6 @@
 /**
  * GET /api/payments/me
- * Devuelve los pagos y estado de morosidad del jugador autenticado.
+ * Devuelve los pagos y estado de morosidad del cliente autenticado.
  * Solo disponible para usuarios con rol player (vinculados vía playerLogins).
  */
 
@@ -28,12 +28,12 @@ export async function GET(request: Request) {
     const db = getAdminFirestore();
     const loginSnap = await db.collection('playerLogins').doc(emailNorm).get();
     if (!loginSnap.exists) {
-      return NextResponse.json({ error: 'No eres un jugador registrado' }, { status: 403 });
+      return NextResponse.json({ error: 'No eres un cliente registrado' }, { status: 403 });
     }
 
     const { schoolId, playerId } = loginSnap.data() as { schoolId: string; playerId: string };
     if (!schoolId || !playerId) {
-      return NextResponse.json({ error: 'Datos de jugador incompletos' }, { status: 403 });
+      return NextResponse.json({ error: 'Datos de cliente incompletos' }, { status: 403 });
     }
 
     const [paymentsResult, delinquents] = await Promise.all([

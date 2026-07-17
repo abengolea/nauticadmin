@@ -54,13 +54,13 @@ export async function POST(request: Request) {
       .get();
 
     if (!schoolUserSnap.exists) {
-      return NextResponse.json({ error: 'Sin acceso a esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin acceso a esta náutica' }, { status: 403 });
     }
 
     const role = schoolUserSnap.data()?.role;
     if (role !== 'school_admin' && role !== 'operador') {
       return NextResponse.json(
-        { error: 'Solo admin o entrenador puede ingresar pagos' },
+        { error: 'Solo admin u operador puede ingresar pagos' },
         { status: 403 }
       );
     }
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
       const toEmail = playerData?.email as string | undefined;
       const playerName = playerData
         ? `${playerData.firstName ?? ''} ${playerData.lastName ?? ''}`.trim()
-        : 'Jugador';
+        : 'Cliente';
       if (toEmail) {
         try {
           await sendEmailEvent({

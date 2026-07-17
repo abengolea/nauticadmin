@@ -26,7 +26,7 @@ export default function RecordVideoPage() {
       <Card>
         <CardContent className="p-10 text-center text-muted-foreground">
           <Video className="mx-auto h-12 w-12 mb-4 opacity-50" />
-          <p>Selecciona una escuela para grabar o subir videos a la videoteca de los jugadores.</p>
+          <p>Selecciona una náutica para grabar o subir videos a la galería de los clientes.</p>
         </CardContent>
       </Card>
     );
@@ -37,15 +37,15 @@ export default function RecordVideoPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight font-headline">Grabar video</h1>
         <p className="text-muted-foreground mt-1">
-          Añade videos a la videoteca de un jugador: graba con la cámara o sube un archivo.
+          Añade videos a la galería de un cliente: graba con la cámara o sube un archivo.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline">Videoteca de jugadores</CardTitle>
+          <CardTitle className="font-headline">Galería de videos de clientes</CardTitle>
           <CardDescription>
-            Elige un jugador y graba o sube un video para documentar habilidades y entrenamientos.
+            Elige un cliente y graba o sube un video para documentar habilidades y entrenamientos.
           </CardDescription>
         </CardHeader>
         <CardContent>

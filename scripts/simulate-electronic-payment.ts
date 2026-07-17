@@ -1,17 +1,17 @@
 /**
- * Script para simular un pago electrónico (MercadoPago) a favor de un jugador
+ * Script para simular un pago electrónico (MercadoPago) a favor de un cliente
  * identificado por email. Crea el pago vía POST al webhook de pagos.
  *
  * Uso:
  *   1. Tener el servidor Next.js corriendo (npm run dev, p. ej. en puerto 9002).
- *   2. GOOGLE_APPLICATION_CREDENTIALS o service-account.json para buscar al jugador en Firestore.
+ *   2. GOOGLE_APPLICATION_CREDENTIALS o service-account.json para buscar al cliente en Firestore.
  *   3. npx tsx scripts/simulate-electronic-payment.ts
  *   4. Opcional: PLAYER_EMAIL=otro@mail.com BASE_URL=http://localhost:9002 npx tsx scripts/simulate-electronic-payment.ts
  *   5. Por jugador directo (sin buscar por email): SCHOOL_ID=xxx PLAYER_ID=yyy npx tsx scripts/simulate-electronic-payment.ts
  *
  * Variables de entorno (o .env.local):
- *   - PLAYER_EMAIL: email del jugador (si no se usan SCHOOL_ID/PLAYER_ID)
- *   - SCHOOL_ID + PLAYER_ID: opcional; si están definidos, se usa este jugador y no se busca por email
+ *   - PLAYER_EMAIL: email del cliente (si no se usan SCHOOL_ID/PLAYER_ID)
+ *   - SCHOOL_ID + PLAYER_ID: opcional; si están definidos, se usa este cliente y no se busca por email
  *   - BASE_URL: URL de la app (default: http://localhost:9002)
  *   - PERIOD: YYYY-MM (default: mes actual)
  *   - AMOUNT: monto en número (default: 15000)

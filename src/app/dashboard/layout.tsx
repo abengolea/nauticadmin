@@ -40,7 +40,7 @@ export default function DashboardLayout({
   // Jugador con perfil incompleto: solo puede estar en su página de perfil o en Pagos.
   useEffect(() => {
     if (!isReady || !profile || profile.role !== "player" || !profile.activeSchoolId || !profile.playerId) return;
-    if (!player) return; // Esperar a que cargue el jugador
+    if (!player) return; // Esperar a que cargue el cliente
     if (isPlayerProfileComplete(player)) return;
     const profilePath = `/dashboard/players/${profile.playerId}`;
     const isOnProfilePage = pathname === profilePath || pathname?.startsWith(profilePath + "/");

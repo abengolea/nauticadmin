@@ -67,13 +67,13 @@ export const supportFlowsSeed: (Omit<SupportFlow, 'updatedAt'> & { updatedAt: Da
         choices: [
           { label: 'No veo opciones que debería ver', value: 'missing_options', nextStepId: 'perm_info' },
           { label: 'Me dice que no tengo permiso', value: 'denied', nextStepId: 'perm_info' },
-          { label: 'Necesito otro rol (admin/entrenador)', value: 'change_role', nextStepId: 'perm_form' },
+          { label: 'Necesito otro rol (admin/operador)', value: 'change_role', nextStepId: 'perm_form' },
         ],
       },
       perm_info: {
         id: 'perm_info',
         type: 'info',
-        message: 'Tu rol en la escuela define qué podés ver. Si sos jugador, solo ves tu perfil y soporte. Si sos entrenador o admin, tenés más opciones. Un administrador de la escuela puede asignarte otro rol.',
+        message: 'Tu rol en la náutica define qué podés ver. Si sos cliente, solo ves tu perfil y soporte. Si sos operador o admin, tenés más opciones. Un administrador de la náutica puede asignarte otro rol.',
         nextStepId: 'perm_confirm',
       },
       perm_form: {
@@ -106,7 +106,7 @@ export const supportFlowsSeed: (Omit<SupportFlow, 'updatedAt'> & { updatedAt: Da
   },
   {
     id: 'player_edit',
-    name: 'Jugadores (crear / editar / duplicados)',
+    name: 'Clientes (crear / editar / duplicados)',
     category: 'player_edit',
     enabled: true,
     startStepId: 'player_choice',
@@ -116,15 +116,15 @@ export const supportFlowsSeed: (Omit<SupportFlow, 'updatedAt'> & { updatedAt: Da
         type: 'choice',
         message: '¿Qué necesitás?',
         choices: [
-          { label: 'Crear un jugador', value: 'create', nextStepId: 'player_info' },
-          { label: 'Editar datos de un jugador', value: 'edit', nextStepId: 'player_form' },
+          { label: 'Crear un cliente', value: 'create', nextStepId: 'player_info' },
+          { label: 'Editar datos de un cliente', value: 'edit', nextStepId: 'player_form' },
           { label: 'Jugador duplicado o error', value: 'duplicate', nextStepId: 'player_form' },
         ],
       },
       player_info: {
         id: 'player_info',
         type: 'info',
-        message: 'Desde "Jugadores" en el menú podés agregar un nuevo jugador. Si el botón no aparece, necesitás rol de entrenador o administrador de la escuela.',
+        message: 'Desde "Clientes" en el menú podés agregar un nuevo cliente. Si el botón no aparece, necesitás rol de operador o administrador de la náutica.',
         nextStepId: 'player_confirm',
       },
       player_form: {
@@ -132,7 +132,7 @@ export const supportFlowsSeed: (Omit<SupportFlow, 'updatedAt'> & { updatedAt: Da
         type: 'form',
         message: 'Datos para el ticket (opcional: jugador afectado).',
         fields: [
-          { key: 'affectedPlayerId', label: 'ID del jugador (si lo conocés)', type: 'text', required: false },
+          { key: 'affectedPlayerId', label: 'ID del cliente (si lo conocés)', type: 'text', required: false },
           { key: 'severity', label: 'Severidad', type: 'select', options: [
             { label: 'Baja', value: 'low' },
             { label: 'Media', value: 'medium' },
@@ -270,7 +270,7 @@ export const supportFlowsSeed: (Omit<SupportFlow, 'updatedAt'> & { updatedAt: Da
       pay_info: {
         id: 'pay_info',
         type: 'info',
-        message: 'Los pagos se gestionan directamente con cada escuela; la app no procesa ni retiene el dinero. Si pagaste y no se refleja en la app, puede ser un tema de sincronización con la escuela. Podemos ayudarte con la parte de la app (pantalla, mensajes, flujo).',
+        message: 'Los pagos se gestionan directamente con cada escuela; la app no procesa ni retiene el dinero. Si pagaste y no se refleja en la app, puede ser un tema de sincronización con la náutica. Podemos ayudarte con la parte de la app (pantalla, mensajes, flujo).',
         nextStepId: 'pay_confirm',
       },
       pay_confirm: {

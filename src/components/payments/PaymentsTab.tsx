@@ -77,7 +77,7 @@ const REGISTRATION_PERIOD = "inscripcion";
 function formatPeriodDisplay(period: string, payment?: PaymentWithPlayerName): string {
   if (period === REGISTRATION_PERIOD) return "Inscripción";
   const ropaMatch = period.match(/^ropa-(\d+)$/);
-  if (ropaMatch) return `Pago de ropa (${ropaMatch[1]})`;
+  if (ropaMatch) return `Concepto ${ropaMatch[1]}`;
   const extraMatch = period.match(/^extra-(\d{6})-\d+$/);
   if (extraMatch) {
     const y = extraMatch[1].slice(0, 4);

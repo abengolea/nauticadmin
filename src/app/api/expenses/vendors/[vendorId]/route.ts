@@ -34,7 +34,7 @@ export async function GET(
 
     const canAccess = await isSchoolAdminOrSuperAdmin(auth.uid, schoolId);
     if (!canAccess) {
-      return NextResponse.json({ error: 'Sin permisos para esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin permisos para esta náutica' }, { status: 403 });
     }
 
     const db = getAdminFirestore();
@@ -122,7 +122,7 @@ export async function PATCH(
 
     const canAccess = await isSchoolAdminOrSuperAdmin(auth.uid, schoolId);
     if (!canAccess) {
-      return NextResponse.json({ error: 'Sin permisos para esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin permisos para esta náutica' }, { status: 403 });
     }
 
     const db = getAdminFirestore();

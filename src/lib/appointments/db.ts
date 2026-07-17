@@ -29,7 +29,7 @@ export async function getAppointmentConfig(
   } as AppointmentConfig & { id: string };
 }
 
-/** Lista turnos de una escuela en un rango de fechas */
+/** Lista turnos de una náutica en un rango de fechas */
 export async function getAppointmentsByDateRange(
   firestore: Firestore,
   schoolId: string,

@@ -1,6 +1,6 @@
 /**
  * POST /api/reconciliation/confirm-pending-alias
- * Asigna un alias pendiente a un jugador y lo mueve a recPayerAliases.
+ * Asigna un alias pendiente a un cliente y lo mueve a recPayerAliases.
  */
 
 import { NextResponse } from 'next/server';

@@ -105,7 +105,7 @@ export function EditSchoolUserDialog({ schoolId, user, children }: EditSchoolUse
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Editar Usuario de Escuela</DialogTitle>
+          <DialogTitle>Editar usuario de la náutica</DialogTitle>
           <DialogDescription>
             Modifica el rol para este usuario.
           </DialogDescription>

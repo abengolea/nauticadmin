@@ -1,4 +1,4 @@
-/** Habilidad/categoría para etiquetar videos de la videoteca. */
+/** Habilidad/categoría para etiquetar videos de la galería. */
 export interface VideoSkillOption {
   id: string;
   label: string;

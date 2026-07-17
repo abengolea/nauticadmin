@@ -1,7 +1,7 @@
 /**
  * POST /api/players/archive
- * Archiva un jugador (borrado parcial: no aparece en listados ni suma en totales).
- * Solo administrador de la escuela o super admin.
+ * Archiva un cliente (borrado parcial: no aparece en listados ni suma en totales).
+ * Solo administrador de la náutica o super admin.
  */
 
 import { NextResponse } from "next/server";
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
     if (!isSchoolAdmin && !isSuperAdmin) {
       return NextResponse.json(
-        { error: "Solo el administrador de la escuela puede archivar jugadores" },
+        { error: "Solo el administrador de la náutica puede archivar clientes" },
         { status: 403 }
       );
     }
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const playerSnap = await playerRef.get();
     if (!playerSnap.exists) {
       return NextResponse.json(
-        { error: "Jugador no encontrado en esta escuela" },
+        { error: "Cliente no encontrado en esta náutica" },
         { status: 404 }
       );
     }
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[players/archive POST]", e);
     return NextResponse.json(
-      { error: "Error al archivar el jugador", detail: message },
+      { error: "Error al archivar el cliente", detail: message },
       { status: 500 }
     );
   }

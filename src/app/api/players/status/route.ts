@@ -1,7 +1,7 @@
 /**
  * POST /api/players/status
- * Actualiza solo el status del jugador (active | inactive | suspended).
- * Solo administrador o entrenador de la escuela.
+ * Actualiza solo el status del cliente (active | inactive | suspended).
+ * Solo administrador o operador de la náutica.
  */
 
 import { NextResponse } from "next/server";
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
     if (!userInSchool && !isSuperAdmin) {
       return NextResponse.json(
-        { error: "Solo el administrador o entrenador de la escuela puede cambiar el estado" },
+        { error: "Solo el administrador o operador de la náutica puede cambiar el estado" },
         { status: 403 }
       );
     }
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     const playerSnap = await playerRef.get();
     if (!playerSnap.exists) {
       return NextResponse.json(
-        { error: "Jugador no encontrado en esta escuela" },
+        { error: "Cliente no encontrado en esta náutica" },
         { status: 404 }
       );
     }

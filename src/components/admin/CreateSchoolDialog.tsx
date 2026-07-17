@@ -208,7 +208,7 @@ export function CreateSchoolDialog() {
                         <FormItem>
                         <FormLabel>Nombre y Apellido del Admin</FormLabel>
                         <FormControl>
-                            <Input placeholder="Marcelo Gallardo" {...field} />
+                            <Input placeholder="Juan Pérez" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -221,7 +221,7 @@ export function CreateSchoolDialog() {
                         <FormItem>
                         <FormLabel>Email del Admin</FormLabel>
                         <FormControl>
-                            <Input type="email" placeholder="mg@riverplate.com" {...field} />
+                            <Input type="email" placeholder="admin@ejemplo.com" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -234,7 +234,7 @@ export function CreateSchoolDialog() {
                         <FormItem>
                         <FormLabel>Confirmar Email del Admin</FormLabel>
                         <FormControl>
-                            <Input type="email" placeholder="mg@riverplate.com" {...field} />
+                            <Input type="email" placeholder="admin@ejemplo.com" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -260,7 +260,7 @@ export function CreateSchoolDialog() {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSubmitting ? "Creando..." : "Crear Escuela y Admin"}
+                {isSubmitting ? "Creando..." : "Crear náutica y Admin"}
               </Button>
             </DialogFooter>
           </form>

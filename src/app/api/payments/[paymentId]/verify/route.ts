@@ -48,7 +48,7 @@ export async function PATCH(
 
     const canAccess = await isSchoolAdminOrSuperAdmin(auth.uid, schoolId);
     if (!canAccess) {
-      return NextResponse.json({ error: 'Sin permisos para esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin permisos para esta náutica' }, { status: 403 });
     }
 
     const db = getAdminFirestore();
@@ -61,7 +61,7 @@ export async function PATCH(
 
     const paymentData = paymentSnap.data()!;
     if (paymentData.schoolId !== schoolId) {
-      return NextResponse.json({ error: 'Pago no pertenece a esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Pago no pertenece a esta náutica' }, { status: 403 });
     }
     if (paymentData.status !== 'pending_verification') {
       return NextResponse.json(
@@ -98,7 +98,7 @@ export async function PATCH(
       const playerData = playerSnap.data();
       const playerName = playerData
         ? `${playerData.firstName ?? ''} ${playerData.lastName ?? ''}`.trim()
-        : 'Jugador';
+        : 'Cliente';
       const toEmail = playerData?.email;
       if (toEmail) {
         try {

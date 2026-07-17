@@ -64,7 +64,7 @@ export function RiverPlateLogo({ className }: { className?: string }) {
     <Image
       key={logoSrc}
       src={logoSrc}
-      alt="Escuelas River Logo"
+      alt="NauticAdmin Logo"
       width={40}
       height={40}
       className={cn("h-10 w-10", className)}

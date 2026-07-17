@@ -1,6 +1,6 @@
 /**
  * GET /api/duplicate-cases?schoolId=xxx
- * Lista casos de duplicado abiertos para la escuela.
+ * Lista casos de duplicado abiertos para la náutica.
  */
 
 import { NextResponse } from 'next/server';
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'schoolId requerido' }, { status: 400 });
     }
 
-    // Verificar que el usuario tenga acceso a la escuela
+    // Verificar que el usuario tenga acceso a la náutica
     const db = getAdminFirestore();
     const schoolUserSnap = await db
       .collection('schools')
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
       .get();
 
     if (!schoolUserSnap.exists) {
-      return NextResponse.json({ error: 'Sin acceso a esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin acceso a esta náutica' }, { status: 403 });
     }
 
     const cases = await listOpenDuplicateCases(db, schoolId);

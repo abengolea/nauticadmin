@@ -29,7 +29,7 @@ export async function GET(
 
     const canAccess = await isSchoolAdminOrSuperAdmin(auth.uid, schoolId);
     if (!canAccess) {
-      return NextResponse.json({ error: 'Sin permisos para esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin permisos para esta náutica' }, { status: 403 });
     }
 
     const db = getAdminFirestore();
@@ -41,7 +41,7 @@ export async function GET(
 
     const data = snap.data()!;
     if (data.schoolId !== schoolId) {
-      return NextResponse.json({ error: 'Pago no pertenece a esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Pago no pertenece a esta náutica' }, { status: 403 });
     }
 
     const storagePath = data.facturaStoragePath as string | undefined;

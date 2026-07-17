@@ -150,7 +150,7 @@ export function SchoolAdminMensualidadView({ schoolId, getToken, refreshTrigger 
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-green-800 dark:text-green-200 text-lg">
               <CheckCircle className="h-5 w-5" />
-              Escuela bonificada
+              Náutica bonificada
             </CardTitle>
             <CardDescription>
               No tenés cuotas que pagar a la plataforma.
@@ -240,13 +240,13 @@ export function SchoolAdminMensualidadView({ schoolId, getToken, refreshTrigger 
               Al día
             </CardTitle>
             <CardDescription>
-              No tenés mensualidades pendientes. Tu escuela está al día con la plataforma.
+              No tenés mensualidades pendientes. Tu náutica está al día con la plataforma.
             </CardDescription>
           </CardHeader>
         </Card>
       )}
 
-      {/* Historial de pagos de la escuela a la plataforma */}
+      {/* Historial de pagos de la náutica a la plataforma */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

@@ -1,7 +1,7 @@
 /**
  * POST /api/players/medical-record
- * Guarda en el jugador la ficha médica recién subida (url, storagePath, uploadedAt, uploadedBy).
- * Autorizado: el propio jugador (email coincide) o staff de la escuela.
+ * Guarda en el cliente la ficha médica recién subida (url, storagePath, uploadedAt, uploadedBy).
+ * Autorizado: el propio jugador (email coincide) o personal de la náutica.
  */
 
 import { NextResponse } from "next/server";
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     const playerSnap = await db.doc(`schools/${schoolId}/players/${playerId}`).get();
     if (!playerSnap.exists) {
-      return NextResponse.json({ error: "Jugador no encontrado" }, { status: 404 });
+      return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
     }
     const playerData = playerSnap.data() as { email?: string };
     const playerEmail = (playerData?.email ?? "").trim().toLowerCase();
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
     if (!isPlayerSelf && !isStaff) {
       return NextResponse.json(
-        { error: "No tenés permiso para cargar la ficha médica de este jugador" },
+        { error: "No tenés permiso para cargar la ficha médica de este cliente" },
         { status: 403 }
       );
     }

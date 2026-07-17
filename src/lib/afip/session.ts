@@ -1,5 +1,5 @@
 /**
- * Contexto AFIP por escuela.
+ * Contexto AFIP por náutica.
  *
  * Modelo delegación ARCA (Opción A):
  * - Certificados (.crt/.key): NOTIFICAS SRL (delegado / operador técnico)

@@ -1,6 +1,6 @@
 /**
  * Creación de preferencia de Checkout Pro en Mercado Pago.
- * Usa el access_token de la escuela (OAuth por escuela).
+ * Usa el access_token de la náutica (OAuth por náutica).
  */
 
 import { MercadoPagoConfig, Preference } from 'mercadopago';
@@ -38,9 +38,7 @@ export async function createMercadoPagoPreference(
   const title =
     params.period === 'inscripcion'
       ? 'Derecho de inscripción - NauticAdmin'
-      : params.period.startsWith('ropa-')
-        ? `Pago de ropa (${params.period.replace('ropa-', '')}) - NauticAdmin`
-        : `Cuota ${params.period} - NauticAdmin`;
+      : `Cuota ${params.period} - NauticAdmin`;
 
   const notificationUrl = `${BASE_URL}/api/payments/webhook/mercadopago?schoolId=${encodeURIComponent(params.schoolId)}`;
   const externalReference = `${params.schoolId}|${params.playerId}|${params.period}`;

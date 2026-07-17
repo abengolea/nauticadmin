@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 
     const canAccess = await isSchoolAdminOrSuperAdmin(auth.uid, schoolId);
     if (!canAccess) {
-      return NextResponse.json({ error: 'Sin permisos para esta escuela' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin permisos para esta náutica' }, { status: 403 });
     }
 
     const db = getAdminFirestore();
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       });
     }
 
-    // Obtener nombres de jugadores
+    // Obtener nombres de clientes
     const playersRef = db.collection('schools').doc(schoolId).collection('players');
     for (const pid of playerIds) {
       const playerSnap = await playersRef.doc(pid).get();

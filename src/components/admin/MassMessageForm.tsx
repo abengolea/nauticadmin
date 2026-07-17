@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Mail, Loader2, Sparkles } from "lucide-react";
 
-/** Jugadores con email válido. */
+/** Clientes con email válido. */
 function playersWithEmail(players: Player[]): Player[] {
   return players.filter((p) => p.email?.trim());
 }
@@ -105,9 +105,9 @@ export function MassMessageForm() {
     try {
       const contentHtml = content.replace(/\n/g, "<br>");
       const html = buildEmailHtml(contentHtml, {
-        title: "Escuelas River SN",
+        title: "NauticAdmin",
         baseUrl: typeof window !== "undefined" ? window.location.origin : "",
-        greeting: "Mensaje de tu escuela:",
+        greeting: "Mensaje de tu náutica:",
       });
       const text = htmlToPlainText(contentHtml);
 
@@ -139,7 +139,7 @@ export function MassMessageForm() {
       <Card>
         <CardHeader>
           <CardTitle>Enviar mensajes</CardTitle>
-          <CardDescription>Solo el administrador de la escuela puede enviar mensajes masivos.</CardDescription>
+          <CardDescription>Solo el administrador de la náutica puede enviar mensajes masivos.</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -149,7 +149,7 @@ export function MassMessageForm() {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">Cargando jugadores…</p>
+          <p className="text-sm text-muted-foreground">Cargando clientes…</p>
         </CardContent>
       </Card>
     );
@@ -160,7 +160,7 @@ export function MassMessageForm() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Mail className="h-5 w-5" />
-          Enviar mensaje a los chicos
+          Enviar mensaje masivo a clientes
         </CardTitle>
         <CardDescription>
           Solo reciben el correo los clientes que tienen email cargado en su perfil. Los envíos se realizan mediante Trigger Email.
@@ -181,7 +181,7 @@ export function MassMessageForm() {
           <Label htmlFor="mass-subject">Asunto</Label>
           <Input
             id="mass-subject"
-            placeholder="Ej: Próximo entrenamiento"
+            placeholder="Ej: Aviso importante"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
           />

@@ -1,7 +1,7 @@
 /**
  * POST /api/platform-fee/intent
- * Crea link de pago Mercado Pago para mensualidad de escuela (solo super admin).
- * Retorna checkoutUrl para redirigir a la escuela.
+ * Crea link de pago Mercado Pago para mensualidad de náutica (solo super admin).
+ * Retorna checkoutUrl para redirigir a la náutica.
  */
 
 import { NextResponse } from 'next/server';
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
 
     if (schoolConfig.isBonified) {
       return NextResponse.json(
-        { error: 'Esta escuela está bonificada y no debe pagar' },
+        { error: 'Esta náutica está bonificada y no debe pagar' },
         { status: 400 }
       );
     }
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     const baseAmount = await getSchoolMonthlyAmount(db, schoolId, platformConfig);
     if (baseAmount <= 0) {
       return NextResponse.json(
-        { error: 'No hay tarifa configurada para esta escuela' },
+        { error: 'No hay tarifa configurada para esta náutica' },
         { status: 400 }
       );
     }
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     const totalAmount = baseAmount + lateFeeAmount;
 
     const schoolSnap = await db.collection('schools').doc(schoolId).get();
-    const schoolName = schoolSnap.exists ? (schoolSnap.data()?.name ?? 'Escuela') : 'Escuela';
+    const schoolName = schoolSnap.exists ? (schoolSnap.data()?.name ?? 'Náutica') : 'Náutica';
 
     const { init_point } = await createPlatformFeePreference(platformToken, {
       schoolId,

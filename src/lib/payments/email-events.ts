@@ -97,7 +97,7 @@ export async function sendEmailEvent(params: SendEmailEventParams): Promise<bool
 
   switch (type) {
     case 'payment_receipt':
-      subject = `Recibo de pago - Cuota ${period} - Escuelas River SN`;
+      subject = `Recibo de pago - Cuota ${period} - NauticAdmin`;
       contentHtml = `
         <p>Hola ${escapeHtml(playerName)},</p>
         <p>Confirmamos la recepción del pago correspondiente al período <strong>${period}</strong>.</p>
@@ -107,7 +107,7 @@ export async function sendEmailEvent(params: SendEmailEventParams): Promise<bool
       `;
       break;
     case 'delinquency_10_days':
-      subject = `Aviso de mora - Cuota ${period} - Escuelas River SN`;
+      subject = `Aviso de mora - Cuota ${period} - NauticAdmin`;
       contentHtml = `
         <p>Hola ${escapeHtml(playerName)},</p>
         <p>Te recordamos que la cuota correspondiente al período <strong>${period}</strong> (${amountStr}) se encuentra en mora.</p>
@@ -116,12 +116,12 @@ export async function sendEmailEvent(params: SendEmailEventParams): Promise<bool
       `;
       break;
     case 'suspension_30_days':
-      subject = `Suspensión por mora - Cuota ${period} - Escuelas River SN`;
+      subject = `Suspensión por mora - Cuota ${period} - NauticAdmin`;
       contentHtml = `
         <p>Hola ${escapeHtml(playerName)},</p>
         <p>Informamos que por haber superado los 30 días de mora en la cuota del período <strong>${period}</strong> (${amountStr}), tu situación ha sido marcada como <strong>suspendido</strong>.</p>
         <p>Para regularizar: realizá el pago de la cuota adeudada. Una vez acreditado, tu estado se reactivará automáticamente.</p>
-        <p>Si tenés dudas, contactá a la administración de tu escuela.</p>
+        <p>Si tenés dudas, contactá a la administración de tu náutica.</p>
       `;
       break;
     default:

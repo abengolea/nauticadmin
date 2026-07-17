@@ -1,8 +1,8 @@
 /**
- * Cloud Functions para Escuela River.
+ * Cloud Functions para NauticAdmin.
  *
  * - enforceDelinquencyAndSuspensions: Job diario que:
- *   - Recorre jugadores activos por escuela
+ *   - Recorre jugadores activos por náutica
  *   - Detecta mora >= 10 días → envía email aviso
  *   - Detecta mora >= 30 días → suspende jugador y envía email
  */
@@ -193,7 +193,7 @@ export const enforceDelinquencyAndSuspensions = onSchedule(
               .update({ status: 'suspended' });
             suspended++;
             if (toEmail && (await ensureEmailSent('suspension_30_days', playerId, schoolId, period))) {
-              const subject = `Suspensión por mora - Cuota ${period} - Escuelas River SN`;
+              const subject = `Suspensión por mora - Cuota ${period} - NauticAdmin`;
               const content = `
                 <p>Hola ${playerName},</p>
                 <p>Informamos que por haber superado los 30 días de mora en la cuota del período <strong>${period}</strong> (${currency} ${periodAmount}), tu situación ha sido marcada como <strong>suspendido</strong>.</p>
@@ -204,7 +204,7 @@ export const enforceDelinquencyAndSuspensions = onSchedule(
             }
           } else if (daysOverdue >= daysEmail) {
             if (toEmail && (await ensureEmailSent('delinquency_10_days', playerId, schoolId, period))) {
-              const subject = `Aviso de mora - Cuota ${period} - Escuelas River SN`;
+              const subject = `Aviso de mora - Cuota ${period} - NauticAdmin`;
               const content = `
                 <p>Hola ${playerName},</p>
                 <p>Te recordamos que la cuota correspondiente al período <strong>${period}</strong> (${currency} ${periodAmount}) se encuentra en mora.</p>
@@ -224,7 +224,7 @@ export const enforceDelinquencyAndSuspensions = onSchedule(
 
 /**
  * Job diario: suspender escuelas en mora de mensualidad a la plataforma.
- * Si una escuela supera delinquencyDaysSuspension días sin pagar, se suspende.
+ * Si una náutica supera delinquencyDaysSuspension días sin pagar, se suspende.
  */
 export const enforceSchoolFeeSuspensions = onSchedule(
   {

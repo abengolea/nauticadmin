@@ -1,7 +1,7 @@
 /**
  * GET /api/payments/players-status?schoolId=...
- * Devuelve el estado de pagos de todos los jugadores: morosos (inscripción/cuota) y ropa pendiente.
- * Solo admin de escuela o super admin.
+ * Devuelve el estado de pagos de todos los clientes: morosos (inscripción/cuota) y ropa pendiente.
+ * Solo admin de náutica o super admin.
  */
 
 import { NextResponse } from 'next/server';
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
     if (!isSchoolAdmin && !isSuperAdmin) {
       return NextResponse.json(
-        { error: 'Solo el administrador de la escuela puede ver el estado de pagos' },
+        { error: 'Solo el administrador de la náutica puede ver el estado de pagos' },
         { status: 403 }
       );
     }

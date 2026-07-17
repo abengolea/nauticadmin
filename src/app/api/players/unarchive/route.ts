@@ -1,7 +1,7 @@
 /**
  * POST /api/players/unarchive
- * Desarchiva un jugador (vuelve a aparecer en listados y suma en totales).
- * Solo administrador de la escuela o super admin.
+ * Desarchiva un cliente (vuelve a aparecer en listados y suma en totales).
+ * Solo administrador de la náutica o super admin.
  */
 
 import { NextResponse } from "next/server";
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     if (!isSchoolAdmin && !isSuperAdmin) {
       return NextResponse.json(
-        { error: "Solo el administrador de la escuela puede desarchivar jugadores" },
+        { error: "Solo el administrador de la náutica puede desarchivar clientes" },
         { status: 403 }
       );
     }
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     const playerSnap = await playerRef.get();
     if (!playerSnap.exists) {
       return NextResponse.json(
-        { error: "Jugador no encontrado en esta escuela" },
+        { error: "Cliente no encontrado en esta náutica" },
         { status: 404 }
       );
     }
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[players/unarchive POST]", e);
     return NextResponse.json(
-      { error: "Error al desarchivar el jugador", detail: message },
+      { error: "Error al desarchivar el cliente", detail: message },
       { status: 500 }
     );
   }

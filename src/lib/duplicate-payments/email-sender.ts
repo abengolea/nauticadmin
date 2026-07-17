@@ -34,14 +34,14 @@ export async function sendInvoiceEmail(
   `;
 
   const html = buildEmailHtml(contentHtml, {
-    title: `Factura ${invoiceNumber} - Escuelas River SN`,
+    title: `Factura ${invoiceNumber} - NauticAdmin`,
     greeting: '',
   });
 
   const payload: Record<string, unknown> = {
     to,
     message: {
-      subject: `Factura ${invoiceNumber} - Escuelas River SN`,
+      subject: `Factura ${invoiceNumber} - NauticAdmin`,
       html,
       text: contentHtml.replace(/<[^>]+>/g, ''),
     },

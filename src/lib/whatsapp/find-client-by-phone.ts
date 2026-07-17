@@ -12,7 +12,7 @@ export interface ClientMatch {
 }
 
 /**
- * Busca jugadores/clientes cuya tutorContact.phone coincida con el wa_id.
+ * Busca clientes/clientes cuya tutorContact.phone coincida con el wa_id.
  * Para náuticas: los clientes están en schools/{schoolId}/players con tutorContact.phone.
  */
 export async function findClientsByPhone(

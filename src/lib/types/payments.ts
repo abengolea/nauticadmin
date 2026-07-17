@@ -14,7 +14,7 @@ export type PaymentMethod = 'card' | 'transfer' | 'cash' | 'unknown';
 /** Estado de duplicado: none, suspected (en caso abierto), confirmed/ignored (resuelto). */
 export type DuplicateStatus = 'none' | 'suspected' | 'confirmed' | 'ignored';
 
-/** Estado del jugador respecto a pagos: active, inactive, suspended (por mora >= 30 días). */
+/** Estado del cliente respecto a pagos: active, inactive, suspended (por mora >= 30 días). */
 export type PlayerStatus = 'active' | 'inactive' | 'suspended';
 
 // --- Modelos ---
@@ -96,7 +96,7 @@ export interface EmailEvent {
   idempotencyKey: string; // Para evitar duplicados: type-playerId-period
 }
 
-/** Configuración de cuotas y mora por escuela. Almacenada en schools/{schoolId}/paymentConfig/default */
+/** Configuración de cuotas y mora por náutica. Almacenada en schools/{schoolId}/paymentConfig/default */
 export interface PaymentConfig {
   id: string;
   amount: number;
@@ -106,7 +106,7 @@ export interface PaymentConfig {
   regularizationDayOfMonth?: number;
   /** Mora desde mes de activación (true) o desde siempre (false). Default true. */
   moraFromActivationMonth?: boolean;
-  /** Día del mes: si el jugador se activa después, la cuota del primer mes es prorrateada. 0 = sin prorrata. Default 15. */
+  /** Día del mes: si el cliente se activa después, la cuota del primer mes es prorrateada. 0 = sin prorrata. Default 15. */
   prorateDayOfMonth?: number;
   /** Porcentaje de la cuota en mes de ingreso si activó después de prorateDayOfMonth (0-100). Default 50. */
   proratePercent?: number;
@@ -136,7 +136,7 @@ export interface PaymentConfig {
   updatedBy: string;
 }
 
-/** Conexión OAuth de Mercado Pago por escuela. Almacenada en schools/{schoolId}/mercadopagoConnection/default */
+/** Conexión OAuth de Mercado Pago por náutica. Almacenada en schools/{schoolId}/mercadopagoConnection/default */
 export interface MercadoPagoConnection {
   access_token: string;
   refresh_token: string;

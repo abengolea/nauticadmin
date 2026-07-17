@@ -1,6 +1,6 @@
 /**
  * GET /api/payments/delinquents?schoolId=...
- * Lista morosos de la escuela (admin).
+ * Lista morosos de la náutica (admin).
  */
 
 import { NextResponse } from 'next/server';

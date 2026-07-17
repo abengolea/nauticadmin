@@ -21,7 +21,7 @@ export interface DuplicateCaseResolution {
 export interface DuplicateCase {
   id: string;
   schoolId: string;
-  customerId: string; // playerId en contexto de escuelas
+  customerId: string; // playerId en contexto de náuticas
   fingerprintHash: string;
   windowMinutes: number;
   paymentIds: string[];

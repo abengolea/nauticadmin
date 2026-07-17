@@ -49,7 +49,7 @@ export function SchoolUsersList({ schoolId }: { schoolId: string }) {
     operador: 'Operador',
     editor: 'Editor',
     viewer: 'Visor',
-    player: 'Jugador',
+    player: 'Cliente',
   };
 
   const handleRevokeAccess = async () => {
@@ -62,7 +62,7 @@ export function SchoolUsersList({ schoolId }: { schoolId: string }) {
       await deleteDoc(userRef);
       toast({
         title: "Acceso Revocado",
-        description: `El usuario ${userToDelete.displayName} ya no tiene acceso a esta escuela.`,
+        description: `El usuario ${userToDelete.displayName} ya no tiene acceso a esta náutica.`,
       });
     } catch (e) {
       toast({
@@ -83,10 +83,10 @@ export function SchoolUsersList({ schoolId }: { schoolId: string }) {
           <div>
               <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
-                  Usuarios de la Escuela
+                  Usuarios de la náutica
               </CardTitle>
               <CardDescription>
-                  {loading ? 'Cargando usuarios...' : `Hay ${users?.length || 0} usuarios asignados a esta escuela.`}
+                  {loading ? 'Cargando usuarios...' : `Hay ${users?.length || 0} usuarios asignados a esta náutica.`}
               </CardDescription>
           </div>
           <AddSchoolUserDialog schoolId={schoolId} />
@@ -149,7 +149,7 @@ export function SchoolUsersList({ schoolId }: { schoolId: string }) {
               ))}
               {!loading && (!users || users.length === 0) && (
                   <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">No hay usuarios asignados a esta escuela.</TableCell>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">No hay usuarios asignados a esta náutica.</TableCell>
                   </TableRow>
               )}
             </TableBody>
@@ -163,7 +163,7 @@ export function SchoolUsersList({ schoolId }: { schoolId: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción revocará el acceso de <span className="font-semibold">{userToDelete?.displayName}</span> a la escuela. El usuario no será eliminado de la plataforma, pero no podrá acceder a los datos de esta sede. Puedes volver a darle acceso más tarde.
+              Esta acción revocará el acceso de <span className="font-semibold">{userToDelete?.displayName}</span> a la náutica. El usuario no será eliminado de la plataforma, pero no podrá acceder a los datos de esta sede. Puedes volver a darle acceso más tarde.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

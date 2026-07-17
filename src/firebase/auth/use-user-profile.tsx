@@ -78,7 +78,7 @@ export function useUserProfile() {
         setProfileLoading(false);
         return;
       }
-      // 5. No membership in users: check playerLogins (email -> schoolId + playerId) para que el jugador inicie sesión.
+      // 5. No membership in users: check playerLogins (email -> schoolId + playerId) para que el cliente inicie sesión.
       const emailNorm = (user.email ?? '').trim().toLowerCase();
       if (!emailNorm) {
         setMemberships([]);
@@ -104,7 +104,7 @@ export function useUserProfile() {
               setProfileLoading(false);
               return;
             }
-            const displayName = ([playerData.firstName, playerData.lastName].filter(Boolean).join(' ') || user.email) ?? 'Jugador';
+            const displayName = ([playerData.firstName, playerData.lastName].filter(Boolean).join(' ') || user.email) ?? 'Cliente';
             setMemberships([{
               schoolId,
               role: 'player',

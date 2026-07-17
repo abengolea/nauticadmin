@@ -34,7 +34,7 @@ export function SupportCenter() {
   const createTicketFinal = useCallback(
     async (payload: Omit<SupportTicket, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>) => {
       if (!activeSchoolId || !user) {
-        throw new Error('No hay escuela activa o usuario');
+        throw new Error('No hay náutica activa o usuario');
       }
       const counterRef = doc(firestore, `schools/${activeSchoolId}/supportTicketCounter`, 'counter');
       const ticketsColl = collection(firestore, `schools/${activeSchoolId}/supportTickets`);

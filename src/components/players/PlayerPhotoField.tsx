@@ -23,7 +23,7 @@ interface PlayerPhotoFieldProps {
   playerId?: string;
   playerName?: string;
   disabled?: boolean;
-  /** Cuando no hay playerId, se llama con el archivo en lugar de subir (para subir después de crear el jugador). Pasar null para limpiar. */
+  /** Cuando no hay playerId, se llama con el archivo en lugar de subir (para subir después de crear el cliente). Pasar null para limpiar. */
   onFileChange?: (file: File | null) => void;
 }
 
@@ -162,7 +162,7 @@ export function PlayerPhotoField({
         if (prev) URL.revokeObjectURL(prev);
         return URL.createObjectURL(file);
       });
-      toast({ title: "Foto guardada", description: "La foto se subirá al crear el jugador." });
+      toast({ title: "Foto guardada", description: "La foto se subirá al crear el cliente." });
       return;
     }
     setUploading(true);

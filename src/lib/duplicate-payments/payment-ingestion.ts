@@ -60,7 +60,7 @@ export async function ingestPayment(
     }
   }
 
-  // 2) Verificar que el jugador exista
+  // 2) Verificar que el cliente exista
   const playerExists = await playerExistsInSchool(db, input.schoolId, input.customerId);
   if (!playerExists) {
     throw new Error(`Player ${input.customerId} not found in school ${input.schoolId}`);

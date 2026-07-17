@@ -1,7 +1,7 @@
 /**
  * POST /api/players/medical-record/approve
- * Marca la ficha médica del jugador como cumplida (approvedAt, approvedBy).
- * Solo administrador o entrenador de la escuela.
+ * Marca la ficha médica del cliente como cumplida (approvedAt, approvedBy).
+ * Solo administrador o operador de la náutica.
  */
 
 import { NextResponse } from "next/server";
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
     if (!isStaff && !isSuperAdmin) {
       return NextResponse.json(
-        { error: "Solo el administrador o entrenador de la escuela puede marcar la ficha como cumplida" },
+        { error: "Solo el administrador o operador de la náutica puede marcar la ficha como cumplida" },
         { status: 403 }
       );
     }
@@ -48,14 +48,14 @@ export async function POST(request: Request) {
     const playerRef = db.doc(`schools/${schoolId}/players/${playerId}`);
     const playerSnap = await playerRef.get();
     if (!playerSnap.exists) {
-      return NextResponse.json({ error: "Jugador no encontrado" }, { status: 404 });
+      return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
     }
 
     const data = playerSnap.data() as { medicalRecord?: { url?: string; storagePath?: string; uploadedAt?: unknown; uploadedBy?: string } };
     const current = data?.medicalRecord;
     if (!current?.url) {
       return NextResponse.json(
-        { error: "Este jugador aún no tiene una ficha médica cargada" },
+        { error: "Este cliente aún no tiene una ficha médica cargada" },
         { status: 400 }
       );
     }

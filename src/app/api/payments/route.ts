@@ -1,6 +1,6 @@
 /**
  * GET /api/payments?schoolId=...&...
- * Lista pagos con filtros (admin de escuela).
+ * Lista pagos con filtros (admin de náutica).
  */
 
 import { NextResponse } from 'next/server';

@@ -1,5 +1,5 @@
 /**
- * Acceso a Firestore para mensualidades de escuelas a la plataforma.
+ * Acceso a Firestore para mensualidades de náuticas a la plataforma.
  * Solo servidor (usa firebase-admin).
  */
 
@@ -83,7 +83,7 @@ export async function savePlatformFeeConfig(
   });
 }
 
-/** Obtiene o crea configuración de mensualidad por escuela. */
+/** Obtiene o crea configuración de mensualidad por náutica. */
 export async function getOrCreateSchoolFeeConfig(db: Firestore, schoolId: string): Promise<SchoolFeeConfig> {
   const ref = db.collection('schools').doc(schoolId).collection('schoolFeeConfig').doc(SCHOOL_FEE_CONFIG_DOC);
   const snap = await ref.get();
@@ -105,7 +105,7 @@ export async function getOrCreateSchoolFeeConfig(db: Firestore, schoolId: string
   };
 }
 
-/** Guarda configuración de mensualidad por escuela. */
+/** Guarda configuración de mensualidad por náutica. */
 export async function saveSchoolFeeConfig(
   db: Firestore,
   schoolId: string,
@@ -122,7 +122,7 @@ export async function saveSchoolFeeConfig(
   });
 }
 
-/** Obtiene monto base mensual para una escuela (0 si bonificada). */
+/** Obtiene monto base mensual para una náutica (0 si bonificada). */
 export async function getSchoolMonthlyAmount(
   db: Firestore,
   schoolId: string,
@@ -214,7 +214,7 @@ export async function findSchoolFeePaymentByProviderId(
   return toSchoolFeePayment(snap.docs[0]);
 }
 
-/** Genera períodos desde el mes de creación de la escuela hasta el mes actual. */
+/** Genera períodos desde el mes de creación de la náutica hasta el mes actual. */
 function periodsFromSchoolCreationToNow(createdAt: Date): string[] {
   const periods: string[] = [];
   const now = new Date();
@@ -227,7 +227,7 @@ function periodsFromSchoolCreationToNow(createdAt: Date): string[] {
   return periods;
 }
 
-/** Calcula escuelas en mora de mensualidad. */
+/** Calcula náuticas en mora de mensualidad. */
 export async function computeSchoolFeeDelinquents(db: Firestore): Promise<SchoolFeeDelinquent[]> {
   const platformConfig = await getOrCreatePlatformFeeConfig(db);
   const schoolsSnap = await db.collection('schools').get();
@@ -267,7 +267,7 @@ export async function computeSchoolFeeDelinquents(db: Firestore): Promise<School
 
       delinquents.push({
         schoolId,
-        schoolName: school.name ?? 'Escuela',
+        schoolName: school.name ?? 'Náutica',
         city: school.city ?? '',
         province: school.province ?? '',
         period,

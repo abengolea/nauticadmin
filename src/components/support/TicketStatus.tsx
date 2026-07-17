@@ -44,7 +44,7 @@ export function TicketStatus({ schoolId, userId }: TicketStatusProps) {
     return (
       <Card>
         <CardContent className="py-6 text-center text-muted-foreground">
-          No hay escuela activa.
+          No hay náutica activa.
         </CardContent>
       </Card>
     );

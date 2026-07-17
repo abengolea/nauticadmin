@@ -63,7 +63,7 @@ export interface PayerAlias {
   normalized_payer_name: string;
   /** ID del cliente en recClients (usado por conciliación). */
   client_id?: string;
-  /** ID del jugador en schools/{schoolId}/players (usado por import-excel cuando viene de carga de alias). */
+  /** ID del cliente en schools/{schoolId}/players (usado por import-excel cuando viene de carga de alias). */
   player_id?: string;
   created_at: string;
   created_by: string;

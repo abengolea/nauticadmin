@@ -1,6 +1,6 @@
 /**
  * GET /api/platform-fee/schools/[schoolId]/config
- * Obtiene configuración de mensualidad de la escuela (super admin).
+ * Obtiene configuración de mensualidad de la náutica (super admin).
  *
  * PUT /api/platform-fee/schools/[schoolId]/config
  * Actualiza configuración (solo super admin).

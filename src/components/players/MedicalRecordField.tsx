@@ -28,11 +28,11 @@ interface MedicalRecordFieldProps {
   schoolId: string;
   playerId: string;
   playerName?: string;
-  /** Email del jugador para enviarle el mensaje automático cuando se rechaza. */
+  /** Email del cliente para enviarle el mensaje automático cuando se rechaza. */
   playerEmail?: string | null;
-  /** Si es true, muestra los botones Marcar cumplido / Marcar incumplido (solo admin/entrenador). */
+  /** Si es true, muestra los botones Marcar cumplido / Marcar incumplido (solo admin/operador). */
   canApprove?: boolean;
-  /** Si es true, el jugador no puede subir (solo ver); si false, puede subir. */
+  /** Si es true, el cliente no puede subir (solo ver); si false, puede subir. */
   disabled?: boolean;
 }
 
@@ -104,7 +104,7 @@ export function MedicalRecordField({
       });
       toast({
         title: "Ficha médica cargada",
-        description: "El administrador o entrenador la revisará y marcará como cumplida si está correcta.",
+        description: "El administrador o operador la revisará y marcará como cumplida si está correcta.",
       });
     } catch (err) {
       toast({
@@ -134,7 +134,7 @@ export function MedicalRecordField({
       onApprove();
       toast({
         title: "Ficha marcada como cumplida",
-        description: `${playerName || "El jugador"} ya no aparece en la lista de pendientes.`,
+        description: `${playerName || "El cliente"} ya no aparece en la lista de pendientes.`,
       });
       setPreviewOpen(false);
     } catch (err) {
@@ -155,7 +155,7 @@ export function MedicalRecordField({
       toast({
         variant: "destructive",
         title: "Motivo requerido",
-        description: "Explicá qué está mal con la ficha para que el jugador pueda corregirlo.",
+        description: "Explicá qué está mal con la ficha para que el cliente pueda corregirlo.",
       });
       return;
     }
@@ -179,9 +179,9 @@ export function MedicalRecordField({
         const safeReason = escapeHtml(reason).replace(/\n/g, "<br>");
         const contentHtml = `<p>Hola,</p><p>Tu ficha médica no fue aprobada. Motivo:</p><p><strong>${safeReason}</strong></p><p>Por favor subí una nueva ficha médica corregida desde tu perfil en el panel.</p>`;
         const html = buildEmailHtml(contentHtml, {
-          title: "Escuelas River SN",
+          title: "NauticAdmin",
           baseUrl: typeof window !== "undefined" ? window.location.origin : "",
-          greeting: "Mensaje de tu escuela:",
+          greeting: "Mensaje de tu náutica:",
         });
         await sendMailDoc(firestore, {
           to: emailTo,
@@ -194,8 +194,8 @@ export function MedicalRecordField({
       toast({
         title: "Ficha marcada como incumplida",
         description: emailTo
-          ? "Se envió un correo al jugador con el motivo."
-          : `${playerName || "El jugador"} quedó marcado. Avisale el motivo ya que no tiene email cargado.`,
+          ? "Se envió un correo al cliente con el motivo."
+          : `${playerName || "El cliente"} quedó marcado. Avisale el motivo ya que no tiene email cargado.`,
       });
       setRejectDialogOpen(false);
       setRejectionReason("");
@@ -217,7 +217,7 @@ export function MedicalRecordField({
       {!hasFile ? (
         <div className="flex flex-col gap-2">
           <p className="text-sm text-muted-foreground">
-            El jugador debe adjuntar su ficha médica en PDF. También podés subirla vos desde aquí.
+            El cliente debe adjuntar su ficha médica en PDF. También podés subirla vos desde aquí.
           </p>
           {!disabled && (
             <Button
@@ -365,7 +365,7 @@ export function MedicalRecordField({
           <DialogHeader>
             <DialogTitle>Marcar ficha como incumplida</DialogTitle>
             <DialogDescription>
-              Explicá qué está mal con la ficha (ej. mal impresa, faltan datos, no es legible). El jugador recibirá un correo automático con este motivo para que pueda corregirla.
+              Explicá qué está mal con la ficha (ej. mal impresa, faltan datos, no es legible). El cliente recibirá un correo automático con este motivo para que pueda corregirla.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">

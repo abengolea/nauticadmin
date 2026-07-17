@@ -53,7 +53,7 @@ export function AttendanceSheet({ schoolId }: Props) {
   const [loadingTraining, setLoadingTraining] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Solo staff (admin/operador) puede listar jugadores; un jugador no tiene permiso.
+  // Solo staff (admin/operador) puede listar jugadores; un cliente no tiene permiso.
   const canListPlayers = isReady && schoolId && !isPlayer;
   const { data: players, loading: playersLoading } = useCollection<Player>(
     canListPlayers ? `schools/${schoolId}/players` : "",
@@ -184,7 +184,7 @@ export function AttendanceSheet({ schoolId }: Props) {
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Hacé clic en el jugador que faltó para marcarlo como ausente. Un segundo clic lo marca presente.
+        Hacé clic en el cliente que faltó para marcarlo como ausente. Un segundo clic lo marca presente.
       </p>
 
       {loadingTraining ? (
@@ -196,7 +196,7 @@ export function AttendanceSheet({ schoolId }: Props) {
       ) : activePlayers.length === 0 ? (
         <Card>
           <CardContent className="p-10 text-center text-muted-foreground">
-            No hay jugadores activos en esta escuela.
+            No hay clientes activos en esta náutica.
           </CardContent>
         </Card>
       ) : (

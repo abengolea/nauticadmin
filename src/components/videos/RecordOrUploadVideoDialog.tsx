@@ -40,7 +40,7 @@ interface RecordOrUploadVideoDialogProps {
   schoolId: string;
   initialPlayerId: string | null;
   initialPlayerName: string;
-  /** Si true, no mostrar selector de jugador (estamos en la página del jugador) */
+  /** Si true, no mostrar selector de jugador (estamos en la página del cliente) */
   embedded?: boolean;
   onSuccess?: () => void;
 }
@@ -226,20 +226,20 @@ export function RecordOrUploadVideoDialog({
       );
       toast({
         title: "Video subido",
-        description: "Se añadió a la videoteca del jugador.",
+        description: "Se añadió a la galería del cliente.",
       });
-      // Notificar por mail al jugador si tiene email
+      // Notificar por mail al cliente si tiene email
       try {
         const playerRef = doc(firestore, `schools/${schoolId}/players/${effectivePlayerId}`);
         const playerSnap = await getDoc(playerRef);
         const playerData = playerSnap.data();
         const playerEmail = playerData?.email?.trim?.();
-        const firstName = playerData?.firstName ?? (playerName?.trim() || "jugador");
+        const firstName = playerData?.firstName ?? (playerName?.trim() || "cliente");
         if (playerEmail) {
-          const subject = "Nuevo video en tu videoteca - Escuelas River SN";
-          const contentHtml = `<p>Hola <strong>${escapeHtml(firstName)}</strong>,</p><p>Tu entrenador subió un nuevo video a tu videoteca. Entrá al panel para verlo.</p><p><a href="${typeof window !== "undefined" ? window.location.origin : ""}/dashboard" style="color: #d4002a; font-weight: bold;">Ver mi videoteca</a></p>`;
+          const subject = "Nuevo video en tu galería - NauticAdmin";
+          const contentHtml = `<p>Hola <strong>${escapeHtml(firstName)}</strong>,</p><p>El personal subió un nuevo video a tu galería. Entrá al panel para verlo.</p><p><a href="${typeof window !== "undefined" ? window.location.origin : ""}/dashboard" style="color: #1a4a73; font-weight: bold;">Ver mi galería</a></p>`;
           const html = buildEmailHtml(contentHtml, {
-            title: "Escuelas River SN",
+            title: "NauticAdmin",
             greeting: "Tenés un nuevo video en tu perfil.",
             baseUrl: typeof window !== "undefined" ? window.location.origin : "",
           });
@@ -287,7 +287,7 @@ export function RecordOrUploadVideoDialog({
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Elige un jugador" />
+                <SelectValue placeholder="Elige un cliente" />
               </SelectTrigger>
               <SelectContent>
                 {activePlayers.map((p) => (
@@ -419,7 +419,7 @@ export function RecordOrUploadVideoDialog({
                         Subiendo...
                       </>
                     ) : (
-                      "Guardar en videoteca"
+                      "Guardar en galería"
                     )}
                   </Button>
                   <Button
@@ -489,7 +489,7 @@ export function RecordOrUploadVideoDialog({
             id="title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Ej: Control de balón, Entrenamiento 08/02"
+            placeholder="Ej: Maniobra / práctica, Actividad 08/02"
             disabled={uploading}
           />
         </div>
@@ -499,7 +499,7 @@ export function RecordOrUploadVideoDialog({
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Comentarios del entrenador"
+            placeholder="Comentarios del operador"
             rows={2}
             disabled={uploading}
           />
@@ -524,7 +524,7 @@ export function RecordOrUploadVideoDialog({
                 Subiendo...
               </>
             ) : (
-              "Subir a videoteca"
+              "Subir a galería"
             )}
           </Button>
         </DialogFooter>

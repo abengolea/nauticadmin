@@ -170,7 +170,7 @@ async function processNotification(params: {
       const playerData = playerSnap.data();
       const playerName = playerData
         ? `${playerData.firstName ?? ''} ${playerData.lastName ?? ''}`.trim()
-        : 'Jugador';
+        : 'Cliente';
       const toEmail = playerData?.email;
       if (toEmail) {
         try {

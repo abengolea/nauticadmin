@@ -75,7 +75,7 @@ function toPayment(docSnap: DocumentSnapshot): Payment {
   };
 }
 
-/** Obtiene o crea configuración de pagos por escuela */
+/** Obtiene o crea configuración de pagos por náutica */
 export async function getOrCreatePaymentConfig(
   db: Firestore,
   schoolId: string
@@ -125,7 +125,7 @@ export async function getOrCreatePaymentConfig(
   };
 }
 
-/** Obtiene la conexión Mercado Pago de la escuela, si existe. */
+/** Obtiene la conexión Mercado Pago de la náutica, si existe. */
 export async function getMercadoPagoConnection(
   db: Firestore,
   schoolId: string
@@ -143,7 +143,7 @@ export async function getMercadoPagoConnection(
   };
 }
 
-/** Guarda la conexión OAuth de Mercado Pago para la escuela. */
+/** Guarda la conexión OAuth de Mercado Pago para la náutica. */
 export async function setMercadoPagoConnection(
   db: Firestore,
   schoolId: string,
@@ -161,7 +161,7 @@ export async function setMercadoPagoConnection(
   });
 }
 
-/** Obtiene el access_token de Mercado Pago para la escuela (para cobrar a nombre de esa escuela). Retorna null si no está conectada. */
+/** Obtiene el access_token de Mercado Pago para la náutica (para cobrar a nombre de esa escuela). Retorna null si no está conectada. */
 export async function getMercadoPagoAccessToken(db: Firestore, schoolId: string): Promise<string | null> {
   const conn = await getMercadoPagoConnection(db, schoolId);
   return conn?.access_token ?? null;
@@ -213,7 +213,7 @@ export async function getExpectedAmountForPeriod(
   return prorated ? Math.round(amount * proratePct) : amount;
 }
 
-/** Verifica que el jugador exista en esa escuela y no esté archivado. Regla: solo crear pagos con jugadores no archivados. */
+/** Verifica que el cliente exista en esa escuela y no esté archivado. Regla: solo crear pagos con jugadores no archivados. */
 export async function playerExistsInSchool(
   db: Firestore,
   schoolId: string,
@@ -243,7 +243,7 @@ export async function findApprovedPayment(
 }
 
 /**
- * Obtiene todos los pagos aprobados de una escuela en una sola consulta (o pocas).
+ * Obtiene todos los pagos aprobados de una náutica en una sola consulta (o pocas).
  * Retorna Map<playerId, Set<period>> para lookup O(1).
  */
 export async function getAllApprovedPaymentsForSchool(
@@ -282,7 +282,7 @@ export async function getAllApprovedPaymentsForSchool(
   return map;
 }
 
-/** Busca pago aprobado de inscripción para un jugador (una sola vez por jugador). */
+/** Busca pago aprobado de inscripción para un cliente (una sola vez por jugador). */
 export async function findApprovedRegistrationPayment(
   db: Firestore,
   playerId: string
@@ -290,7 +290,7 @@ export async function findApprovedRegistrationPayment(
   return findApprovedPayment(db, playerId, REGISTRATION_PERIOD);
 }
 
-/** Cuota de ropa pendiente para un jugador. */
+/** Cuota de ropa pendiente para un cliente. */
 export interface ClothingPendingItem {
   period: string;
   amount: number;
@@ -309,61 +309,23 @@ function getClothingAmountForInstallment(config: PaymentConfig, installmentIndex
   return installmentIndex <= remainder ? base + 1 : base;
 }
 
-/** Obtiene las cuotas de ropa pendientes para un jugador según la config de la escuela. */
+/** Cuotas de ropa: deshabilitado (feature retirada). */
 export async function getClothingPendingForPlayer(
-  db: Firestore,
-  schoolId: string,
-  playerId: string,
-  config: PaymentConfig
+  _db: Firestore,
+  _schoolId: string,
+  _playerId: string,
+  _config: PaymentConfig
 ): Promise<ClothingPendingItem[]> {
-  const total = config.clothingAmount ?? 0;
-  const installments = config.clothingInstallments ?? 2;
-  if (total <= 0 || installments < 1) return [];
-
-  const pending: ClothingPendingItem[] = [];
-  for (let i = 1; i <= installments; i++) {
-    const period = `${CLOTHING_PERIOD_PREFIX}${i}`;
-    const hasPaid = await findApprovedPayment(db, playerId, period);
-    if (!hasPaid) {
-      const amount = getClothingAmountForInstallment(config, i);
-      if (amount > 0) {
-        pending.push({ period, amount, installmentIndex: i, totalInstallments: installments });
-      }
-    }
-  }
-  return pending;
+  return [];
 }
 
-/** Obtiene las cuotas de ropa pendientes por jugador para todos los jugadores activos de la escuela. */
+/** Cuotas de ropa por jugador: deshabilitado (feature retirada). */
 export async function getClothingPendingByPlayerMap(
-  db: Firestore,
-  schoolId: string,
-  approvedPaymentsMap?: Map<string, Set<string>>
+  _db: Firestore,
+  _schoolId: string,
+  _approvedPaymentsMap?: Map<string, Set<string>>
 ): Promise<Record<string, ClothingPendingItem[]>> {
-  const playersWithConfig = await getActivePlayersWithConfig(db, schoolId);
-  if (playersWithConfig.length === 0) return {};
-  const config = playersWithConfig[0].config;
-  if ((config.clothingAmount ?? 0) <= 0) return {};
-
-  const paidMap = approvedPaymentsMap ?? (await getAllApprovedPaymentsForSchool(db, schoolId));
-  const installments = config.clothingInstallments ?? 2;
-  const result: Record<string, ClothingPendingItem[]> = {};
-
-  for (const { player } of playersWithConfig) {
-    const pending: ClothingPendingItem[] = [];
-    for (let i = 1; i <= installments; i++) {
-      const period = `${CLOTHING_PERIOD_PREFIX}${i}`;
-      const paid = paidMap.get(player.id)?.has(period);
-      if (!paid) {
-        const amount = getClothingAmountForInstallment(config, i);
-        if (amount > 0) {
-          pending.push({ period, amount, installmentIndex: i, totalInstallments: installments });
-        }
-      }
-    }
-    if (pending.length > 0) result[player.id] = pending;
-  }
-  return result;
+  return {};
 }
 
 /** Busca pago por provider + providerPaymentId (evitar duplicados) */
@@ -444,7 +406,7 @@ export async function createPaymentIntent(
   };
 }
 
-/** Obtiene requiereFactura de jugadores. Default true si no está definido. */
+/** Obtiene requiereFactura de clientes. Default true si no está definido. */
 export async function getPlayerRequiereFacturaMap(
   db: Firestore,
   schoolId: string,
@@ -472,7 +434,7 @@ export async function getPlayerRequiereFacturaMap(
   return map;
 }
 
-/** Obtiene nombres de jugadores por IDs (schools/{schoolId}/players). Si el ID no es un doc, intenta resolverlo como UID de Firebase Auth (email → playerLogins → jugador). */
+/** Obtiene nombres de clientes por IDs (schools/{schoolId}/players). Si el ID no es un doc, intenta resolverlo como UID de Firebase Auth (email → playerLogins → jugador). */
 export async function getPlayerNames(
   db: Firestore,
   schoolId: string,
@@ -499,7 +461,7 @@ export async function getPlayerNames(
       }
     });
   }
-  // Fallback 1: el ID puede ser el doc id del jugador pero en OTRA escuela (p. ej. Gregorio: doc id Xt2r6Fx2yT0IG0QCd7Ai en otra escuela)
+  // Fallback 1: el ID puede ser el doc id del cliente pero en OTRA escuela (p. ej. Gregorio: doc id Xt2r6Fx2yT0IG0QCd7Ai en otra escuela)
   const missingIds = unique.filter((id) => map.get(id) === id);
   if (missingIds.length === 0) return map;
   const schoolsSnap = await db.collection('schools').get();
@@ -540,12 +502,12 @@ export async function getPlayerNames(
           playerSnap = await playersRef.doc(docId).get();
         }
       }
-      // 2) Si no tiene playerLogins o la escuela no coincide, buscar por email en esta escuela
+      // 2) Si no tiene playerLogins o la náutica no coincide, buscar por email en esta náutica
       if (!playerSnap?.exists) {
         const byEmail = await playersRef.where('email', '==', emailNorm).limit(1).get();
         playerSnap = byEmail.empty ? null : byEmail.docs[0];
       }
-      // 3) Si sigue sin aparecer (jugador en otra escuela o creado sin escuela), buscar en todas las escuelas
+      // 3) Si sigue sin aparecer (jugador en otra escuela o creado sin escuela), buscar en todas las náuticas
       if (!playerSnap?.exists) {
         const schoolsSnap = await db.collection('schools').get();
         for (const schoolDoc of schoolsSnap.docs) {
@@ -575,7 +537,7 @@ export async function getPlayerNames(
   return map;
 }
 
-/** Obtiene los IDs de jugadores archivados de una escuela (para excluir sus pagos de totales). */
+/** Obtiene los IDs de clientes archivados de una náutica (para excluir sus pagos de totales). */
 export async function getArchivedPlayerIds(
   db: Firestore,
   schoolId: string
@@ -649,7 +611,7 @@ export async function listPayments(
   return { payments, total };
 }
 
-/** Obtiene jugadores activos de una escuela (no archivados) con su configuración de pago */
+/** Obtiene jugadores activos de una náutica (no archivados) con su configuración de pago */
 export async function getActivePlayersWithConfig(
   db: Firestore,
   schoolId: string
@@ -753,9 +715,9 @@ function periodsFromActivationToNow(activatedAt: Date): string[] {
 
 /**
  * Calcula morosos: jugadores que deben desde su mes de activación.
- * - Inscripción: si la escuela tiene registrationAmount > 0 y el jugador no tiene pago aprobado de inscripción, se agrega un ítem con period "inscripcion".
+ * - Inscripción: si la náutica tiene registrationAmount > 0 y el cliente no tiene pago aprobado de inscripción, se agrega un ítem con period "inscripcion".
  * - Cuota mensual: solo períodos >= mes de activación. Si registrationCancelsMonthFee y ya pagó inscripción, el mes de alta no se exige como cuota (inscripción la cubre).
- * - Si el jugador se activó después del día 15, la cuota del primer mes es 50%.
+ * - Si el cliente se activó después del día 15, la cuota del primer mes es 50%.
  */
 export async function computeDelinquents(
   db: Firestore,
@@ -862,7 +824,7 @@ export interface UnpaidPeriodItem {
 }
 
 /**
- * Obtiene las cuotas adeudadas de un jugador, ordenadas de la más vieja a la más nueva.
+ * Obtiene las cuotas adeudadas de un cliente, ordenadas de la más vieja a la más nueva.
  * Usado para: (1) selector en pago manual, (2) imputación automática en Excel (cuota más vieja).
  */
 export async function getUnpaidPeriodsForPlayer(
@@ -953,8 +915,8 @@ export async function getUnpaidPeriodsForPlayer(
 
 /**
  * Obtiene morosos adicionales a partir de pagos no aplicados (observados).
- * Los pagos con Aplicada=No en el Excel van a unappliedPayments y NO se acreditan al jugador.
- * Si un jugador tiene un pago no aplicado para un período que debe, debe aparecer como moroso.
+ * Los pagos con Aplicada=No en el Excel van a unappliedPayments y NO se acreditan al cliente.
+ * Si un cliente tiene un pago no aplicado para un período que debe, debe aparecer como moroso.
  */
 export async function getDelinquentsFromUnapplied(
   db: Firestore,
@@ -1031,7 +993,7 @@ export async function getDelinquentsFromUnapplied(
   return result.sort((a, b) => b.daysOverdue - a.daysOverdue);
 }
 
-/** Actualiza status del jugador (ej. a suspended). Si el documento no existe, no hace nada (evita 500 en webhook). */
+/** Actualiza status del cliente (ej. a suspended). Si el documento no existe, no hace nada (evita 500 en webhook). */
 export async function updatePlayerStatus(
   db: Firestore,
   schoolId: string,

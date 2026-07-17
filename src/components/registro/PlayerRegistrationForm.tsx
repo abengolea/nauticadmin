@@ -81,7 +81,7 @@ export function PlayerRegistrationForm() {
       // 1. Crear cuenta (email + contraseña); el usuario queda logueado
       await createUserWithEmailAndPassword(auth, emailNorm, values.password);
 
-      // 2. Crear solicitud pendiente en la escuela con nombre y apellido
+      // 2. Crear solicitud pendiente en la náutica con nombre y apellido
       const pendingRef = collection(
         firestore,
         `schools/${values.schoolId}/pendingPlayers`

@@ -34,7 +34,7 @@ export default function CheckoutPage() {
         <CardContent className="space-y-4">
           {isStub && (
             <p className="text-sm text-muted-foreground">
-              Por ahora la escuela puede registrar tu pago manualmente (efectivo, transferencia). Volvé a
+              Por ahora la náutica puede registrar tu pago manualmente (efectivo, transferencia). Volvé a
               <strong> Pago de cuotas</strong> para ver el estado de tus pagos.
             </p>
           )}

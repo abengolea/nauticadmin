@@ -37,7 +37,7 @@ interface PlayerVideotecaProps {
   schoolId: string;
   playerId: string;
   playerName: string;
-  /** Si viene desde la página del jugador, no mostrar selector de jugador en el diálogo */
+  /** Si viene desde la página del cliente, no mostrar selector de jugador en el diálogo */
   embedded?: boolean;
   /** Jugador viendo su perfil: no mostrar Grabar/Subir video ni eliminar. */
   isViewingAsPlayer?: boolean;
@@ -86,7 +86,7 @@ export function PlayerVideoteca({
       await deleteDoc(
         doc(firestore, `schools/${schoolId}/playerVideos/${videoToDelete.id}`)
       );
-      toast({ title: "Video eliminado", description: "Se eliminó de la videoteca." });
+      toast({ title: "Video eliminado", description: "Se eliminó de la galería." });
       setVideoToDelete(null);
     } catch (e) {
       toast({
@@ -111,7 +111,7 @@ export function PlayerVideoteca({
     return (
       <Card>
         <CardContent className="p-6 text-center text-muted-foreground">
-          Error al cargar la videoteca. Revisa permisos o índices de Firestore.
+          Error al cargar la galería. Revisa permisos o índices de Firestore.
         </CardContent>
       </Card>
     );
@@ -124,7 +124,7 @@ export function PlayerVideoteca({
     <>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h3 className="text-lg font-semibold font-headline">Videoteca</h3>
+          <h3 className="text-lg font-semibold font-headline">Galería</h3>
           {!isViewingAsPlayer && (
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
@@ -206,8 +206,8 @@ export function PlayerVideoteca({
               <Film className="h-14 w-14 text-muted-foreground mb-4 opacity-60" />
               <p className="text-muted-foreground text-center max-w-sm mb-4">
                 {isViewingAsPlayer
-                  ? "Aún no hay videos en tu videoteca. Tu entrenador puede agregar videos para documentar tus habilidades."
-                  : `Aún no hay videos de ${playerName}. Graba o sube un video para documentar habilidades y entrenamientos.`}
+                  ? "Aún no hay videos en tu galería. El personal puede agregar videos para documentar tus habilidades."
+                  : `Aún no hay videos de ${playerName}. Grabá o subí un video para documentar actividades.`}
               </p>
               {!isViewingAsPlayer && (
                 <Button onClick={() => setDialogOpen(true)}>
@@ -281,7 +281,7 @@ export function PlayerVideoteca({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar este video?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se quitará de la videoteca del jugador. Esta acción no se puede deshacer.
+              Se quitará de la galería del cliente. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

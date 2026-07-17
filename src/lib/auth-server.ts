@@ -20,7 +20,7 @@ export async function verifyIdToken(authHeader: string | null): Promise<{ uid: s
 }
 
 /**
- * Verifica que el usuario sea admin de la escuela (school_admin) o super admin.
+ * Verifica que el usuario sea admin de la náutica (school_admin) o super admin.
  * Consulta schools/{schoolId}/users/{uid} y platformUsers/{uid}.
  */
 export async function isSchoolAdminOrSuperAdmin(uid: string, schoolId: string): Promise<boolean> {

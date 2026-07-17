@@ -1,6 +1,6 @@
 /**
  * GET /api/payments/player-unpaid?schoolId=...&playerId=...
- * Devuelve las cuotas adeudadas de un jugador, ordenadas de la más vieja a la más nueva.
+ * Devuelve las cuotas adeudadas de un cliente, ordenadas de la más vieja a la más nueva.
  * Usado para el selector de imputación en pagos manuales.
  */
 

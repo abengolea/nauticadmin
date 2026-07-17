@@ -127,7 +127,7 @@ export function OperatorDashboard() {
         try {
           const statusLabel = statusLabels[newStatus] ?? newStatus;
           const contentHtml = `<p>Tu ticket de soporte <strong>#${ticket.ticketNumber}</strong> fue marcado como <strong>${escapeHtml(statusLabel)}</strong>.</p><p>Resumen: ${escapeHtml(ticket.summary)}</p><p>Si tenés más dudas, podés abrir otro ticket desde el Centro de Soporte en la app.</p>`;
-          const subject = `Ticket #${ticket.ticketNumber} ${statusLabel} - Escuelas River SN`;
+          const subject = `Ticket #${ticket.ticketNumber} ${statusLabel} - NauticAdmin`;
           const html = buildEmailHtml(contentHtml, {
             title: subject,
             greeting: `Hola${ticket.userDisplayName ? ` ${escapeHtml(ticket.userDisplayName)}` : ''},`,
@@ -210,17 +210,17 @@ export function OperatorDashboard() {
       {isSuperAdmin && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Filtrar por escuela</CardTitle>
-            <CardDescription>Superadmin puede ver cualquier escuela.</CardDescription>
+            <CardTitle className="text-base">Filtrar por náutica</CardTitle>
+            <CardDescription>Superadmin puede ver cualquier náutica.</CardDescription>
           </CardHeader>
           <CardContent>
             <Input
-              placeholder="ID de escuela (dejar vacío para ver todas no soportado en esta versión)"
+              placeholder="ID de náutica (dejar vacío para ver todas no soportado en esta versión)"
               value={schoolFilter}
               onChange={(e) => setSchoolFilter(e.target.value)}
             />
             <p className="text-muted-foreground mt-1 text-xs">
-              Por ahora mostramos la escuela activa. Para ver otra, cambiá de escuela en el panel.
+              Por ahora mostramos la náutica activa. Para ver otra, cambiá de náutica en el panel.
             </p>
           </CardContent>
         </Card>
