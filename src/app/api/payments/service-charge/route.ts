@@ -14,6 +14,7 @@ import {
 } from '@/lib/payments/db';
 import { buildEmailHtmlServer } from '@/lib/email-template-server';
 import { escapeHtml } from '@/lib/email';
+import { getSchoolEmailBrand } from '@/lib/email-brand';
 import { verifyIdToken } from '@/lib/auth-server';
 
 const MAIL_COLLECTION = 'mail';
@@ -111,7 +112,8 @@ export async function POST(request: Request) {
 
     if (toEmail) {
       const amountStr = `${currency} ${amount.toLocaleString('es-AR')}`;
-      const subject = `Servicio facturado: ${concept} - NauticAdmin`;
+      const { brandName, logoUrl } = await getSchoolEmailBrand(db, schoolId);
+      const subject = `Servicio facturado: ${concept} - ${brandName}`;
       const contentHtml = `
         <p>Hola ${escapeHtml(playerName)},</p>
         <p>Te informamos que se ha cargado el siguiente concepto a tu cuenta:</p>
@@ -121,7 +123,9 @@ export async function POST(request: Request) {
         <p>Este concepto se incluirá en tu próxima facturación.</p>
       `;
       const html = buildEmailHtmlServer(contentHtml, {
-        title: 'NauticAdmin',
+        brandName,
+        logoUrl,
+        title: brandName,
         greeting: `Estimado/a ${escapeHtml(playerName)}:`,
       });
       await enqueueMail(db, {

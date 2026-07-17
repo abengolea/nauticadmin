@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 import { verifyIdToken } from "@/lib/auth-server";
 import { buildEmailHtmlServer } from "@/lib/email-template-server";
+import { getSchoolEmailBrand } from "@/lib/email-brand";
 
 const MAIL_COLLECTION = "mail";
 
@@ -64,13 +65,16 @@ export async function POST(request: Request) {
     }
 
     const to = (body.playerEmail as string).trim().toLowerCase();
-    const subject = "Fuiste aceptado - NauticAdmin";
+    const { brandName, logoUrl } = await getSchoolEmailBrand(db, body.schoolId as string);
+    const subject = `Fuiste aceptado - ${brandName}`;
     const contentHtml = `
       <p>Tu solicitud de registro fue <strong>aceptada</strong>.</p>
       <p>Ya podés ingresar al panel con tu email y la contraseña que elegiste al registrarte.</p>
       <p>Si olvidaste tu contraseña, en la pantalla de inicio de sesión usá <strong>Olvidé mi contraseña</strong> para restablecerla.</p>
     `;
     const html = buildEmailHtmlServer(contentHtml, {
+      brandName,
+      logoUrl,
       title: subject,
       greeting: "Hola,",
     });

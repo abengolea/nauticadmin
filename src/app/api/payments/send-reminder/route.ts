@@ -9,6 +9,7 @@ import { getAdminFirestore } from '@/lib/firebase-admin';
 import { verifyIdToken } from '@/lib/auth-server';
 import { computeDelinquents } from '@/lib/payments/db';
 import { buildEmailHtml, escapeHtml } from '@/lib/email';
+import { getSchoolEmailBrand } from '@/lib/email-brand';
 
 const MAIL_COLLECTION = 'mail';
 
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
 
     let sent = 0;
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+    const { brandName, logoUrl } = await getSchoolEmailBrand(db, schoolId);
 
     if (type === 'unapplied') {
       const unappliedRef = db.collection('schools').doc(schoolId).collection('unappliedPayments');
@@ -86,7 +88,7 @@ export async function POST(request: Request) {
         }
       }
 
-      const subject = 'Pago sin aplicar - NauticAdmin';
+      const subject = `Pago sin aplicar - ${brandName}`;
       const sentEmails = new Set<string>();
       for (const [, { email, name }] of playerEmails) {
         const emailNorm = email.toLowerCase();
@@ -98,6 +100,8 @@ export async function POST(request: Request) {
           <p><a href="${escapeHtml(baseUrl)}/dashboard" style="color: #1a4a73; font-weight: bold;">Ir al panel</a></p>
         `;
         const html = buildEmailHtml(contentHtml, {
+          brandName,
+          logoUrl,
           title: subject,
           greeting: '',
           baseUrl,
@@ -121,7 +125,7 @@ export async function POST(request: Request) {
         sentEmails.add(emailNorm);
         const email = d.playerEmail!.trim();
         const amountStr = `${d.currency} ${d.amount.toLocaleString('es-AR')}`;
-        const subject = `Aviso de mora - Cuota ${d.period} - NauticAdmin`;
+        const subject = `Aviso de mora - Cuota ${d.period} - ${brandName}`;
         const contentHtml = `
           <p>Hola <strong>${escapeHtml(d.playerName)}</strong>,</p>
           <p>Te recordamos que la cuota correspondiente al período <strong>${d.period}</strong> (${amountStr}) se encuentra en mora.</p>
@@ -130,6 +134,8 @@ export async function POST(request: Request) {
           <p>Si ya realizaste el pago, ignora este mensaje.</p>
         `;
         const html = buildEmailHtml(contentHtml, {
+          brandName,
+          logoUrl,
           title: subject,
           greeting: `Estimado/a responsable de ${escapeHtml(d.playerName)}:`,
           baseUrl,

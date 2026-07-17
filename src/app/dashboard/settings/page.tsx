@@ -15,8 +15,9 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
 import { useUserProfile } from "@/firebase/auth/use-user-profile";
-import { useAuth, useFirestore } from "@/firebase/provider";
+import { useAuth, useFirestore, useDoc } from "@/firebase";
 import { buildEmailHtml, htmlToPlainText, sendMailDoc } from "@/lib/email";
+import type { School } from "@/lib/types";
 import { Upload, Moon, Sun, Mail } from "lucide-react";
 
 const LOGO_STORAGE_KEY = "app-logo-data-url";
@@ -26,7 +27,12 @@ export default function SettingsPage() {
   const { setTheme, resolvedTheme } = useTheme();
   const { user } = useAuth();
   const firestore = useFirestore();
-  const { isSuperAdmin, isPlayer } = useUserProfile();
+  const { isSuperAdmin, isPlayer, activeSchoolId } = useUserProfile();
+  const { data: school } = useDoc<School>(
+    activeSchoolId ? `schools/${activeSchoolId}` : ""
+  );
+  const brandName = school?.name?.trim() || "NauticAdmin";
+  const logoUrl = school?.logoUrl?.trim() || undefined;
   const [mounted, setMounted] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [testEmailTo, setTestEmailTo] = useState("");
@@ -50,10 +56,12 @@ export default function SettingsPage() {
     }
     setSendingTest(true);
     try {
-      const subject = "Prueba Trigger Email - NauticAdmin";
+      const subject = `Prueba Trigger Email - ${brandName}`;
       const contentHtml = "<p>Este es un <strong>email de prueba</strong> desde la extensión Trigger Email.</p><p>Si lo recibiste, la configuración está correcta.</p>";
       const html = buildEmailHtml(contentHtml, {
-        title: "NauticAdmin",
+        brandName,
+        logoUrl,
+        title: brandName,
         baseUrl: typeof window !== "undefined" ? window.location.origin : "",
       });
       const text = htmlToPlainText(contentHtml);

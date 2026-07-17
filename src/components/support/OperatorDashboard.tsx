@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useUserProfile } from '@/firebase';
 import { useFirestore } from '@/firebase/provider';
 import { useCollection } from '@/firebase';
-import { doc, updateDoc, Timestamp, collection, addDoc } from 'firebase/firestore';
+import { doc, updateDoc, Timestamp, collection, addDoc, getDoc } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -126,9 +126,21 @@ export function OperatorDashboard() {
       if ((newStatus === 'resolved' || newStatus === 'closed') && ticket.userEmail?.trim()) {
         try {
           const statusLabel = statusLabels[newStatus] ?? newStatus;
+          let brandName = 'NauticAdmin';
+          let logoUrl: string | undefined;
+          try {
+            const schoolSnap = await getDoc(doc(firestore, `schools/${ticket.schoolId}`));
+            const schoolData = schoolSnap.data() as { name?: string; logoUrl?: string } | undefined;
+            if (schoolData?.name?.trim()) brandName = schoolData.name.trim();
+            if (schoolData?.logoUrl?.trim()) logoUrl = schoolData.logoUrl.trim();
+          } catch {
+            // fallback NauticAdmin
+          }
           const contentHtml = `<p>Tu ticket de soporte <strong>#${ticket.ticketNumber}</strong> fue marcado como <strong>${escapeHtml(statusLabel)}</strong>.</p><p>Resumen: ${escapeHtml(ticket.summary)}</p><p>Si tenés más dudas, podés abrir otro ticket desde el Centro de Soporte en la app.</p>`;
-          const subject = `Ticket #${ticket.ticketNumber} ${statusLabel} - NauticAdmin`;
+          const subject = `Ticket #${ticket.ticketNumber} ${statusLabel} - ${brandName}`;
           const html = buildEmailHtml(contentHtml, {
+            brandName,
+            logoUrl,
             title: subject,
             greeting: `Hola${ticket.userDisplayName ? ` ${escapeHtml(ticket.userDisplayName)}` : ''},`,
           });

@@ -12,12 +12,12 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useStorage, useFirestore } from "@/firebase";
+import { useStorage, useFirestore, useDoc } from "@/firebase";
 import { uploadMedicalRecord } from "@/lib/medical-record";
 import { buildEmailHtml, escapeHtml, htmlToPlainText, sendMailDoc } from "@/lib/email";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Upload, Loader2, ExternalLink, CheckCircle, XCircle } from "lucide-react";
-import type { MedicalRecord } from "@/lib/types";
+import type { MedicalRecord, School } from "@/lib/types";
 import { useUser } from "@/firebase";
 
 interface MedicalRecordFieldProps {
@@ -52,6 +52,9 @@ export function MedicalRecordField({
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const { data: school } = useDoc<School>(schoolId ? `schools/${schoolId}` : "");
+  const brandName = school?.name?.trim() || "NauticAdmin";
+  const logoUrl = school?.logoUrl?.trim() || undefined;
   const [uploading, setUploading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [approving, setApproving] = useState(false);
@@ -179,9 +182,11 @@ export function MedicalRecordField({
         const safeReason = escapeHtml(reason).replace(/\n/g, "<br>");
         const contentHtml = `<p>Hola,</p><p>Tu ficha médica no fue aprobada. Motivo:</p><p><strong>${safeReason}</strong></p><p>Por favor subí una nueva ficha médica corregida desde tu perfil en el panel.</p>`;
         const html = buildEmailHtml(contentHtml, {
-          title: "NauticAdmin",
+          brandName,
+          logoUrl,
+          title: brandName,
           baseUrl: typeof window !== "undefined" ? window.location.origin : "",
-          greeting: "Mensaje de tu náutica:",
+          greeting: `Mensaje de ${brandName}:`,
         });
         await sendMailDoc(firestore, {
           to: emailTo,

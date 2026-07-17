@@ -9,6 +9,7 @@ import { getAdminFirestore, getAdminAuth } from "@/lib/firebase-admin";
 import { verifyIdToken } from "@/lib/auth-server";
 import { Timestamp } from "firebase-admin/firestore";
 import { buildEmailHtmlServer } from "@/lib/email-template-server";
+import { getSchoolEmailBrand } from "@/lib/email-brand";
 
 const MAIL_COLLECTION = "mail";
 
@@ -70,6 +71,7 @@ export async function POST(request: Request) {
 
     const baseUrl = getBaseUrl();
     const loginUrl = `${baseUrl}/auth/login`;
+    const { brandName, logoUrl } = await getSchoolEmailBrand(db, schoolId);
 
     const results: { playerId: string; email: string; status: "sent" | "skipped" | "error"; detail?: string }[] = [];
 
@@ -154,7 +156,9 @@ export async function POST(request: Request) {
         `;
 
         const html = buildEmailHtmlServer(contentHtml, {
-          title: "Acceso al panel - NauticAdmin",
+          brandName,
+          logoUrl,
+          title: `Acceso al panel - ${brandName}`,
           greeting: "Hola,",
         });
 

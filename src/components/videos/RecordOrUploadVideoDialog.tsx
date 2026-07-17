@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/select";
 import { doc, getDoc } from "firebase/firestore";
 import { useStorage, useFirestore } from "@/firebase/provider";
-import { useUser, useCollection } from "@/firebase";
-import type { Player } from "@/lib/types";
+import { useUser, useCollection, useDoc } from "@/firebase";
+import type { Player, School } from "@/lib/types";
 import { uploadPlayerVideoWithProgress } from "@/lib/player-videos";
 import { buildEmailHtml, escapeHtml, htmlToPlainText, sendMailDoc } from "@/lib/email";
 import { useToast } from "@/hooks/use-toast";
@@ -60,6 +60,9 @@ export function RecordOrUploadVideoDialog({
   const storage = useStorage();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { data: school } = useDoc<School>(schoolId ? `schools/${schoolId}` : "");
+  const brandName = school?.name?.trim() || "NauticAdmin";
+  const logoUrl = school?.logoUrl?.trim() || undefined;
 
   const [mode, setMode] = useState<Mode>("upload");
   const [playerId, setPlayerId] = useState<string>(initialPlayerId ?? "");
@@ -236,10 +239,12 @@ export function RecordOrUploadVideoDialog({
         const playerEmail = playerData?.email?.trim?.();
         const firstName = playerData?.firstName ?? (playerName?.trim() || "cliente");
         if (playerEmail) {
-          const subject = "Nuevo video en tu galería - NauticAdmin";
+          const subject = `Nuevo video en tu galería - ${brandName}`;
           const contentHtml = `<p>Hola <strong>${escapeHtml(firstName)}</strong>,</p><p>El personal subió un nuevo video a tu galería. Entrá al panel para verlo.</p><p><a href="${typeof window !== "undefined" ? window.location.origin : ""}/dashboard" style="color: #1a4a73; font-weight: bold;">Ver mi galería</a></p>`;
           const html = buildEmailHtml(contentHtml, {
-            title: "NauticAdmin",
+            brandName,
+            logoUrl,
+            title: brandName,
             greeting: "Tenés un nuevo video en tu perfil.",
             baseUrl: typeof window !== "undefined" ? window.location.origin : "",
           });

@@ -5,6 +5,7 @@
 
 import type admin from 'firebase-admin';
 import { buildEmailHtml, escapeHtml } from '@/lib/email';
+import { getSchoolEmailBrand } from '@/lib/email-brand';
 import type { EmailEventType } from '@/lib/types/payments';
 
 const MAIL_COLLECTION = 'mail';
@@ -91,13 +92,14 @@ export async function sendEmailEvent(params: SendEmailEventParams): Promise<bool
   }
 
   const amountStr = `${currency} ${amount.toLocaleString('es-AR')}`;
+  const { brandName, logoUrl } = await getSchoolEmailBrand(db, schoolId);
 
   let subject: string;
   let contentHtml: string;
 
   switch (type) {
     case 'payment_receipt':
-      subject = `Recibo de pago - Cuota ${period} - NauticAdmin`;
+      subject = `Recibo de pago - Cuota ${period} - ${brandName}`;
       contentHtml = `
         <p>Hola ${escapeHtml(playerName)},</p>
         <p>Confirmamos la recepción del pago correspondiente al período <strong>${period}</strong>.</p>
@@ -107,7 +109,7 @@ export async function sendEmailEvent(params: SendEmailEventParams): Promise<bool
       `;
       break;
     case 'delinquency_10_days':
-      subject = `Aviso de mora - Cuota ${period} - NauticAdmin`;
+      subject = `Aviso de mora - Cuota ${period} - ${brandName}`;
       contentHtml = `
         <p>Hola ${escapeHtml(playerName)},</p>
         <p>Te recordamos que la cuota correspondiente al período <strong>${period}</strong> (${amountStr}) se encuentra en mora.</p>
@@ -116,7 +118,7 @@ export async function sendEmailEvent(params: SendEmailEventParams): Promise<bool
       `;
       break;
     case 'suspension_30_days':
-      subject = `Suspensión por mora - Cuota ${period} - NauticAdmin`;
+      subject = `Suspensión por mora - Cuota ${period} - ${brandName}`;
       contentHtml = `
         <p>Hola ${escapeHtml(playerName)},</p>
         <p>Informamos que por haber superado los 30 días de mora en la cuota del período <strong>${period}</strong> (${amountStr}), tu situación ha sido marcada como <strong>suspendido</strong>.</p>
@@ -129,6 +131,8 @@ export async function sendEmailEvent(params: SendEmailEventParams): Promise<bool
   }
 
   const html = buildEmailHtml(contentHtml, {
+    brandName,
+    logoUrl,
     title: subject,
     greeting: `Estimado/a responsable de ${escapeHtml(playerName)}:`,
   });

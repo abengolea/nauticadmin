@@ -20,8 +20,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Upload, ExternalLink, CheckCircle, UserX, Loader2, XCircle } from "lucide-react";
-import { useCollection, useUserProfile, useUser } from "@/firebase";
-import type { Player, MedicalRecord } from "@/lib/types";
+import { useCollection, useUserProfile, useUser, useFirestore, useDoc } from "@/firebase";
+import type { Player, MedicalRecord, School } from "@/lib/types";
 import { isMedicalRecordApproved, isMedicalRecordRejected } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MedicalRecordField } from "@/components/players/MedicalRecordField";
@@ -37,7 +37,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { buildEmailHtml, escapeHtml, htmlToPlainText, sendMailDoc } from "@/lib/email";
-import { useFirestore } from "@/firebase";
 import { useState } from "react";
 
 export default function MedicalRecordsPage() {
@@ -263,6 +262,9 @@ function PendingReviewRowActions({
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { data: school } = useDoc<School>(schoolId ? `schools/${schoolId}` : "");
+  const brandName = school?.name?.trim() || "NauticAdmin";
+  const logoUrl = school?.logoUrl?.trim() || undefined;
   const [previewOpen, setPreviewOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -331,9 +333,11 @@ function PendingReviewRowActions({
         const safeReason = escapeHtml(reason).replace(/\n/g, "<br>");
         const contentHtml = `<p>Hola,</p><p>Tu ficha médica no fue aprobada. Motivo:</p><p><strong>${safeReason}</strong></p><p>Por favor subí una nueva ficha médica corregida desde tu perfil en el panel.</p>`;
         const html = buildEmailHtml(contentHtml, {
-          title: "NauticAdmin",
+          brandName,
+          logoUrl,
+          title: brandName,
           baseUrl: typeof window !== "undefined" ? window.location.origin : "",
-          greeting: "Mensaje de tu náutica:",
+          greeting: `Mensaje de ${brandName}:`,
         });
         await sendMailDoc(firestore, {
           to: emailTo,

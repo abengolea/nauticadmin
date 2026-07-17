@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useFirestore, useCollection } from "@/firebase";
-import type { Player } from "@/lib/types";
+import { useFirestore, useCollection, useDoc } from "@/firebase";
+import type { Player, School } from "@/lib/types";
 import { buildEmailHtml, escapeHtml, htmlToPlainText, sendMailDoc } from "@/lib/email";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,9 @@ interface NovedadesMailCardProps {
 export function NovedadesMailCard({ schoolId, schoolName }: NovedadesMailCardProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { data: school } = useDoc<School>(schoolId ? `schools/${schoolId}` : "");
+  const brandName = school?.name?.trim() || schoolName || "NauticAdmin";
+  const logoUrl = school?.logoUrl?.trim() || undefined;
   const { data: playersData, loading: playersLoading } = useCollection<Player>(
     schoolId ? `schools/${schoolId}/players` : ""
   );
@@ -59,8 +62,10 @@ export function NovedadesMailCard({ schoolId, schoolName }: NovedadesMailCardPro
           const firstName = player.firstName ?? "cliente";
           const contentHtml = `<p>Hola <strong>${escapeHtml(firstName)}</strong>,</p><p>${escapeHtml(text).replace(/\n/g, "</p><p>")}</p>`;
           const html = buildEmailHtml(contentHtml, {
-            title: schoolName,
-            greeting: `Novedad de ${escapeHtml(schoolName)}.`,
+            brandName,
+            logoUrl,
+            title: brandName,
+            greeting: `Novedad de ${brandName}.`,
             baseUrl: typeof window !== "undefined" ? window.location.origin : "",
           });
           await sendMailDoc(firestore, {
