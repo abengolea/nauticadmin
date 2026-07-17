@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -31,6 +31,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Loader2, FileText } from "lucide-react";
 import { PaymentDocumentoAdjunto } from "@/components/payments/PaymentDocumentoAdjunto";
+import { ClientSelectCombobox } from "@/components/players/ClientSelectCombobox";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useCollection } from "@/firebase";
@@ -144,13 +145,26 @@ export function PaymentsTab({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [facturando, setFacturando] = useState(false);
   const [modoSimulacion, setModoSimulacion] = useState(true);
+  const [enviarPorEmail, setEnviarPorEmail] = useState(false);
   const { toast } = useToast();
 
   const { data: players } = useCollection<Player>(
     schoolId ? `schools/${schoolId}/players` : "",
     { orderBy: ["lastName", "asc"] }
   );
-  const activePlayers = (players ?? []).filter((p) => !p.archived);
+  const playerOptions = useMemo(
+    () =>
+      (players ?? [])
+        .filter((p) => !p.archived)
+        .map((p) => ({
+          id: p.id,
+          displayName:
+            [p.firstName, p.lastName].filter(Boolean).join(" ").trim() ||
+            p.email ||
+            p.id,
+        })),
+    [players]
+  );
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
@@ -268,6 +282,7 @@ export function PaymentsTab({
           schoolId,
           paymentIds: Array.from(selectedIds),
           simulation: modoSimulacion,
+          sendEmail: enviarPorEmail,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -276,15 +291,41 @@ export function PaymentsTab({
       }
       const okCount = data.processed ?? 0;
       const failCount = data.failed ?? 0;
+      const emailSentCount = data.emailSent ?? 0;
+      const emailSkippedCount = data.emailSkipped ?? 0;
+      const emailFailedCount = data.emailFailed ?? 0;
       const okResults = (data.results ?? []).filter((r: { ok: boolean }) => r.ok);
       const filenames = okResults.map((r: { filename?: string }) => r.filename).filter(Boolean) as string[];
       const failMsgs = (data.results ?? [])
         .filter((r: { ok: boolean; error?: string }) => !r.ok && r.error)
         .map((r: { error: string }) => r.error);
+      const emailSkipMsgs = (data.results ?? [])
+        .filter((r: { emailSkippedReason?: string }) => r.emailSkippedReason)
+        .map((r: { emailSkippedReason: string }) => r.emailSkippedReason);
+      const emailErrorMsgs = (data.results ?? [])
+        .filter((r: { emailError?: string }) => r.emailError)
+        .map((r: { emailError: string }) => r.emailError);
+
+      const emailSummary = enviarPorEmail
+        ? [
+            emailSentCount > 0 ? `${emailSentCount} enviada(s) por email` : null,
+            emailSkippedCount > 0 ? `${emailSkippedCount} sin email` : null,
+            emailFailedCount > 0 ? `${emailFailedCount} con error de email` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : null;
+
       if (okCount > 0 && filenames.length > 0) {
         toast({
           title: modoSimulacion ? `Simulación: ${okCount} factura(s) generada(s)` : `${okCount} factura(s) emitida(s) a AFIP`,
-          description: failCount > 0 ? `${failCount} fallaron.` : "Hacé clic en 'Descargar' para abrir los PDF.",
+          description: [
+            failCount > 0 ? `${failCount} fallaron.` : null,
+            emailSummary,
+            "Hacé clic en 'Descargar' para abrir los PDF.",
+          ]
+            .filter(Boolean)
+            .join(" "),
           action: (
             <ToastAction
               altText="Descargar"
@@ -321,6 +362,16 @@ export function PaymentsTab({
       }
       if (failMsgs.length > 0) {
         failMsgs.slice(0, 3).forEach((msg: string) => toast({ variant: "destructive", title: "Error", description: msg }));
+      }
+      if (emailSkipMsgs.length > 0) {
+        emailSkipMsgs.slice(0, 3).forEach((msg: string) =>
+          toast({ title: "Email no enviado", description: msg })
+        );
+      }
+      if (emailErrorMsgs.length > 0) {
+        emailErrorMsgs.slice(0, 3).forEach((msg: string) =>
+          toast({ variant: "destructive", title: "Error al enviar email", description: msg })
+        );
       }
       setSelectedIds(new Set());
       fetchPayments();
@@ -538,6 +589,16 @@ export function PaymentsTab({
               />
               <span className="text-muted-foreground text-xs sm:text-sm">Simulación</span>
             </label>
+            <label
+              className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap"
+              title="Si está marcado, se envía el PDF al email del cliente (si tiene uno cargado)"
+            >
+              <Checkbox
+                checked={enviarPorEmail}
+                onCheckedChange={(c) => setEnviarPorEmail(c === true)}
+              />
+              <span className="text-muted-foreground text-xs sm:text-sm">Enviar por email</span>
+            </label>
             <Button
               variant="outline"
               size="sm"
@@ -673,28 +734,26 @@ export function PaymentsTab({
       )}
 
       <Dialog open={manualOpen} onOpenChange={setManualOpen}>
-        <DialogContent>
+        <DialogContent className="overflow-visible sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Registrar pago manual</DialogTitle>
             <DialogDescription>
               Simulá o registrá un pago realizado fuera del sistema (efectivo, transferencia, etc.).
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 overflow-visible">
             <div>
               <Label htmlFor="manual-player">Cliente</Label>
-              <Select value={manualPlayerId} onValueChange={setManualPlayerId}>
-                <SelectTrigger id="manual-player" className="mt-1">
-                  <SelectValue placeholder="Elegí un cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activePlayers.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {[p.firstName, p.lastName].filter(Boolean).join(" ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="mt-1">
+                <ClientSelectCombobox
+                  id="manual-player"
+                  value={manualPlayerId}
+                  onChange={setManualPlayerId}
+                  players={playerOptions}
+                  placeholder="Elegí un cliente"
+                  searchPlaceholder="Escribí apellido o nombre…"
+                />
+              </div>
             </div>
             {manualPlayerId && (
               <div>

@@ -14,6 +14,7 @@
     "seed:support": "tsx scripts/seed-support-flows.ts",
     "seed:aliases": "tsx scripts/seed-payer-aliases.ts",
     "simulate:payment": "tsx scripts/simulate-electronic-payment.ts",
+    "simulate:invoice-email": "tsx scripts/simulate-payment-and-invoice-email.ts",
     "emit:invoice": "tsx scripts/emit-test-invoice.ts",
     "test-afip": "tsx scripts/test-afip.ts",
     "test-afip:homo": "tsx scripts/test-afip.ts homo",

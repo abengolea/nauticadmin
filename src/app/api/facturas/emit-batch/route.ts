@@ -19,6 +19,7 @@ import {
   getPtoVta,
   getCbteTipo,
 } from '@/lib/school-facturacion';
+import { sendInvoiceEmail } from '@/lib/duplicate-payments/email-sender';
 import { COLLECTIONS } from '@/lib/payments/constants';
 import { z } from 'zod';
 
@@ -27,7 +28,24 @@ const EmitBatchSchema = z.object({
   paymentIds: z.array(z.string()).min(1).max(50),
   /** true = no emite a AFIP, solo genera PDF simulado */
   simulation: z.boolean().optional().default(true),
+  /** true = encolar email al cliente con el PDF adjunto (si tiene email) */
+  sendEmail: z.boolean().optional().default(false),
 });
+
+function formatAmountLabel(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: currency === 'USD' ? 'USD' : 'ARS',
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount}`;
+  }
+}
+
+function formatInvoiceNumber(ptoVta: number, voucherNumber: number): string {
+  return `${String(ptoVta).padStart(4, '0')}-${String(voucherNumber).padStart(8, '0')}`;
+}
 
 function toDate(val: unknown): Date {
   if (val instanceof Date) return val;
@@ -61,7 +79,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { schoolId, paymentIds, simulation } = parsed.data;
+    const { schoolId, paymentIds, simulation, sendEmail } = parsed.data;
 
     const db = getAdminFirestore();
 
@@ -72,6 +90,7 @@ export async function POST(request: Request) {
     const cbteTipo = getCbteTipo(facturacion);
 
     // Verificar acceso a la náutica
+    const schoolSnap = await db.collection('schools').doc(schoolId).get();
     const schoolUserSnap = await db
       .collection('schools')
       .doc(schoolId)
@@ -82,7 +101,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Sin acceso a esta náutica' }, { status: 403 });
     }
 
-    console.log('[emit-batch] emisor:', emisor.razonSocial, emisor.cuit, '| ptoVta:', ptoVta);
+    const schoolData = schoolSnap.exists ? schoolSnap.data() : undefined;
+    const schoolName =
+      (typeof schoolData?.name === 'string' && schoolData.name.trim()) ||
+      emisor.razonSocial;
+
+    console.log(
+      '[emit-batch] emisor:',
+      emisor.razonSocial,
+      emisor.cuit,
+      '| ptoVta:',
+      ptoVta,
+      '| sendEmail:',
+      sendEmail
+    );
 
     const fecha = new Date();
     const fechaStr = fecha.toISOString().slice(0, 10);
@@ -101,6 +133,10 @@ export async function POST(request: Request) {
       pdfPath?: string;
       filename?: string;
       error?: string;
+      emailSent?: boolean;
+      emailTo?: string;
+      emailSkippedReason?: string;
+      emailError?: string;
     }> = [];
 
     let nextVoucherNumber = 1;
@@ -286,6 +322,40 @@ export async function POST(request: Request) {
         });
 
         const filename = path.basename(pdfPath);
+        const invoiceNumber = formatInvoiceNumber(ptoVta, voucherNumber);
+        const amountLabel = formatAmountLabel(impTotal, currency);
+
+        let emailSent = false;
+        let emailTo: string | undefined;
+        let emailSkippedReason: string | undefined;
+        let emailError: string | undefined;
+
+        if (sendEmail) {
+          const rawEmail =
+            typeof playerData?.email === 'string' ? playerData.email.trim() : '';
+          if (!rawEmail || !rawEmail.includes('@')) {
+            emailSkippedReason = `${playerName} no tiene email cargado`;
+          } else {
+            emailTo = rawEmail;
+            try {
+              await sendInvoiceEmail(db, {
+                to: rawEmail,
+                customerName: playerName,
+                invoiceNumber,
+                amount: amountLabel,
+                pdfPath,
+                pdfFilename: filename,
+                brandName: schoolName,
+                simulation,
+              });
+              emailSent = true;
+            } catch (mailErr) {
+              emailError =
+                mailErr instanceof Error ? mailErr.message : String(mailErr);
+              console.error('[emit-batch] Error enviando email', paymentId, mailErr);
+            }
+          }
+        }
 
         // Marcar pago como facturado
         const now = new Date();
@@ -301,6 +371,20 @@ export async function POST(request: Request) {
           paymentUpdate.CAE = cae;
           paymentUpdate.CAEFchVto = caeVto;
         }
+        if (sendEmail) {
+          paymentUpdate.facturaEmailRequested = true;
+          if (emailSent && emailTo) {
+            paymentUpdate.facturaEmailSent = true;
+            paymentUpdate.facturaEmailTo = emailTo;
+            paymentUpdate.facturaEmailSentAt = now;
+          } else if (emailSkippedReason) {
+            paymentUpdate.facturaEmailSent = false;
+            paymentUpdate.facturaEmailSkipReason = emailSkippedReason;
+          } else if (emailError) {
+            paymentUpdate.facturaEmailSent = false;
+            paymentUpdate.facturaEmailError = emailError;
+          }
+        }
         await paymentsCol.doc(paymentId).update(paymentUpdate);
 
         results.push({
@@ -310,6 +394,14 @@ export async function POST(request: Request) {
           CAE: cae,
           pdfPath,
           filename,
+          ...(sendEmail
+            ? {
+                emailSent,
+                emailTo,
+                emailSkippedReason,
+                emailError,
+              }
+            : {}),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -320,14 +412,21 @@ export async function POST(request: Request) {
 
     const okCount = results.filter((r) => r.ok).length;
     const failCount = results.filter((r) => !r.ok).length;
+    const emailSentCount = results.filter((r) => r.emailSent).length;
+    const emailSkippedCount = results.filter((r) => !!r.emailSkippedReason).length;
+    const emailFailedCount = results.filter((r) => !!r.emailError).length;
 
     return NextResponse.json({
       ok: true,
       simulation,
+      sendEmail,
       emisor: { razonSocial: emisor.razonSocial, cuit: emisor.cuit, ptoVta },
       total: results.length,
       processed: okCount,
       failed: failCount,
+      emailSent: emailSentCount,
+      emailSkipped: emailSkippedCount,
+      emailFailed: emailFailedCount,
       results,
     });
   } catch (err) {

@@ -98,6 +98,7 @@ export async function processInvoiceOrder(db: Firestore, order: InvoiceOrder): P
         invoiceNumber: `${afipResult.cbteNro}`,
         amount: `${order.currency} ${order.amount.toLocaleString('es-AR')}`,
         pdfUrl,
+        schoolId: order.schoolId,
       });
 
       await orderRef.update({
