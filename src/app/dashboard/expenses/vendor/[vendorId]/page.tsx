@@ -24,6 +24,13 @@ import { VendorPaymentDialog } from '@/components/expenses/VendorPaymentDialog';
 import type { VendorAccountEntry } from '@/lib/expenses/types';
 import type { ExpenseVendor } from '@/lib/expenses/types';
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
 const ENTRY_TYPE_LABELS: Record<string, string> = {
   invoice: 'Factura',
   payment: 'Pago',
@@ -41,25 +48,12 @@ function VerComprobanteLink({
   schoolId: string;
   receiptType?: string;
 }) {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const handleClick = async () => {
-    const user = getAuth().currentUser;
-    if (!user) return;
-    setLoading(true);
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch(
-        `/api/expenses/payment-receipt-url?storagePath=${encodeURIComponent(storagePath)}&schoolId=${encodeURIComponent(schoolId)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.url) window.open(data.url, '_blank');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [open, setOpen] = useState(false);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [isPdf, setIsPdf] = useState(false);
+
   const label =
     receiptType === 'cheque'
       ? 'Ver cheque'
@@ -68,21 +62,131 @@ function VerComprobanteLink({
         : receiptType === 'credit_card'
           ? 'Ver cupón'
           : 'Ver comprobante';
+
+  const clearObjectUrl = useCallback(() => {
+    setObjectUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
+  useEffect(() => () => clearObjectUrl(), [clearObjectUrl]);
+
+  const handleClick = async () => {
+    const user = getAuth().currentUser;
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Sesión expirada',
+        description: 'Volvé a iniciar sesión e intentá de nuevo.',
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `/api/expenses/payment-receipt-url?storagePath=${encodeURIComponent(storagePath)}&schoolId=${encodeURIComponent(schoolId)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok) {
+        const data = contentType.includes('application/json')
+          ? await res.json().catch(() => ({}))
+          : {};
+        throw new Error(
+          (data as { error?: string }).error ||
+            `No se pudo abrir el comprobante (${res.status})`
+        );
+      }
+      if (contentType.includes('application/json')) {
+        // Compat: URL firmada
+        const data = await res.json();
+        if (!data.url) throw new Error('URL de comprobante no disponible');
+        clearObjectUrl();
+        setIsPdf(String(data.url).toLowerCase().includes('.pdf'));
+        setObjectUrl(data.url);
+        setOpen(true);
+        return;
+      }
+      const blob = await res.blob();
+      clearObjectUrl();
+      const url = URL.createObjectURL(blob);
+      setIsPdf(
+        blob.type === 'application/pdf' ||
+          storagePath.toLowerCase().endsWith('.pdf')
+      );
+      setObjectUrl(url);
+      setOpen(true);
+    } catch (e) {
+      toast({
+        variant: 'destructive',
+        title: 'No se pudo abrir el comprobante',
+        description: e instanceof Error ? e.message : 'Error desconocido',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <Button
-      variant="link"
-      size="sm"
-      className="h-auto p-0 text-primary inline-flex items-center gap-1"
-      onClick={handleClick}
-      disabled={loading}
-    >
-      {loading ? (
-        <Loader2 className="h-3 w-3 animate-spin" />
-      ) : (
-        <ExternalLink className="h-3 w-3" />
-      )}
-      {label}
-    </Button>
+    <>
+      <Button
+        variant="link"
+        size="sm"
+        className="h-auto p-0 text-primary inline-flex items-center gap-1"
+        onClick={handleClick}
+        disabled={loading}
+      >
+        {loading ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <ExternalLink className="h-3 w-3" />
+        )}
+        {label}
+      </Button>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) clearObjectUrl();
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{label}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-auto rounded-md border bg-muted/30 p-2">
+            {objectUrl && isPdf ? (
+              <iframe
+                title={label}
+                src={objectUrl}
+                className="w-full h-[70vh] rounded bg-white"
+              />
+            ) : objectUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={objectUrl}
+                alt={label}
+                className="mx-auto max-h-[70vh] w-auto max-w-full object-contain"
+              />
+            ) : null}
+          </div>
+          {objectUrl && (
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(objectUrl, '_blank', 'noopener,noreferrer')}
+              >
+                Abrir en pestaña nueva
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
