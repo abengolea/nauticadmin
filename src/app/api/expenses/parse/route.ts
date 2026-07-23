@@ -16,6 +16,7 @@ import {
   validateCuit,
   findDuplicateCandidates,
 } from '@/lib/expenses/utils';
+import { parseSchoolFacturacion } from '@/lib/school-facturacion';
 import type { Expense, ExpenseAI, ExpenseValidations } from '@/lib/expenses/types';
 
 const MAX_IMAGE_DIMENSION = 1280; // Para facturas, 1280px es suficiente y reduce tokens/latencia
@@ -109,7 +110,16 @@ export async function POST(request: Request) {
       size: finalBuffer.length,
     });
 
-    const result = await parseExpenseFromImage(base64, finalContentType);
+    const schoolSnap = await db.collection('schools').doc(schoolId).get();
+    const schoolData = schoolSnap.data();
+    const facturacion = parseSchoolFacturacion(schoolData?.facturacion);
+    const buyerContext = {
+      schoolName: typeof schoolData?.name === 'string' ? schoolData.name : undefined,
+      razonSocial: facturacion?.razonSocial,
+      cuit: facturacion?.cuit,
+    };
+
+    const result = await parseExpenseFromImage(base64, finalContentType, buyerContext);
     console.log('[expenses/parse] IA extraction done');
 
     const validations: ExpenseValidations = {

@@ -22,29 +22,46 @@ import {
   normalizeNumber,
   normalizeDate,
   normalizeAndValidateCuit,
+  normalizeCuit,
 } from '@/lib/expenses/normalize';
 
+/** Gemini a menudo devuelve null en campos opcionales; .optional() solo admite undefined. */
+const numOrStr = z.union([z.number(), z.string()]).nullish();
+const str = z.string().nullish();
+
 const RawAIOutputSchema = z.object({
-  concept: z.string().optional(),
-  supplier: z.object({
-    name: z.string().optional(),
-    cuit: z.string().optional(),
-    ivaCondition: z.string().optional(),
-  }),
-  invoice: z.object({
-    type: z.string().optional(),
-    letter: z.string().optional(),
-    pos: z.union([z.string(), z.number()]).optional(),
-    number: z.union([z.string(), z.number()]).optional(),
-    issueDate: z.string().optional(),
-    cae: z.string().optional(),
-    caeDue: z.string().optional(),
-  }),
+  concept: str,
+  supplier: z
+    .object({
+      name: str,
+      cuit: str,
+      ivaCondition: str,
+    })
+    .nullish(),
+  /** Receptor/cliente (quien compra). Solo para desambiguar; no es el proveedor. */
+  buyer: z
+    .object({
+      name: str,
+      cuit: str,
+    })
+    .nullish(),
+  invoice: z
+    .object({
+      type: str,
+      letter: str,
+      pos: numOrStr,
+      number: numOrStr,
+      issueDate: str,
+      cae: str,
+      caeDue: str,
+    })
+    .nullish(),
   amounts: z.object({
-    currency: z.union([z.enum(['ARS', 'USD']), z.string()]).optional(),
-    net: z.union([z.number(), z.string()]).optional(),
-    iva: z.union([z.number(), z.string()]).optional(),
-    total: z.union([z.number(), z.string()]),
+    currency: z.union([z.enum(['ARS', 'USD']), z.string()]).nullish(),
+    net: numOrStr,
+    iva: numOrStr,
+    /** Obligatorio en la práctica; null se convierte a 0 y falla luego si no hay total usable. */
+    total: z.union([z.number(), z.string()]).nullish(),
     breakdown: z
       .object({
         alicuotas: z
@@ -55,7 +72,7 @@ const RawAIOutputSchema = z.object({
               amount: z.union([z.number(), z.string()]),
             })
           )
-          .optional(),
+          .nullish(),
         percepciones: z
           .array(
             z.object({
@@ -64,30 +81,78 @@ const RawAIOutputSchema = z.object({
               amount: z.union([z.number(), z.string()]),
             })
           )
-          .optional(),
+          .nullish(),
       })
-      .optional(),
+      .nullish(),
   }),
   items: z
     .array(
       z.object({
         description: z.string(),
-        qty: z.union([z.number(), z.string()]).optional(),
-        unitPrice: z.union([z.number(), z.string()]).optional(),
-        subtotal: z.union([z.number(), z.string()]).optional(),
+        qty: numOrStr,
+        unitPrice: numOrStr,
+        subtotal: numOrStr,
       })
     )
-    .optional(),
+    .nullish(),
 });
 
-function normalizeCurrency(value: string | undefined): 'ARS' | 'USD' {
+/** Contexto del comprador (la náutica) para no confundirlo con el proveedor. */
+export interface ExpenseBuyerContext {
+  schoolName?: string;
+  razonSocial?: string;
+  cuit?: string;
+}
+
+function normalizeCurrency(value: string | undefined | null): 'ARS' | 'USD' {
   if (!value || typeof value !== 'string') return 'ARS';
   const upper = value.trim().toUpperCase();
-  if (upper === 'USD' || upper === 'U$S' || upper === 'US$' || upper === 'DOL' || upper === 'DÓLARES' || upper === 'DOLARES') return 'USD';
+  if (
+    upper === 'USD' ||
+    upper === 'U$S' ||
+    upper === 'US$' ||
+    upper === 'DOL' ||
+    upper === 'DÓLARES' ||
+    upper === 'DOLARES'
+  ) {
+    return 'USD';
+  }
   return 'ARS';
 }
 
-function normalizeAIOutput(raw: z.infer<typeof RawAIOutputSchema>): AIExtractedExpense {
+function normalizeNameKey(value: string | undefined | null): string {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\b(s\.?a\.?|s\.?r\.?l\.?|s\.?a\.?s\.?|sociedad anonima)\b/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function namesMatch(a: string | undefined | null, b: string | undefined | null): boolean {
+  const ka = normalizeNameKey(a);
+  const kb = normalizeNameKey(b);
+  if (!ka || !kb) return false;
+  return ka === kb || ka.includes(kb) || kb.includes(ka);
+}
+
+function isSameParty(
+  party: { name?: string | null; cuit?: string | null } | null | undefined,
+  buyer: ExpenseBuyerContext | undefined
+): boolean {
+  if (!party || !buyer) return false;
+  const partyCuit = normalizeCuit(party.cuit ?? undefined);
+  const buyerCuit = normalizeCuit(buyer.cuit);
+  if (partyCuit && buyerCuit && partyCuit === buyerCuit) return true;
+  if (namesMatch(party.name, buyer.razonSocial)) return true;
+  if (namesMatch(party.name, buyer.schoolName)) return true;
+  return false;
+}
+
+function normalizeAIOutput(
+  raw: z.infer<typeof RawAIOutputSchema>,
+  buyerContext?: ExpenseBuyerContext
+): AIExtractedExpense {
   const net = normalizeNumber(raw.amounts.net);
   const iva = normalizeNumber(raw.amounts.iva);
   const total =
@@ -106,8 +171,28 @@ function normalizeAIOutput(raw: z.infer<typeof RawAIOutputSchema>): AIExtractedE
     amount: normalizeNumber(p.amount) ?? 0,
   }));
 
-  const cuitResult = raw.supplier?.cuit
-    ? normalizeAndValidateCuit(raw.supplier.cuit)
+  let supplierName = raw.supplier?.name?.trim() || undefined;
+  let supplierCuitRaw = raw.supplier?.cuit?.trim();
+  let supplierIvaCondition = raw.supplier?.ivaCondition?.trim() || undefined;
+
+  // Si la IA puso a la náutica (comprador) como proveedor, corregir con el otro bloque.
+  if (isSameParty({ name: supplierName, cuit: supplierCuitRaw }, buyerContext)) {
+    const buyerName = raw.buyer?.name?.trim();
+    const buyerCuit = raw.buyer?.cuit?.trim();
+    if (buyerName && !isSameParty({ name: buyerName, cuit: buyerCuit }, buyerContext)) {
+      supplierName = buyerName;
+      supplierCuitRaw = buyerCuit;
+      supplierIvaCondition = undefined;
+    } else {
+      // No hay candidato confiable: no guardar la náutica como proveedor.
+      supplierName = undefined;
+      supplierCuitRaw = undefined;
+      supplierIvaCondition = undefined;
+    }
+  }
+
+  const cuitResult = supplierCuitRaw
+    ? normalizeAndValidateCuit(supplierCuitRaw)
     : undefined;
 
   const conceptFromItems =
@@ -118,18 +203,23 @@ function normalizeAIOutput(raw: z.infer<typeof RawAIOutputSchema>): AIExtractedE
   return {
     concept: raw.concept?.trim() || conceptFromItems,
     supplier: {
-      name: raw.supplier?.name?.trim() || undefined,
-      cuit: cuitResult?.raw ?? raw.supplier?.cuit?.trim(),
-      ivaCondition: raw.supplier?.ivaCondition?.trim(),
+      name: supplierName,
+      cuit: cuitResult?.raw ?? supplierCuitRaw,
+      ivaCondition: supplierIvaCondition,
     },
     invoice: {
-      type: raw.invoice?.type?.trim(),
-      letter: raw.invoice?.letter?.trim(),
+      type: raw.invoice?.type?.trim() || undefined,
+      letter: raw.invoice?.letter?.trim() || undefined,
       pos: raw.invoice?.pos != null ? String(raw.invoice.pos).trim() : undefined,
-      number: raw.invoice?.number != null ? String(raw.invoice.number).trim() : undefined,
-      issueDate: normalizeDate(raw.invoice?.issueDate ?? '') ?? raw.invoice?.issueDate?.trim(),
-      cae: raw.invoice?.cae?.trim(),
-      caeDue: normalizeDate(raw.invoice?.caeDue ?? '') ?? raw.invoice?.caeDue?.trim(),
+      number:
+        raw.invoice?.number != null ? String(raw.invoice.number).trim() : undefined,
+      issueDate:
+        normalizeDate(raw.invoice?.issueDate ?? '') ??
+        (raw.invoice?.issueDate?.trim() || undefined),
+      cae: raw.invoice?.cae?.trim() || undefined,
+      caeDue:
+        normalizeDate(raw.invoice?.caeDue ?? '') ??
+        (raw.invoice?.caeDue?.trim() || undefined),
     },
     amounts: {
       currency: normalizeCurrency(raw.amounts.currency),
@@ -137,15 +227,13 @@ function normalizeAIOutput(raw: z.infer<typeof RawAIOutputSchema>): AIExtractedE
       iva: iva as number | undefined,
       total,
       breakdown:
-        alicuotas || percepciones
-          ? { alicuotas, percepciones }
-          : undefined,
+        alicuotas || percepciones ? { alicuotas, percepciones } : undefined,
     },
     items: raw.items?.map((i) => ({
       description: i.description,
-      qty: normalizeNumber(i.qty) ?? i.qty,
-      unitPrice: normalizeNumber(i.unitPrice) ?? i.unitPrice,
-      subtotal: normalizeNumber(i.subtotal) ?? i.subtotal,
+      qty: normalizeNumber(i.qty),
+      unitPrice: normalizeNumber(i.unitPrice),
+      subtotal: normalizeNumber(i.subtotal),
     })),
   };
 }
@@ -161,10 +249,12 @@ export interface ParseExpenseResult {
  * Parsea una imagen o PDF de factura/ticket y devuelve datos estructurados.
  * @param imageBase64 - Imagen o PDF en base64 (data URL o raw)
  * @param mimeType - image/jpeg, image/png, application/pdf, etc.
+ * @param buyerContext - Identidad de la náutica (comprador) para no usarla como proveedor
  */
 export async function parseExpenseFromImage(
   imageBase64: string,
-  mimeType: string = 'image/jpeg'
+  mimeType: string = 'image/jpeg',
+  buyerContext?: ExpenseBuyerContext
 ): Promise<ParseExpenseResult> {
   if (!hasGeminiApiKey()) {
     throw new Error(getGeminiApiKeyMissingMessage());
@@ -178,18 +268,41 @@ export async function parseExpenseFromImage(
   // Quitar prefijo data URL si existe
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
+  const buyerLines: string[] = [];
+  if (buyerContext?.razonSocial) {
+    buyerLines.push(`- Razón social: ${buyerContext.razonSocial}`);
+  }
+  if (buyerContext?.schoolName) {
+    buyerLines.push(`- Nombre de la náutica: ${buyerContext.schoolName}`);
+  }
+  if (buyerContext?.cuit) {
+    buyerLines.push(`- CUIT: ${buyerContext.cuit}`);
+  }
+  const buyerBlock =
+    buyerLines.length > 0
+      ? `
+CONTEXTO DEL COMPRADOR (nuestra náutica / receptor de la factura):
+${buyerLines.join('\n')}
+Estos datos son del RECEPTOR/CLIENTE (quien compra/paga). NUNCA los uses como supplier (proveedor). El proveedor es quien EMITE la factura (bloque superior / emisor / vendedor).
+`
+      : '';
+
   const promptText = `
 Eres un asistente que extrae datos de facturas y tickets de compra (Argentina).
 
 IMPORTANTE: Solo considerá el texto impreso de la factura. Las anotaciones manuscritas, tachaduras, notas o sellos agregados por personas NO deben influir en los datos extraídos. Ignoralas por completo.
-
+${buyerBlock}
 Analizá la imagen y devolvé un JSON con esta estructura exacta (sin markdown, solo JSON):
 
 {
   "supplier": {
-    "name": "Razón social o nombre del emisor",
-    "cuit": "CUIT con formato XX-XXXXXXXX-X",
-    "ivaCondition": "Condición IVA si aparece (ej: IVA Responsable Inscripto)"
+    "name": "Razón social o nombre del EMISOR (quien emite/vende)",
+    "cuit": "CUIT del emisor con formato XX-XXXXXXXX-X",
+    "ivaCondition": "Condición IVA del emisor si aparece (ej: IVA Responsable Inscripto)"
+  },
+  "buyer": {
+    "name": "Razón social o nombre del RECEPTOR/CLIENTE (quien compra)",
+    "cuit": "CUIT del receptor si aparece"
   },
   "concept": "Descripción breve del gasto o productos/servicios comprados (ej: Combustible, Reparación motor, etc.)",
   "invoice": {
@@ -218,13 +331,16 @@ Analizá la imagen y devolvé un JSON con esta estructura exacta (sin markdown, 
 
 Reglas:
 - Extraé SOLO datos impresos (texto de la factura/ticket original). Ignorá anotaciones manuscritas, tachaduras, notas al margen, firmas, sellos adicionales o cualquier cosa escrita a mano. No uses esos datos para el JSON.
+- PROVEEDOR (supplier) = EMISOR de la factura: bloque de cabecera del vendedor, razón social grande arriba, CUIT del emisor. NO es el cliente.
+- COMPRADOR (buyer) = RECEPTOR/CLIENTE: bloque "Cliente", "Señor/es", "Receptor", "Doc. Nro", datos de quien compra. NUNCA copies buyer a supplier.
 - Si es ticket sin IVA, net y iva pueden omitirse; total es obligatorio.
 - Fechas en dd/mm/yyyy.
 - Números: en Argentina el punto separa miles (6.880 = 6880) y la coma decimales (68,8 = 68.8). Devolvé el valor numérico correcto: si la factura dice $6.880, devolvé 6880; si dice $68,80, devolvé 68.8.
 - Moneda (currency): ES CRÍTICO detectar si es pesos o dólares. Buscá indicadores como: "US$", "USD", "U$S", "Dólares", "Dólares USA", "DOL" → currency: "USD". Si dice "ARS", "Pesos", "$" (sin US), "Pesos Argentinos" o no hay indicación de dólares → currency: "ARS".
-- Si no encontrás un dato, omitilo (no pongas null).
+- Si no encontrás un dato, omitilo del JSON (no pongas null).
 - items es opcional; si la factura no tiene ítems detallados, omitilo.
 - breakdown es opcional.
+- buyer es opcional pero útil si aparecen ambos bloques.
 `;
 
   const response = await ai.generate({
@@ -271,7 +387,7 @@ Reglas:
     );
   }
 
-  const extracted = normalizeAIOutput(rawResult.data);
+  const extracted = normalizeAIOutput(rawResult.data, buyerContext);
   const validated = aiExtractedExpenseSchema.safeParse(extracted);
   if (!validated.success) {
     throw new Error(`Validación fallida: ${validated.error.message}`);
