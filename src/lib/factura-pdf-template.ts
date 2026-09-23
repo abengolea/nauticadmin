@@ -10,6 +10,7 @@ import QRCode from 'qrcode';
 import type { FacturaPdfDatos } from '@/lib/factura-pdf';
 import type { SchoolFacturacion } from '@/lib/school-facturacion';
 import { formatCuitDisplay } from '@/lib/school-facturacion';
+import { getFacturasDir } from '@/lib/afip/credentials';
 
 export interface TemplateFacturaField {
   key: string;
@@ -45,7 +46,9 @@ export interface TemplateFactura {
   table?: TemplateFacturaTable;
 }
 
-const FACTURAS_DIR = path.resolve(process.cwd(), 'facturas');
+function facturasDir(): string {
+  return getFacturasDir();
+}
 
 function facturaLetra(tipoComprobante: string): 'A' | 'B' | 'C' {
   const u = tipoComprobante.toUpperCase();
@@ -436,9 +439,10 @@ export async function generarFacturaConPlantilla(params: {
   txtR(`Vto CAE: ${formatFechaAr(datos.CAEFchVto)}`, PW - MR - 5, FTR_TOP + 40, 7.5);
 
   // ── GUARDAR ──────────────────────────────────────────────────────────────
-  if (!fs.existsSync(FACTURAS_DIR)) fs.mkdirSync(FACTURAS_DIR, { recursive: true });
+  const outDir = facturasDir();
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   const filename = `factura-${letra}-${ptoStr}-${nroStr}.pdf`;
-  const filepath = path.join(FACTURAS_DIR, filename);
+  const filepath = path.join(outDir, filename);
   fs.writeFileSync(filepath, await pdfDoc.save());
   console.log('[factura-template] PDF guardado:', path.resolve(filepath));
   return path.resolve(filepath);

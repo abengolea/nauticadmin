@@ -7,7 +7,12 @@
  * - La autorización del mandante se da en ARCA → Administrador de relaciones de clave fiscal
  */
 
+import * as fs from 'fs';
 import * as path from 'path';
+import {
+  materializeAfipCredentials,
+  resolveExistingPath,
+} from './credentials';
 
 export interface AfipSession {
   /** CUIT emisor fiscal (delegante), solo dígitos — va en el Auth de WSFE */
@@ -58,14 +63,31 @@ export function resolveAfipSessionFromEnv(): AfipSession {
   }
   const production =
     String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
-  const certPath = resolvePath(
-    process.env.AFIP_CERT_PATH ?? 'afip/certificado_homo.crt'
+  const materialized = materializeAfipCredentials();
+  const certPath = resolveExistingPath(
+    undefined,
+    process.env.AFIP_CERT_PATH ? resolvePath(process.env.AFIP_CERT_PATH) : undefined,
+    materialized.certPath,
+    resolvePath(production ? 'afip/certificado_prod.crt' : 'afip/certificado_homo.crt')
   );
+  const keyPath = resolveExistingPath(
+    undefined,
+    process.env.AFIP_KEY_PATH ? resolvePath(process.env.AFIP_KEY_PATH) : undefined,
+    materialized.keyPath,
+    resolvePath(production ? 'afip/privada_prod.key' : 'afip/privada_homo.key')
+  );
+  if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
+    throw new Error(
+      'Certificados AFIP de Notificas SRL no disponibles. En App Hosting configurá AFIP_CERT_PEM y AFIP_KEY_PEM.'
+    );
+  }
   return {
     cuit,
     certPath,
-    keyPath: resolvePath(process.env.AFIP_KEY_PATH ?? 'afip/privada_homo.key'),
-    chainPath: resolvePath(process.env.AFIP_CHAIN_PATH ?? 'afip/chain.pem'),
+    keyPath,
+    chainPath:
+      materialized.chainPath ??
+      resolvePath(process.env.AFIP_CHAIN_PATH ?? 'afip/chain.pem'),
     production,
     cacheKey: cacheKeyFromCert(certPath),
   };
@@ -86,28 +108,39 @@ export function resolveAfipSessionForSchool(facturacion: {
   const production =
     facturacion.afipProduction ??
     String(process.env.AFIP_PRODUCTION ?? '').trim().toLowerCase() === 'true';
+  const materialized = materializeAfipCredentials();
 
-  const certPath = resolvePath(
-    facturacion.afipCertPath ??
-      process.env.AFIP_CERT_PATH ??
-      (production ? 'afip/certificado_prod.crt' : 'afip/certificado_homo.crt')
+  const certPath = resolveExistingPath(
+    facturacion.afipCertPath ? resolvePath(facturacion.afipCertPath) : undefined,
+    process.env.AFIP_CERT_PATH ? resolvePath(process.env.AFIP_CERT_PATH) : undefined,
+    materialized.certPath,
+    resolvePath(production ? 'afip/certificado_prod.crt' : 'afip/certificado_homo.crt')
   );
-  const keyPath = resolvePath(
-    facturacion.afipKeyPath ??
-      process.env.AFIP_KEY_PATH ??
-      (production ? 'afip/privada_prod.key' : 'afip/privada_homo.key')
+  const keyPath = resolveExistingPath(
+    facturacion.afipKeyPath ? resolvePath(facturacion.afipKeyPath) : undefined,
+    process.env.AFIP_KEY_PATH ? resolvePath(process.env.AFIP_KEY_PATH) : undefined,
+    materialized.keyPath,
+    resolvePath(production ? 'afip/privada_prod.key' : 'afip/privada_homo.key')
   );
-  const chainPath = resolvePath(
-    facturacion.afipChainPath ??
-      process.env.AFIP_CHAIN_PATH ??
-      (production ? 'afip/chain_prod.pem' : 'afip/chain.pem')
-  );
+  if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
+    throw new Error(
+      'Certificados AFIP de Notificas SRL no disponibles. En App Hosting configurá AFIP_CERT_PEM y AFIP_KEY_PEM.'
+    );
+  }
 
   return {
     cuit,
     certPath,
     keyPath,
-    chainPath,
+    chainPath:
+      (facturacion.afipChainPath
+        ? resolvePath(facturacion.afipChainPath)
+        : undefined) ??
+      materialized.chainPath ??
+      resolvePath(
+        process.env.AFIP_CHAIN_PATH ??
+          (production ? 'afip/chain_prod.pem' : 'afip/chain.pem')
+      ),
     production,
     cacheKey: cacheKeyFromCert(certPath),
   };

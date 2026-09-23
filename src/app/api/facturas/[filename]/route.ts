@@ -8,8 +8,7 @@ import { NextResponse } from 'next/server';
 import * as path from 'path';
 import * as fs from 'fs';
 import { verifyIdToken } from '@/lib/auth-server';
-
-const FACTURAS_DIR = path.resolve(process.cwd(), 'facturas');
+import { getFacturasDir } from '@/lib/afip/credentials';
 
 export async function GET(
   request: Request,
@@ -26,7 +25,7 @@ export async function GET(
       return NextResponse.json({ error: 'Nombre de archivo inválido' }, { status: 400 });
     }
 
-    const filepath = path.join(FACTURAS_DIR, filename);
+    const filepath = path.join(getFacturasDir(), filename);
     if (!fs.existsSync(filepath)) {
       return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 });
     }

@@ -11,6 +11,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import axios from 'axios';
 import { getActiveAfipSession } from './session';
+import { getAfipWorkDir } from './credentials';
 
 /** Agente HTTPS para AFIP producción (usa OPENSSL_CONF=./openssl.cnf con SECLEVEL=0) */
 const afipAgent = new https.Agent({
@@ -36,7 +37,7 @@ let cacheExpiry = 0;
 /** Ruta del archivo de caché del TA (distinto para homo/prod) */
 function getTaFilePath(): string {
   const session = getActiveAfipSession();
-  const workDir = path.resolve(process.cwd(), process.env.AFIP_WORK_DIR ?? 'afip');
+  const workDir = getAfipWorkDir();
   const suffix = session.production ? 'prod' : 'homo';
   return path.join(workDir, `ta_wsfe_${session.cacheKey}_${suffix}.json`);
 }
@@ -142,10 +143,7 @@ function getPaths(): {
   cmsPath: string;
 } {
   const session = getActiveAfipSession();
-  const workDir = path.resolve(
-    process.cwd(),
-    process.env.AFIP_WORK_DIR ?? 'afip'
-  );
+  const workDir = getAfipWorkDir();
   const certPath = session.certPath;
   const keyPath = session.keyPath;
   const chainPath = session.chainPath;
@@ -166,6 +164,8 @@ function getOpenSSLPath(): string {
     'C:\\Program Files\\Git\\usr\\bin\\openssl.exe',
     'C:\\Program Files\\OpenSSL-Win64\\bin\\openssl.exe',
     'C:\\Program Files\\OpenSSL-Win32\\bin\\openssl.exe',
+    '/usr/bin/openssl',
+    '/usr/local/bin/openssl',
   ];
   for (const p of candidates) {
     if (fs.existsSync(p)) return p;

@@ -53,4 +53,21 @@ env:
     secret: GEMINI_API_KEY
     availability:
       - RUNTIME
+  # AFIP producción (certificados Notificas SRL via Secret Manager)
+  - variable: AFIP_PRODUCTION
+    value: "true"
+    availability:
+      - RUNTIME
+  - variable: AFIP_WORK_DIR
+    value: "/tmp/afip"
+    availability:
+      - RUNTIME
+  - variable: AFIP_CERT_PEM
+    secret: AFIP_CERT_PEM
+    availability:
+      - RUNTIME
+  - variable: AFIP_KEY_PEM
+    secret: AFIP_KEY_PEM
+    availability:
+      - RUNTIME
 

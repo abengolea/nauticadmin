@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { getFacturasDir } from '@/lib/afip/credentials';
 
 export interface FacturaPdfEmisor {
   razonSocial: string;
@@ -48,7 +49,9 @@ export interface FacturaPdfDatos {
   simulacion?: boolean;
 }
 
-const FACTURAS_DIR = path.resolve(process.cwd(), 'facturas');
+function facturasDir(): string {
+  return getFacturasDir();
+}
 
 /**
  * Construye la URL del QR AFIP según especificación.
@@ -85,15 +88,16 @@ function buildAfipQrUrl(datos: FacturaPdfDatos): string {
  * Retorna la ruta absoluta del archivo.
  */
 export async function generarFacturaPDF(datos: FacturaPdfDatos): Promise<string> {
-  if (!fs.existsSync(FACTURAS_DIR)) {
-    fs.mkdirSync(FACTURAS_DIR, { recursive: true });
+  const outDir = facturasDir();
+  if (!fs.existsSync(outDir)) {
+    fs.mkdirSync(outDir, { recursive: true });
   }
 
   const letra = facturaLetra(datos.tipoComprobante);
   const ptoVtaStr = String(datos.puntoVenta).padStart(4, '0');
   const nroStr = String(datos.numero).padStart(8, '0');
   const filename = `factura-${letra}-${ptoVtaStr}-${nroStr}.pdf`;
-  const filepath = path.join(FACTURAS_DIR, filename);
+  const filepath = path.join(outDir, filename);
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();

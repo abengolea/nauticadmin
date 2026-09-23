@@ -5,9 +5,10 @@
  * Modo real: emite a AFIP homologación/producción según config.
  */
 
+import * as fs from 'fs';
 import * as path from 'path';
 import { NextResponse } from 'next/server';
-import { getAdminFirestore } from '@/lib/firebase-admin';
+import { getAdminFirestore, getAdminStorage } from '@/lib/firebase-admin';
 import { verifyIdToken } from '@/lib/auth-server';
 import { createNextVoucher } from '@/lib/afip/wsfe';
 import { runWithAfipSession } from '@/lib/afip/session';
@@ -146,11 +147,12 @@ export async function POST(request: Request) {
           const { getLastVoucher } = await import('@/lib/afip/wsfe');
           nextVoucherNumber = (await getLastVoucher(ptoVta, cbteTipo)) + 1;
         });
-      } catch {
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        console.error('[emit-batch] AFIP connect failed:', detail, err);
         return NextResponse.json(
           {
-            error:
-              'No se pudo conectar con AFIP. Verificá certificados de Notificas SRL y la delegación de Yaguaron en ARCA.',
+            error: `No se pudo conectar con AFIP: ${detail}`,
           },
           { status: 500 }
         );
@@ -322,6 +324,19 @@ export async function POST(request: Request) {
         });
 
         const filename = path.basename(pdfPath);
+        let facturaStoragePath: string | undefined;
+        try {
+          facturaStoragePath = `schools/${schoolId}/payments/${paymentId}/${filename}`;
+          await getAdminStorage()
+            .bucket()
+            .file(facturaStoragePath)
+            .save(fs.readFileSync(pdfPath), {
+              metadata: { contentType: 'application/pdf' },
+            });
+        } catch (storageErr) {
+          console.error('[emit-batch] No se pudo subir PDF a Storage', paymentId, storageErr);
+          facturaStoragePath = undefined;
+        }
         const invoiceNumber = formatInvoiceNumber(ptoVta, voucherNumber);
         const amountLabel = formatAmountLabel(impTotal, currency);
 
@@ -370,6 +385,9 @@ export async function POST(request: Request) {
         if (!simulation && cae) {
           paymentUpdate.CAE = cae;
           paymentUpdate.CAEFchVto = caeVto;
+        }
+        if (facturaStoragePath) {
+          paymentUpdate.facturaStoragePath = facturaStoragePath;
         }
         if (sendEmail) {
           paymentUpdate.facturaEmailRequested = true;
