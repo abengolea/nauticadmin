@@ -12,6 +12,7 @@ import { verifyIdToken } from '@/lib/auth-server';
 import { isSchoolAdminOrSuperAdmin } from '@/lib/auth-server';
 import { confirmExpenseSchema } from '@/lib/expenses/schemas';
 import type { Expense, VendorAccountEntry } from '@/lib/expenses/types';
+import { isVendorAccountEnabled } from '@/lib/expenses/vendor-account-db';
 
 const listSchema = {
   schoolId: (v: string | null) => (v?.trim() ? v : ''),
@@ -136,29 +137,32 @@ export async function PATCH(request: Request) {
           ? expense.supplier.cuit.replace(/\D/g, '').slice(0, 20)
           : `temp-${expenseId}`);
 
-      const entriesCol = db
-        .collection('schools')
-        .doc(schoolId)
-        .collection('vendorAccounts')
-        .doc(vendorId)
-        .collection('entries');
+      const vendorAccountEnabled = await isVendorAccountEnabled(db, schoolId, vendorId);
+      if (vendorAccountEnabled) {
+        const entriesCol = db
+          .collection('schools')
+          .doc(schoolId)
+          .collection('vendorAccounts')
+          .doc(vendorId)
+          .collection('entries');
 
-      const entryRef = entriesCol.doc();
-      const entryId = entryRef.id;
-      const amount = expense.amounts?.total ?? 0;
-      const entry: Omit<VendorAccountEntry, 'id'> & { id: string } = {
-        id: entryId,
-        vendorId,
-        schoolId,
-        date: new Date().toISOString().slice(0, 10),
-        type: 'payment',
-        ref: { expenseId },
-        debit: 0,
-        credit: amount,
-        description: `Pago factura ${expense.invoice?.type || ''} ${expense.invoice?.number || ''}`,
-        createdAt: new Date().toISOString(),
-      };
-      await entryRef.set(entry);
+        const entryRef = entriesCol.doc();
+        const entryId = entryRef.id;
+        const amount = expense.amounts?.total ?? 0;
+        const entry: Omit<VendorAccountEntry, 'id'> & { id: string } = {
+          id: entryId,
+          vendorId,
+          schoolId,
+          date: new Date().toISOString().slice(0, 10),
+          type: 'payment',
+          ref: { expenseId },
+          debit: 0,
+          credit: amount,
+          description: `Pago factura ${expense.invoice?.type || ''} ${expense.invoice?.number || ''}`,
+          createdAt: new Date().toISOString(),
+        };
+        await entryRef.set(entry);
+      }
     }
 
     // Al confirmar: crear entry en cuenta corriente del proveedor
@@ -169,29 +173,32 @@ export async function PATCH(request: Request) {
           ? expense.supplier.cuit.replace(/\D/g, '').slice(0, 20)
           : `temp-${expenseId}`);
 
-      const entriesCol = db
-        .collection('schools')
-        .doc(schoolId)
-        .collection('vendorAccounts')
-        .doc(vendorId)
-        .collection('entries');
+      const vendorAccountEnabled = await isVendorAccountEnabled(db, schoolId, vendorId);
+      if (vendorAccountEnabled) {
+        const entriesCol = db
+          .collection('schools')
+          .doc(schoolId)
+          .collection('vendorAccounts')
+          .doc(vendorId)
+          .collection('entries');
 
-      const entryRef = entriesCol.doc();
-      const entryId = entryRef.id;
-      const entry: Omit<VendorAccountEntry, 'id'> & { id: string } = {
-        id: entryId,
-        vendorId,
-        schoolId,
-        date: expense.invoice?.issueDate || expense.createdAt,
-        type: 'invoice',
-        ref: { expenseId },
-        debit: expense.amounts?.total ?? 0,
-        credit: 0,
-        description: `Factura ${expense.invoice?.type || ''} ${expense.invoice?.number || ''} - ${expense.supplier?.name || 'Proveedor'}`,
-        createdAt: new Date().toISOString(),
-      };
+        const entryRef = entriesCol.doc();
+        const entryId = entryRef.id;
+        const entry: Omit<VendorAccountEntry, 'id'> & { id: string } = {
+          id: entryId,
+          vendorId,
+          schoolId,
+          date: expense.invoice?.issueDate || expense.createdAt,
+          type: 'invoice',
+          ref: { expenseId },
+          debit: expense.amounts?.total ?? 0,
+          credit: 0,
+          description: `Factura ${expense.invoice?.type || ''} ${expense.invoice?.number || ''} - ${expense.supplier?.name || 'Proveedor'}`,
+          createdAt: new Date().toISOString(),
+        };
 
-      await entryRef.set(entry);
+        await entryRef.set(entry);
+      }
     }
 
     return NextResponse.json({ success: true });

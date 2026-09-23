@@ -504,6 +504,10 @@ service cloud.firestore {
       allow read: if isStaffOfSchool(schoolId);
       allow write: if false;  // Solo Admin SDK vía API
     }
+    match /schools/{schoolId}/clientAccounts/{playerId}/entries/{entryId} {
+      allow read: if isStaffOfSchool(schoolId);
+      allow write: if false;  // Solo Admin SDK vía API
+    }
     match /schools/{schoolId}/expensePayments/{paymentId} {
       allow read: if isStaffOfSchool(schoolId);
       allow write: if false;  // Solo Admin SDK vía API

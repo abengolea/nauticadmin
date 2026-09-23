@@ -87,6 +87,12 @@ export async function PATCH(
       if (periodOverride) updates.period = periodOverride;
 
       await paymentRef.update(updates);
+      try {
+        const { recordPaymentInClientAccountById } = await import('@/lib/client-accounts/db');
+        await recordPaymentInClientAccountById(db, paymentId);
+      } catch (err) {
+        console.error('[verify approve] client account entry failed:', err);
+      }
       await updatePlayerStatus(db, schoolId, playerId, 'active');
 
       const playerRef = db

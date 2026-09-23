@@ -5,7 +5,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User, Contact, ArrowLeft, UserX } from "lucide-react";
+import { User, Contact, ArrowLeft, UserX, TrendingUp } from "lucide-react";
 import { isPlayerProfileComplete } from "@/lib/utils";
 import { useDoc, useUserProfile, useCollection, useUser, useFirebase } from "@/firebase";
 import { getAuth } from "firebase/auth";
@@ -280,6 +280,14 @@ export default function PlayerProfilePage() {
           </div>
         </div>
         <div className="flex flex-wrap items-start gap-2">
+          {!isViewingAsPlayer && schoolId && (
+            <Button variant="outline" asChild>
+              <Link href={`/dashboard/players/${id}/account?schoolId=${schoolId}`}>
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Cuenta corriente
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" onClick={() => { setEditInitialTab("personal"); setEditPlayerOpen(true); }}>
             Editar Perfil
           </Button>

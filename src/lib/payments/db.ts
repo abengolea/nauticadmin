@@ -369,7 +369,16 @@ export async function createPayment(
       createdAt: now,
     });
     const snap = await ref.get();
-    return toPayment(snap);
+    const payment = toPayment(snap);
+    if (payment.status === 'approved') {
+      try {
+        const { recordPaymentInClientAccount } = await import('@/lib/client-accounts/db');
+        await recordPaymentInClientAccount(db, payment);
+      } catch (err) {
+        console.error('[createPayment] client account entry failed:', err);
+      }
+    }
+    return payment;
   }
 
   const ref = await col.add({
@@ -379,7 +388,16 @@ export async function createPayment(
     createdAt: now,
   });
   const snap = await ref.get();
-  return toPayment(snap);
+  const payment = toPayment(snap);
+  if (payment.status === 'approved') {
+    try {
+      const { recordPaymentInClientAccount } = await import('@/lib/client-accounts/db');
+      await recordPaymentInClientAccount(db, payment);
+    } catch (err) {
+      console.error('[createPayment] client account entry failed:', err);
+    }
+  }
+  return payment;
 }
 
 /** Crea PaymentIntent (status se setea a 'pending' internamente) */

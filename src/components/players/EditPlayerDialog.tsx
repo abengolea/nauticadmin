@@ -766,7 +766,7 @@ export function EditPlayerDialog({
                     name="creditoActivo"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Crédito activo</FormLabel>
+                        <FormLabel>Cuenta corriente (crédito activo)</FormLabel>
                         <Select
                           onValueChange={(v) =>
                             field.onChange(v === "__none__" ? undefined : v === "true")

@@ -81,6 +81,12 @@ export async function PATCH(
         paidAt: now,
         updatedAt: now,
       });
+      try {
+        const { recordPaymentInClientAccountById } = await import('@/lib/client-accounts/db');
+        await recordPaymentInClientAccountById(db, paymentId);
+      } catch (err) {
+        console.error('[cheque-status] client account entry failed:', err);
+      }
       await updatePlayerStatus(db, schoolId, playerId, 'active');
 
       const playerRef = db

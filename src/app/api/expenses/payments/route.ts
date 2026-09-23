@@ -9,7 +9,7 @@ import { getAdminFirestore } from '@/lib/firebase-admin';
 import { verifyIdToken } from '@/lib/auth-server';
 import { isSchoolAdminOrSuperAdmin } from '@/lib/auth-server';
 import { registerPaymentSchema } from '@/lib/expenses/schemas';
-import type { VendorAccountEntry } from '@/lib/expenses/types';
+import { isVendorAccountEnabled } from '@/lib/expenses/vendor-account-db';
 
 export async function POST(request: Request) {
   try {
@@ -73,37 +73,41 @@ export async function POST(request: Request) {
 
     await paymentRef.set(paymentData);
 
-    // Crear entry en cuenta corriente (haber = pago)
-    const entriesCol = db
-      .collection('schools')
-      .doc(schoolId)
-      .collection('vendorAccounts')
-      .doc(vendorId)
-      .collection('entries');
+    let entryId: string | undefined;
+    const vendorAccountEnabled = await isVendorAccountEnabled(db, schoolId, vendorId);
+    if (vendorAccountEnabled) {
+      // Crear entry en cuenta corriente (haber = pago)
+      const entriesCol = db
+        .collection('schools')
+        .doc(schoolId)
+        .collection('vendorAccounts')
+        .doc(vendorId)
+        .collection('entries');
 
-    const entryRef = entriesCol.doc();
-    const entryId = entryRef.id;
-    const descParts = ['Pago'];
-    if (method) descParts.push(`(${method})`);
-    if (reference) descParts.push(`Ref: ${reference}`);
-    const description = descParts.join(' ');
+      const entryRef = entriesCol.doc();
+      entryId = entryRef.id;
+      const descParts = ['Pago'];
+      if (method) descParts.push(`(${method})`);
+      if (reference) descParts.push(`Ref: ${reference}`);
+      const description = descParts.join(' ');
 
-    const entryData: Record<string, unknown> = {
-      id: entryId,
-      vendorId,
-      schoolId,
-      date,
-      type: 'payment',
-      ref: { paymentId },
-      debit: 0,
-      credit: amount,
-      description,
-      createdAt: now,
-    };
-    if (receiptStoragePath) entryData.receiptStoragePath = receiptStoragePath;
-    if (receiptType) entryData.receiptType = receiptType;
+      const entryData: Record<string, unknown> = {
+        id: entryId,
+        vendorId,
+        schoolId,
+        date,
+        type: 'payment',
+        ref: { paymentId },
+        debit: 0,
+        credit: amount,
+        description,
+        createdAt: now,
+      };
+      if (receiptStoragePath) entryData.receiptStoragePath = receiptStoragePath;
+      if (receiptType) entryData.receiptType = receiptType;
 
-    await entryRef.set(entryData);
+      await entryRef.set(entryData);
+    }
 
     // Actualizar estado de las facturas aplicadas a "paid"
     if (appliedTo && appliedTo.length > 0) {
