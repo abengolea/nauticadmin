@@ -21,6 +21,10 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Receipt } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  PAYMENT_METHOD_LABELS,
+  REGISTER_PAYMENT_METHODS,
+} from "@/lib/payments/payment-method";
 
 const CONCEPTOS_PREDEFINIDOS = [
   "Lavado de lancha",
@@ -83,6 +87,7 @@ export function AddServiceChargeDialog({
   const [conceptPreset, setConceptPreset] = useState<string>("");
   const [conceptCustom, setConceptCustom] = useState("");
   const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState("");
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
   const [submitting, setSubmitting] = useState(false);
@@ -110,6 +115,13 @@ export function AddServiceChargeDialog({
       });
       return;
     }
+    if (!method) {
+      toast({
+        variant: "destructive",
+        title: "Elegí el medio de pago",
+      });
+      return;
+    }
 
     setSubmitting(true);
     const token = await getToken();
@@ -133,6 +145,7 @@ export function AddServiceChargeDialog({
           amount: amountNum,
           currency: "ARS",
           period,
+          method,
         }),
       });
 
@@ -153,6 +166,7 @@ export function AddServiceChargeDialog({
       setConceptPreset("");
       setConceptCustom("");
       setAmount("");
+      setMethod("");
     } catch (e) {
       toast({
         variant: "destructive",
@@ -169,6 +183,7 @@ export function AddServiceChargeDialog({
       setConceptPreset("");
       setConceptCustom("");
       setAmount("");
+      setMethod("");
     }
     onOpenChange(next);
   };
@@ -224,6 +239,22 @@ export function AddServiceChargeDialog({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Medio de pago</Label>
+            <Select value={method} onValueChange={setMethod}>
+              <SelectTrigger>
+                <SelectValue placeholder="Elegí el medio de pago" />
+              </SelectTrigger>
+              <SelectContent>
+                {REGISTER_PAYMENT_METHODS.map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {PAYMENT_METHOD_LABELS[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

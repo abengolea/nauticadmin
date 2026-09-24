@@ -27,6 +27,7 @@ export async function GET(request: Request) {
         status: searchParams.get('status') ?? undefined,
         period: searchParams.get('period') ?? undefined,
         provider: searchParams.get('provider') ?? undefined,
+        method: searchParams.get('method') ?? undefined,
         facturado: searchParams.get('facturado') ?? undefined,
       },
       limit: searchParams.get('limit')

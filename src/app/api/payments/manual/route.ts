@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { playerId, schoolId, period, amount, currency } = parsed.data;
+    const { playerId, schoolId, period, amount, currency, method } = parsed.data;
     const db = getAdminFirestore();
 
     // Regla: solo crear pago si el cliente existe en esta náutica (así el nombre siempre se resuelve)
@@ -77,6 +77,7 @@ export async function POST(request: Request) {
       provider: 'manual',
       status: 'approved',
       paidAt: now,
+      method: method ?? 'unknown',
       metadata: {
         collectedByUid: auth.uid,
         collectedByEmail: auth.email ?? '',

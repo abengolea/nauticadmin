@@ -1,13 +1,18 @@
 /**
  * GET /api/payments/[paymentId]/factura-url?schoolId=...
- * Devuelve una URL firmada para ver la factura cargada manualmente (PDF o imagen) en Storage.
+ * Devuelve una URL firmada del PDF de factura (AFIP o carga manual) en Storage.
+ * Si el PDF está solo en disco local, lo sube a Storage y lo deja guardado.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { NextResponse } from 'next/server';
 import { getAdminFirestore, getAdminStorage } from '@/lib/firebase-admin';
 import { verifyIdToken } from '@/lib/auth-server';
 import { isSchoolAdminOrSuperAdmin } from '@/lib/auth-server';
 import { COLLECTIONS } from '@/lib/payments/constants';
+import { getFacturasDir } from '@/lib/afip/credentials';
+import { buildFacturaPdfFilename } from '@/lib/factura-filename';
 
 export async function GET(
   request: Request,
@@ -44,22 +49,38 @@ export async function GET(
       return NextResponse.json({ error: 'Pago no pertenece a esta náutica' }, { status: 403 });
     }
 
-    const storagePath = data.facturaStoragePath as string | undefined;
-    if (!storagePath?.trim()) {
-      return NextResponse.json(
-        { error: 'Este cobro no tiene factura cargada' },
-        { status: 404 }
-      );
-    }
+    let storagePath =
+      typeof data.facturaStoragePath === 'string' ? data.facturaStoragePath.trim() : '';
+    const filename =
+      path.basename(storagePath) ||
+      buildFacturaPdfFilename({
+        facturaTipo: typeof data.facturaTipo === 'string' ? data.facturaTipo : undefined,
+        facturaPtoVta: typeof data.facturaPtoVta === 'number' ? data.facturaPtoVta : undefined,
+        facturaNumero: typeof data.facturaNumero === 'number' ? data.facturaNumero : undefined,
+      });
 
     const storage = getAdminStorage();
     const bucket = storage.bucket();
-    const file = bucket.file(storagePath);
 
-    const [exists] = await file.exists();
-    if (!exists) {
+    if (storagePath) {
+      const [exists] = await bucket.file(storagePath).exists();
+      if (!exists) storagePath = '';
+    }
+
+    if (!storagePath && filename) {
+      const localPath = path.join(getFacturasDir(), filename);
+      if (fs.existsSync(localPath)) {
+        storagePath = `schools/${schoolId}/payments/${paymentId}/${filename}`;
+        await bucket.file(storagePath).save(fs.readFileSync(localPath), {
+          metadata: { contentType: 'application/pdf' },
+        });
+        await snap.ref.update({ facturaStoragePath: storagePath });
+      }
+    }
+
+    if (!storagePath) {
       return NextResponse.json(
-        { error: 'Archivo de factura no encontrado en Storage' },
+        { error: 'Esta factura no tiene PDF guardado' },
         { status: 404 }
       );
     }
@@ -67,12 +88,15 @@ export async function GET(
     const expires = new Date();
     expires.setMinutes(expires.getMinutes() + 60);
 
-    const [signedUrl] = await file.getSignedUrl({
+    const [signedUrl] = await bucket.file(storagePath).getSignedUrl({
       action: 'read',
       expires,
+      responseDisposition: filename
+        ? `inline; filename="${filename}"`
+        : 'inline',
     });
 
-    return NextResponse.json({ url: signedUrl });
+    return NextResponse.json({ url: signedUrl, filename });
   } catch (err) {
     console.error('[payments factura-url]', err);
     return NextResponse.json(

@@ -28,18 +28,13 @@ import {
 import { AlertTriangle, CheckCircle, History, Loader2, CreditCard } from "lucide-react";
 import type { Payment } from "@/lib/types/payments";
 import type { DelinquentInfo } from "@/lib/types/payments";
+import { getPaymentMethodLabel } from "@/lib/payments/payment-method";
 
 const STATUS_LABELS: Record<string, string> = {
   approved: "Aprobado",
   pending: "Pendiente",
   rejected: "Rechazado",
   refunded: "Reembolsado",
-};
-
-const PROVIDER_LABELS: Record<string, string> = {
-  mercadopago: "MercadoPago",
-  dlocal: "DLocal",
-  manual: "Manual",
 };
 
 const REGISTRATION_PERIOD = "inscripcion";
@@ -517,7 +512,7 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
                           : "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {PROVIDER_LABELS[p.provider] ?? p.provider}
+                      {getPaymentMethodLabel(p)}
                     </TableCell>
                   </TableRow>
                 ))}

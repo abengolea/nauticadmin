@@ -20,7 +20,7 @@ const ingestSchema = z.object({
   currency: z.string().min(1).default('ARS'),
   provider: z.enum(['mercadopago', 'dlocal', 'stripe', 'transfer', 'manual', 'excel_import']),
   providerPaymentId: z.string().nullable().optional(),
-  method: z.enum(['card', 'transfer', 'cash', 'unknown']).optional().default('unknown'),
+  method: z.enum(['card', 'transfer', 'cash', 'cheque', 'mercadopago', 'unknown']).optional().default('unknown'),
   reference: z.string().nullable().optional(),
   paidAt: z.string().datetime().optional(),
 });
