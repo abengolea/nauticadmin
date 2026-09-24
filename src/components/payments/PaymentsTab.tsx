@@ -144,7 +144,7 @@ export function PaymentsTab({
     period: "",
     status: "",
     method: "",
-    facturado: "",
+    facturado: "no",
   });
   const [manualOpenLocal, setManualOpenLocal] = useState(false);
   const manualOpen = manualOpenProp ?? manualOpenLocal;
@@ -587,13 +587,13 @@ export function PaymentsTab({
           value={filters.facturado || "all"}
           onValueChange={(v) => setFilters((f) => ({ ...f, facturado: v === "all" ? "" : v }))}
         >
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Facturado" />
+          <SelectTrigger className="w-52">
+            <SelectValue placeholder="Facturación" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="no">Pendiente de facturación</SelectItem>
             <SelectItem value="yes">Facturado</SelectItem>
-            <SelectItem value="no">No facturado</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
           </SelectContent>
         </Select>
         {approvedFacturable.length > 0 && (
@@ -667,7 +667,9 @@ export function PaymentsTab({
               {payments.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center text-muted-foreground">
-                    No hay pagos para mostrar
+                    {filters.facturado === "no"
+                      ? "No hay pagos pendientes de facturación. Cambiá el filtro a «Todos» para ver el resto."
+                      : "No hay pagos para mostrar"}
                   </TableCell>
                 </TableRow>
               ) : (
