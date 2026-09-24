@@ -149,6 +149,23 @@ describe("listado Visa interno + rendición DA", () => {
 });
 
 describe("buildPaymentsFromRows Rendición DA", () => {
+  it("excluye filas con Aplicada=No (cobro rechazado)", () => {
+    const mapping = detectColumnMapping(DA_HEADERS);
+    const { payments, rejected } = buildPaymentsFromRows(
+      DA_HEADERS,
+      [
+        ["ABRAMOR", "HECTOR E.", "43383100XXXX3899", "275000.00", "Si", "99: ok"],
+        ["AZCOITIA", "JUAN PABLO", "49370200XXXX6185", "275000.00", "No", "00: rechazo"],
+      ],
+      mapping,
+      "credit"
+    );
+    expect(payments).toHaveLength(1);
+    expect(payments[0]?.payerRaw).toBe("ABRAMOR HECTOR E.");
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.payerRaw).toBe("AZCOITIA JUAN PABLO");
+  });
+
   it("junta apellido y nombre como pagador", () => {
     const mapping = detectColumnMapping(DA_HEADERS);
     const { payments, error } = buildPaymentsFromRows(

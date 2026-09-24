@@ -5,8 +5,15 @@
 
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
+import { parseAplicadaFlag } from "./impute-match";
 import { normalizeAccount, normalizePayer } from "./normalize";
-import type { ColumnMapping, PaymentFileKind, PaymentRow, RelationRow } from "./types";
+import type {
+  ColumnMapping,
+  PaymentFileKind,
+  PaymentRow,
+  RejectedPaymentRow,
+  RelationRow,
+} from "./types";
 
 const RELATION_COL_PATTERNS = {
   account: ["ayb (cuenta)", "ayb", "cuenta", "columna a", "col a", "a+b"],
@@ -231,6 +238,7 @@ export async function parseRelationsFile(
 
 export type ParsePaymentsResult = {
   payments: PaymentRow[];
+  rejected: RejectedPaymentRow[];
   headers: string[];
   error?: string;
   preview: string[][];
@@ -242,7 +250,7 @@ export function buildPaymentsFromRows(
   dataRows: string[][],
   mapping: ColumnMapping,
   kind: PaymentFileKind = "credit"
-): { payments: PaymentRow[]; error?: string } {
+): { payments: PaymentRow[]; rejected: RejectedPaymentRow[]; error?: string } {
   const colLastName = mapping.lastName ? headers.indexOf(mapping.lastName) : -1;
   const colFirstName = mapping.firstName ? headers.indexOf(mapping.firstName) : -1;
   const colPayer = mapping.payer ? headers.indexOf(mapping.payer) : -1;
@@ -252,10 +260,10 @@ export function buildPaymentsFromRows(
   const hasSplitName = colLastName >= 0 || colFirstName >= 0;
 
   if (!hasSplitName && colPayer < 0) {
-    return { payments: [], error: "Columna Pagador / Apellido no encontrada en el mapeo" };
+    return { payments: [], rejected: [], error: "Columna Pagador / Apellido no encontrada en el mapeo" };
   }
   if (colAmount < 0) {
-    return { payments: [], error: "Columna Importe no encontrada en el mapeo" };
+    return { payments: [], rejected: [], error: "Columna Importe no encontrada en el mapeo" };
   }
 
   function parseAmount(val: unknown): number {
@@ -275,6 +283,7 @@ export function buildPaymentsFromRows(
     .filter((e) => e.index >= 0);
 
   const payments: PaymentRow[] = [];
+  const rejected: RejectedPaymentRow[] = [];
   for (let i = 0; i < dataRows.length; i++) {
     const row = dataRows[i] ?? [];
     const lastName = colLastName >= 0 ? String(row[colLastName] ?? "").trim() : "";
@@ -292,6 +301,16 @@ export function buildPaymentsFromRows(
       extras[extra.label] = String(row[extra.index] ?? "").trim();
     }
 
+    if (parseAplicadaFlag(extras.Aplicada) === false) {
+      rejected.push({
+        payerRaw,
+        amount,
+        observaciones: reference || extras.Observaciones || "",
+        kind,
+      });
+      continue;
+    }
+
     payments.push({
       rowId: `${kind}-${i + 1}`,
       payerRaw,
@@ -303,7 +322,7 @@ export function buildPaymentsFromRows(
     });
   }
 
-  return { payments };
+  return { payments, rejected };
 }
 
 export async function parsePaymentsFile(
@@ -318,6 +337,7 @@ export async function parsePaymentsFile(
 
   return {
     payments: built.payments,
+    rejected: built.rejected,
     headers,
     preview: rows.slice(0, 21),
     totalRows: rows.length,

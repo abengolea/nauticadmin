@@ -85,8 +85,8 @@ export function ImportPayments({ schoolId, onPaymentsLoaded }: ImportPaymentsPro
       <CardHeader>
         <CardTitle>Paso 2: Archivos de créditos y débitos</CardTitle>
         <CardDescription>
-          Subí la rendición de crédito y la de débito por separado, para marcar la forma de pago.
-          Las columnas se toman tal cual vienen del Excel.
+          Subí la rendición de crédito y la de débito por separado. Solo se concilian filas con Aplicada = Si;
+          las rechazadas (No) se excluyen porque el cobro no entró.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -128,6 +128,7 @@ function PaymentFileSlot({
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>(EMPTY_COLUMN_MAPPING);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [rejectedCount, setRejectedCount] = useState(0);
   const [preview, setPreview] = useState<string[][]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -148,6 +149,7 @@ function PaymentFileSlot({
       setError(null);
       setMappingDone(false);
       setPayments([]);
+      setRejectedCount(0);
       setLoading(true);
       try {
         const previewData = await getPaymentsFilePreview(f);
@@ -176,6 +178,7 @@ function PaymentFileSlot({
     try {
       const result = await parsePaymentsFile(file, mapping, kind);
       setPayments(result.payments);
+      setRejectedCount(result.rejected.length);
       setPreview(result.preview);
       setTotalRows(result.totalRows);
       if (result.error) {
@@ -184,9 +187,13 @@ function PaymentFileSlot({
       } else {
         onPaymentsLoaded(kind, result.payments);
         setMappingDone(true);
+        const rejectedMsg =
+          result.rejected.length > 0
+            ? ` · ${result.rejected.length} rechazados (Aplicada=No, no entran)`
+            : "";
         toast({
           title: `${PAYMENT_FILE_KIND_LABEL[kind]} cargados`,
-          description: `${result.payments.length} movimientos listos para conciliar`,
+          description: `${result.payments.length} cobros aplicados listos para conciliar${rejectedMsg}`,
         });
       }
     } catch (err) {
@@ -311,10 +318,12 @@ function PaymentFileSlot({
         </>
       )}
 
-      {mappingDone && payments.length > 0 && (
+      {mappingDone && (payments.length > 0 || rejectedCount > 0) && (
         <div>
           <p className="text-sm font-medium mb-2">
-            Cargados: {payments.length} · Total filas: {totalRows}
+            Cobros aplicados: {payments.length}
+            {rejectedCount > 0 ? ` · Rechazados (No): ${rejectedCount}` : ""}
+            {totalRows > 0 ? ` · Filas en archivo: ${totalRows - 1}` : ""}
           </p>
           <div className="overflow-x-auto rounded border max-h-32 overflow-y-auto">
             <table className="text-xs min-w-full">

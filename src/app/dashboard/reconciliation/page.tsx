@@ -4,7 +4,18 @@ import { useState, useCallback, useEffect } from "react";
 import { useUserProfile, useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, GitMerge } from "lucide-react";
+import { Loader2, GitMerge, RotateCcw } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ImportRelations } from "@/components/reconciliacion/ImportRelations";
 import { ImportPayments } from "@/components/reconciliacion/ImportPayments";
 import { ReconciliationResults } from "@/components/reconciliacion/ReconciliationResults";
@@ -36,6 +47,8 @@ export default function ReconciliationPage() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [results, setResults] = useState<ReconciliationResult[] | null>(null);
   const [reconciling, setReconciling] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [sessionKey, setSessionKey] = useState(0);
 
   const schoolId = activeSchoolId ?? "";
   const canAccess = profile?.role === "school_admin" && !!schoolId;
@@ -150,6 +163,36 @@ export default function ReconciliationPage() {
     [user, schoolId, toast]
   );
 
+  const handleReset = useCallback(async () => {
+    if (!user) return;
+    setResetting(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `/api/reconciliacion-excel/reset?schoolId=${encodeURIComponent(schoolId)}`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "No se pudo reiniciar");
+      setRelations([]);
+      setPayments([]);
+      setResults(null);
+      setSessionKey((k) => k + 1);
+      toast({ title: "Listo para empezar de nuevo", description: data.message });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudo reiniciar",
+      });
+    } finally {
+      setResetting(false);
+    }
+  }, [user, schoolId, toast]);
+
   useEffect(() => {
     if (isReady && !canAccess) router.replace("/dashboard");
   }, [isReady, canAccess, router]);
@@ -168,9 +211,10 @@ export default function ReconciliationPage() {
         </p>
       </div>
 
-      <ImportRelations onRelationsLoaded={handleRelationsLoaded} />
+      <ImportRelations key={`relations-${sessionKey}`} onRelationsLoaded={handleRelationsLoaded} />
 
       <ImportPayments
+        key={`payments-${sessionKey}`}
         schoolId={schoolId}
         onPaymentsLoaded={handlePaymentsLoaded}
       />
@@ -183,6 +227,7 @@ export default function ReconciliationPage() {
                 onClick={handleConciliar}
                 disabled={
                   reconciling ||
+                  resetting ||
                   relations.length === 0 ||
                   payments.length === 0
                 }
@@ -200,6 +245,40 @@ export default function ReconciliationPage() {
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" disabled={resetting || reconciling}>
+              {resetting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <RotateCcw className="h-4 w-4 mr-2" />
+              )}
+              Empezar de nuevo
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Empezar de nuevo?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Borra los pagos que se hayan imputado desde esta conciliación Visa y limpia
+                la pantalla para cargar los Excel otra vez. Los clientes y otros pagos del
+                sistema no se tocan.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  void handleReset();
+                }}
+              >
+                Borrar y reiniciar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {results && results.length > 0 && (

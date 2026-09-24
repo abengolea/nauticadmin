@@ -32,6 +32,14 @@ export type PaymentRow = {
   extras: Record<string, string>;
 };
 
+/** Cobro rechazado en la rendición DA (Aplicada = No). No entra al banco. */
+export type RejectedPaymentRow = {
+  payerRaw: string;
+  amount: number;
+  observaciones: string;
+  kind: PaymentFileKind;
+};
+
 export type MatchType = "exact" | "fuzzy" | "manual";
 
 export type ReconciliationStatus = "MATCHED" | "REVIEW" | "UNMATCHED";
