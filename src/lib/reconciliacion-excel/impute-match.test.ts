@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  cleanImputeTargetName,
   digitsOnly,
   dniFromAccountRaw,
   imputeIdempotencyKey,
+  imputeTargetNames,
   nameFromAccountRaw,
   nameSearchKeys,
   parseAplicadaFlag,
@@ -18,6 +20,17 @@ describe("impute-match", () => {
   it("lee nombre e imputación del listado", () => {
     expect(nameFromAccountRaw("ABRAMOR HECTOR E. · DNI 18350968")).toBe("ABRAMOR HECTOR E.");
     expect(dniFromAccountRaw("ABRAMOR HECTOR E. · DNI 18.350.968")).toBe("18350968");
+  });
+
+  it("limpia columna G del listado para buscar cliente", () => {
+    expect(cleanImputeTargetName("ARZUAGA JOSE PABLO ( HIJO)  X 2 EMB")).toBe("ARZUAGA JOSE PABLO");
+    expect(
+      imputeTargetNames({
+        imputeToRaw: "ARZUAGA JOSE PABLO ( HIJO)  X 2 EMB",
+        listadoLastName: "ARZUAGA",
+        listadoFirstName: "JOSE E.",
+      })[0]
+    ).toBe("ARZUAGA JOSE PABLO");
   });
 
   it("arma claves de búsqueda por nombre", () => {

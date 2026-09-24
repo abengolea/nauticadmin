@@ -173,6 +173,10 @@ export function parseRelationsFromRows(
         createdAt: now,
         cardLast4: cardLast4(card) || undefined,
         kind,
+        dni: dni || undefined,
+        listadoLastName: lastName || undefined,
+        listadoFirstName: firstName || undefined,
+        imputeToRaw: imputeTo || undefined,
       });
     }
     return {

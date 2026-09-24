@@ -30,12 +30,19 @@ import type {
   ReconciliationResult,
 } from "@/lib/reconciliacion-excel/types";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+function defaultImputePeriod(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
 
 export default function ReconciliationPage() {
   const { profile, isReady, activeSchoolId } = useUserProfile();
@@ -49,6 +56,7 @@ export default function ReconciliationPage() {
   const [reconciling, setReconciling] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [sessionKey, setSessionKey] = useState(0);
+  const [imputePeriod, setImputePeriod] = useState(defaultImputePeriod);
 
   const schoolId = activeSchoolId ?? "";
   const canAccess = profile?.role === "school_admin" && !!schoolId;
@@ -208,7 +216,24 @@ export default function ReconciliationPage() {
         </h1>
         <p className="text-sm text-muted-foreground mt-2">
           Paso 1: listados internos de crédito y débito (a quién imputar). Paso 2: rendiciones Visa de crédito y débito.
+          Indicá qué cuota estás cargando. El cliente (col G del listado) es quien recibe la cuota y la factura.
         </p>
+      </div>
+
+      <div className="rounded-lg border bg-card p-4 flex flex-wrap items-end gap-4">
+        <div className="space-y-1">
+          <Label htmlFor="reconciliation-period">Cuota que estamos cargando</Label>
+          <Input
+            id="reconciliation-period"
+            type="month"
+            className="w-[200px]"
+            value={imputePeriod}
+            onChange={(e) => setImputePeriod(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground max-w-md">
+            Mes de la cuota (ej. rendición sept → 2026-10). Cliente col G = imputar y facturar.
+          </p>
+        </div>
       </div>
 
       <ImportRelations key={`relations-${sessionKey}`} onRelationsLoaded={handleRelationsLoaded} />
@@ -286,6 +311,7 @@ export default function ReconciliationPage() {
           schoolId={schoolId}
           results={results}
           relations={relations}
+          imputePeriod={imputePeriod}
           onSaveRule={handleSaveRule}
         />
       )}

@@ -24,9 +24,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { CheckCircle2, AlertCircle, XCircle, Loader2, Save, UserCheck } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CheckCircle2, AlertCircle, XCircle, Loader2, Save, UserCheck, FlaskConical, HelpCircle } from "lucide-react";
 import { PAYMENT_FILE_KIND_LABEL } from "@/lib/reconciliacion-excel/types";
 import type { ImputePaymentItem } from "@/lib/reconciliacion-excel/types";
 import {
@@ -55,6 +54,16 @@ import type {
   RelationRow,
 } from "@/lib/reconciliacion-excel/types";
 
+type DoubtfulEntry = {
+  paymentRowId: string;
+  payerRaw: string;
+  amount: number;
+  targetName: string;
+  suggestedPlayerId: string;
+  suggestedPlayerName: string;
+  score: number;
+};
+
 type ImputeSummary = {
   applied: number;
   already: number;
@@ -64,6 +73,17 @@ type ImputeSummary = {
   notFound: string[];
   skippedCount: number;
   skipped: string[];
+  doubtful?: DoubtfulEntry[];
+  doubtfulCount?: number;
+  pendingDoubtfulCount?: number;
+  totalAmount?: number;
+  simulate?: boolean;
+  wouldApply?: Array<{
+    paymentRowId?: string;
+    payerRaw: string;
+    amount: number;
+    playerName: string;
+  }>;
   message: string;
 };
 
@@ -71,6 +91,7 @@ type ReconciliationResultsProps = {
   schoolId: string;
   results: ReconciliationResult[];
   relations: RelationRow[];
+  imputePeriod: string;
   onSaveRule: (payerRaw: string, accountKey: string, accountRaw: string) => Promise<void>;
 };
 
@@ -78,6 +99,7 @@ export function ReconciliationResults({
   schoolId,
   results,
   relations,
+  imputePeriod,
   onSaveRule,
 }: ReconciliationResultsProps) {
   const { user } = useUser();
@@ -86,13 +108,13 @@ export function ReconciliationResults({
   const [saving, setSaving] = useState<string | null>(null);
   const [confirmImpute, setConfirmImpute] = useState(false);
   const [imputing, setImputing] = useState(false);
+  const [simulating, setSimulating] = useState(false);
   const [imputeSummary, setImputeSummary] = useState<ImputeSummary | null>(null);
-  const [imputePeriod, setImputePeriod] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const [approvedFuzzy, setApprovedFuzzy] = useState<Set<string>>(new Set());
 
   const matched = results.filter((r) => r.status === "MATCHED");
+  const doubtfulList = imputeSummary?.doubtful ?? [];
+  const pendingDoubtful = imputeSummary?.pendingDoubtfulCount ?? doubtfulList.length;
   const review = results.filter((r) => r.status === "REVIEW");
   const unmatched = results.filter((r) => r.status === "UNMATCHED");
 
@@ -129,29 +151,105 @@ export function ReconciliationResults({
   const getAccountRaw = (accountKey: string) =>
     relations.find((r) => r.accountKey === accountKey)?.accountRaw ?? accountKey;
 
+  const findRelationForResult = (r: ReconciliationResult) =>
+    relations.find(
+      (rel) =>
+        rel.accountKey === r.matchedAccountKey &&
+        (!rel.cardLast4 || !r.cardLast4 || rel.cardLast4 === r.cardLast4)
+    ) ?? relations.find((rel) => rel.accountKey === r.matchedAccountKey);
+
   const formatAmount = (n: number) =>
     `$ ${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const matchedTotal = matched.reduce((s, r) => s + (r.amount ?? 0), 0);
 
-  /** Cuentas únicas para asignación manual en Sin Conciliar */
+  const buildImputeItems = useCallback((): ImputePaymentItem[] => {
+    return matched
+      .filter((r) => r.matchedAccountKey && (r.amount ?? 0) > 0)
+      .map((r) => {
+        const rel = findRelationForResult(r);
+        return {
+          paymentRowId: r.paymentRowId,
+          payerRaw: r.payerRaw,
+          amount: r.amount ?? 0,
+          accountKey: r.matchedAccountKey!,
+          accountRaw: rel?.accountRaw ?? getAccountRaw(r.matchedAccountKey!),
+          sourceKind: r.sourceKind,
+          aplicada: r.aplicada,
+          cardLast4: r.cardLast4,
+          dni: rel?.dni,
+          listadoLastName: rel?.listadoLastName,
+          listadoFirstName: rel?.listadoFirstName,
+          imputeToRaw: rel?.imputeToRaw,
+        };
+      });
+  }, [matched, relations]);
+
+  const handleSimulate = useCallback(async () => {
+    if (!user) {
+      toast({ variant: "destructive", title: "Tenés que iniciar sesión" });
+      return;
+    }
+    const items = buildImputeItems();
+    if (items.length === 0) {
+      toast({ variant: "destructive", title: "No hay pagos conciliados para simular" });
+      return;
+    }
+    setSimulating(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `/api/reconciliacion-excel/simulate-impute?schoolId=${encodeURIComponent(schoolId)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            items,
+            period: imputePeriod,
+            approvedFuzzy: [...approvedFuzzy],
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "No se pudo simular");
+      }
+      setImputeSummary(data);
+      setApprovedFuzzy(new Set());
+      toast({ title: "Simulación lista", description: data.message });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error al simular",
+        description: err instanceof Error ? err.message : "No se pudo simular",
+      });
+    } finally {
+      setSimulating(false);
+    }
+  }, [user, buildImputeItems, schoolId, toast, imputePeriod, approvedFuzzy]);
+
+  const toggleDoubtful = useCallback((paymentRowId: string, checked: boolean) => {
+    setApprovedFuzzy((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(paymentRowId);
+      else next.delete(paymentRowId);
+      return next;
+    });
+  }, []);
+
+  const approveAllDoubtful = useCallback(() => {
+    setApprovedFuzzy(new Set(doubtfulList.map((d) => d.paymentRowId)));
+  }, [doubtfulList]);
+
   const handleImpute = useCallback(async () => {
     if (!user) {
       toast({ variant: "destructive", title: "Tenés que iniciar sesión" });
       return;
     }
-    const items: ImputePaymentItem[] = matched
-      .filter((r) => r.matchedAccountKey && (r.amount ?? 0) > 0)
-      .map((r) => ({
-        paymentRowId: r.paymentRowId,
-        payerRaw: r.payerRaw,
-        amount: r.amount ?? 0,
-        accountKey: r.matchedAccountKey!,
-        accountRaw: getAccountRaw(r.matchedAccountKey!),
-        sourceKind: r.sourceKind,
-        aplicada: r.aplicada,
-        cardLast4: r.cardLast4,
-      }));
+    const items = buildImputeItems();
     if (items.length === 0) {
       toast({ variant: "destructive", title: "No hay pagos conciliados para imputar" });
       return;
@@ -167,14 +265,19 @@ export function ReconciliationResults({
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ items, period: imputePeriod }),
+          body: JSON.stringify({
+            items,
+            period: imputePeriod,
+            approvedFuzzy: [...approvedFuzzy],
+          }),
         }
       );
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error ?? "No se pudo imputar");
       }
-      setImputeSummary(data);
+      setImputeSummary({ ...data, simulate: false });
+      setApprovedFuzzy(new Set());
       toast({ title: "Pagos imputados", description: data.message });
     } catch (err) {
       toast({
@@ -186,7 +289,7 @@ export function ReconciliationResults({
       setImputing(false);
       setConfirmImpute(false);
     }
-  }, [user, matched, schoolId, toast, relations, imputePeriod]);
+  }, [user, buildImputeItems, schoolId, toast, imputePeriod, approvedFuzzy]);
 
   const uniqueAccounts = useMemo(() => {
     const seen = new Set<string>();
@@ -205,26 +308,36 @@ export function ReconciliationResults({
         <CardDescription>
           {matched.length} conciliados · {review.length} a revisar · {unmatched.length} sin conciliar
           {matched.length > 0 ? ` · total pagado ${formatAmount(matchedTotal)}` : ""}
+          {pendingDoubtful > 0 ? ` · ${pendingDoubtful} dudosos sin confirmar` : ""}
         </CardDescription>
+        <p className="text-xs text-muted-foreground pt-1">
+          Cliente del listado (col G) = quien recibe la cuota y la factura. Simulá primero; los matches
+          aproximados van a «A confirmar».
+        </p>
         {matched.length > 0 ? (
           <div className="pt-2 flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="impute-period">Cuota a imputar</Label>
-              <Input
-                id="impute-period"
-                type="month"
-                className="w-[180px]"
-                value={imputePeriod}
-                onChange={(e) => setImputePeriod(e.target.value)}
-              />
-            </div>
-            <Button onClick={() => setConfirmImpute(true)} disabled={imputing}>
+            <p className="text-sm text-muted-foreground">
+              Cuota seleccionada: <strong>{imputePeriod}</strong>
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => void handleSimulate()}
+              disabled={imputing || simulating}
+            >
+              {simulating ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <FlaskConical className="h-4 w-4 mr-2" />
+              )}
+              Simular imputación
+            </Button>
+            <Button onClick={() => setConfirmImpute(true)} disabled={imputing || simulating}>
               {imputing ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
                 <UserCheck className="h-4 w-4 mr-2" />
               )}
-              Imputar {matched.length} pagos a clientes
+              Imputar pagos
             </Button>
           </div>
         ) : null}
@@ -233,7 +346,30 @@ export function ReconciliationResults({
         {imputeSummary ? (
           <Alert className="mb-4">
             <AlertDescription>
+              {imputeSummary.simulate ? (
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                  Simulación — no se guardó nada
+                </p>
+              ) : null}
               <p className="font-medium">{imputeSummary.message}</p>
+              {imputeSummary.totalAmount != null && imputeSummary.totalAmount > 0 ? (
+                <p className="mt-1 text-sm">
+                  Total a acreditar:{" "}
+                  <strong>{formatAmount(imputeSummary.totalAmount)}</strong>
+                </p>
+              ) : null}
+              {imputeSummary.wouldApply && imputeSummary.wouldApply.length > 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Ej.:{" "}
+                  {imputeSummary.wouldApply
+                    .slice(0, 5)
+                    .map((w) => `${w.playerName} (${formatAmount(w.amount)})`)
+                    .join(" · ")}
+                  {imputeSummary.applied > 5
+                    ? ` · y ${imputeSummary.applied - 5} más`
+                    : ""}
+                </p>
+              ) : null}
               {imputeSummary.notFoundCount > 0 ? (
                 <p className="mt-2 text-sm">
                   <strong>{imputeSummary.notFoundCount} sin cliente:</strong> no están cargados en la náutica con ese DNI o nombre.
@@ -255,14 +391,24 @@ export function ReconciliationResults({
                   ) : null}
                 </p>
               ) : null}
+              {(imputeSummary.pendingDoubtfulCount ?? 0) > 0 ? (
+                <p className="mt-2 text-sm">
+                  <strong>{imputeSummary.pendingDoubtfulCount} dudosos:</strong> revisá la pestaña
+                  «A confirmar», marcá OK y volvé a simular o imputá.
+                </p>
+              ) : null}
             </AlertDescription>
           </Alert>
         ) : null}
-        <Tabs defaultValue="matched" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue={pendingDoubtful > 0 ? "doubtful" : "matched"} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="matched" className="gap-1">
               <CheckCircle2 className="h-4 w-4" />
               Conciliados ({matched.length})
+            </TabsTrigger>
+            <TabsTrigger value="doubtful" className="gap-1">
+              <HelpCircle className="h-4 w-4" />
+              A confirmar ({doubtfulList.length || pendingDoubtful})
             </TabsTrigger>
             <TabsTrigger value="review" className="gap-1">
               <AlertCircle className="h-4 w-4" />
@@ -273,6 +419,69 @@ export function ReconciliationResults({
               Sin Conciliar ({unmatched.length})
             </TabsTrigger>
           </TabsList>
+          <TabsContent value="doubtful" className="mt-4 space-y-3">
+            {doubtfulList.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                {imputeSummary
+                  ? "No hay matches dudosos. Ejecutá «Simular imputación» para clasificar."
+                  : "Simulá la imputación para ver sugerencias a confirmar."}
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={approveAllDoubtful}>
+                    Confirmar todos ({doubtfulList.length})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleSimulate()}
+                    disabled={simulating}
+                  >
+                    Re-simular con confirmados
+                  </Button>
+                </div>
+                <div className="rounded border overflow-x-auto max-h-96">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">OK</TableHead>
+                        <TableHead>Cliente listado (col G)</TableHead>
+                        <TableHead>Sugerido en NauticAdmin</TableHead>
+                        <TableHead className="text-right">Importe</TableHead>
+                        <TableHead>Match</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {doubtfulList.map((d) => (
+                        <TableRow key={d.paymentRowId}>
+                          <TableCell>
+                            <Checkbox
+                              checked={approvedFuzzy.has(d.paymentRowId)}
+                              onCheckedChange={(c) =>
+                                toggleDoubtful(d.paymentRowId, c === true)
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>{d.targetName}</TableCell>
+                          <TableCell>{d.suggestedPlayerName}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatAmount(d.amount)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {Math.round(d.score * 100)}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+          </TabsContent>
           <TabsContent value="matched" className="mt-4">
             <div className="rounded border overflow-x-auto max-h-96">
               <Table>

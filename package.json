@@ -25,7 +25,8 @@
     "emit:yaguaron": "cross-env OPENSSL_CONF=./openssl.cnf tsx scripts/emit-yaguaron-invoice.ts",
     "emit:yaguaron:homo": "tsx scripts/emit-yaguaron-invoice.ts 10 homo",
     "emit:yaguaron:prod": "cross-env OPENSSL_CONF=./openssl.cnf tsx scripts/emit-yaguaron-invoice.ts 10 prod",
-    "inspect:expenses": "tsx scripts/inspect-expenses-db.ts"
+    "inspect:expenses": "tsx scripts/inspect-expenses-db.ts",
+    "simulate:visa-reconciliation": "tsx scripts/simulate-visa-reconciliation.ts"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.20.0",

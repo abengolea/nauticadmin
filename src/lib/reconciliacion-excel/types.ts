@@ -14,6 +14,12 @@ export type RelationRow = {
   cardLast4?: string;
   /** Listado de crédito o débito; se cruza solo con esa rendición. */
   kind?: PaymentFileKind;
+  /** DNI del listado Visa (columna C). */
+  dni?: string;
+  listadoLastName?: string;
+  listadoFirstName?: string;
+  /** Columna G: a quién imputar en la náutica (puede ser distinto del titular de tarjeta). */
+  imputeToRaw?: string;
 };
 
 export type ExtraMappedField = {
@@ -69,6 +75,10 @@ export type ImputePaymentItem = {
   sourceKind?: PaymentFileKind;
   aplicada?: string;
   cardLast4?: string;
+  dni?: string;
+  listadoLastName?: string;
+  listadoFirstName?: string;
+  imputeToRaw?: string;
 };
 
 export type ColumnMappingCoreField =

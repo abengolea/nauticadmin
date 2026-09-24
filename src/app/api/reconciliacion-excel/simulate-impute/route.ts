@@ -1,6 +1,6 @@
 /**
- * POST /api/reconciliacion-excel/impute
- * Acredita los pagos conciliados en la cuota indicada.
+ * POST /api/reconciliacion-excel/simulate-impute
+ * Simula la imputación sin escribir en Firestore.
  */
 
 import { NextResponse } from "next/server";
@@ -34,20 +34,13 @@ export async function POST(request: Request) {
     const items = (body?.items ?? []) as ImputePaymentItem[];
     const period = String(body?.period ?? "").trim();
     if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: "No hay pagos para imputar" }, { status: 400 });
+      return NextResponse.json({ error: "No hay pagos para simular" }, { status: 400 });
     }
     if (!/^\d{4}-\d{2}$/.test(period)) {
       return NextResponse.json(
         { error: "Falta el período a imputar (YYYY-MM, ej. 2026-09)" },
         { status: 400 }
       );
-    }
-
-    let collectedByDisplayName = auth.email ?? "Usuario";
-    const schoolUserSnap2 = await db.doc(`schools/${schoolId}/users/${auth.uid}`).get();
-    if (schoolUserSnap2.exists) {
-      const dn = (schoolUserSnap2.data() as { displayName?: string })?.displayName?.trim();
-      if (dn) collectedByDisplayName = dn;
     }
 
     const approvedFuzzy = new Set(
@@ -58,16 +51,14 @@ export async function POST(request: Request) {
       schoolId,
       items,
       period,
-      simulate: false,
+      simulate: true,
       approvedFuzzyIds: approvedFuzzy,
-      collectedByUid: auth.uid,
-      collectedByDisplayName,
     });
 
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, simulate: true, ...result });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("[reconciliacion-excel/impute]", e);
+    console.error("[reconciliacion-excel/simulate-impute]", e);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

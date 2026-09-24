@@ -22,6 +22,38 @@ export function nameFromAccountRaw(accountRaw: string): string {
   return String(accountRaw ?? "").split("·")[0].trim();
 }
 
+/** Limpia columna G del listado: saca (HIJO), "X 2 EMB", etc. */
+export function cleanImputeTargetName(raw: string): string {
+  let s = String(raw ?? "").trim();
+  s = s.replace(/\([^)]*\)/g, " ");
+  s = s.replace(/\s+X\s+\d+\s+EMB\s*$/i, "");
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
+/** Nombres a buscar en la náutica según el listado de conciliación. */
+export function imputeTargetNames(item: {
+  imputeToRaw?: string;
+  listadoLastName?: string;
+  listadoFirstName?: string;
+  accountRaw?: string;
+  payerRaw?: string;
+}): string[] {
+  const names = new Set<string>();
+  const add = (n: string) => {
+    const t = cleanImputeTargetName(n);
+    if (t) names.add(t);
+  };
+
+  if (item.imputeToRaw) add(item.imputeToRaw);
+  const listado = [item.listadoLastName, item.listadoFirstName].filter(Boolean).join(" ");
+  if (listado) add(listado);
+  if (item.accountRaw) add(nameFromAccountRaw(item.accountRaw));
+  if (item.payerRaw) add(item.payerRaw);
+
+  return [...names];
+}
+
 export function dniFromAccountRaw(accountRaw: string): string {
   const m = String(accountRaw ?? "").match(/DNI\s*([0-9.\s-]+)/i);
   return digitsOnly(m?.[1] ?? "");

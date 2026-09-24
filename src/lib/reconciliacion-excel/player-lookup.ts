@@ -1,20 +1,32 @@
 /**
- * Resuelve pagador del listado Visa → cliente en la náutica.
- * Misma lógica que import-excel: DNI, nombre, alias.
+ * Resuelve cliente del listado Visa → ficha en la náutica (col G = imputar y facturar).
  */
 
 import type admin from "firebase-admin";
 import { REC_COLLECTIONS } from "../reconciliation";
 import { normalizeString } from "../text-normalize";
+import type { ImputePaymentItem } from "./types";
+import { digitsOnly, dniFromAccountRaw, imputeTargetNames, nameSearchKeys } from "./impute-match";
+import { fuzzyNameScore, normalizeLegalName } from "./name-fuzzy";
 
 const normalizeName = normalizeString;
-import type { ImputePaymentItem } from "./types";
-import { digitsOnly, dniFromAccountRaw, nameFromAccountRaw, nameSearchKeys } from "./impute-match";
-
 type DocSnapshot = admin.firestore.DocumentSnapshot;
+
+export type PlayerMatchKind = "dni" | "exact" | "alias" | "fuzzy" | "none";
+
+export type PlayerMatchResult = {
+  doc?: DocSnapshot;
+  kind: PlayerMatchKind;
+  score?: number;
+  /** Nombre buscado (listado / col G). */
+  targetName?: string;
+  /** Nombre en NauticAdmin. */
+  matchedName?: string;
+};
 
 export type PlayerLookup = {
   findPlayer: (item: ImputePaymentItem) => DocSnapshot | undefined;
+  resolvePlayerMatch: (item: ImputePaymentItem) => PlayerMatchResult;
 };
 
 function dniKeys(dni: string): string[] {
@@ -51,6 +63,10 @@ export function payerNameKeys(payerRaw: string): string[] {
   return [...keys];
 }
 
+function playerDisplayName(d: { firstName?: string; lastName?: string }): string {
+  return `${d.lastName ?? ""} ${d.firstName ?? ""}`.trim();
+}
+
 export async function buildPlayerLookup(
   db: admin.firestore.Firestore,
   schoolId: string
@@ -81,7 +97,7 @@ export async function buildPlayerLookup(
     const usuarioId = String(d.usuarioId ?? "").trim();
     if (usuarioId) byDni.set(digitsOnly(usuarioId), doc);
 
-    const fullName = `${d.lastName ?? ""} ${d.firstName ?? ""}`.trim();
+    const fullName = playerDisplayName(d);
     const tutor = String(d.tutorContact?.name ?? "").trim();
     for (const raw of [fullName, tutor, `${d.firstName ?? ""} ${d.lastName ?? ""}`.trim()]) {
       for (const key of nameSearchKeys(raw)) {
@@ -134,6 +150,13 @@ export async function buildPlayerLookup(
 
   const aliasToPlayer = new Map<string, DocSnapshot>();
   const playersById = new Map(playersSnap.docs.map((d) => [d.id, d]));
+  const activePlayerDocs = playersSnap.docs.filter((doc) => {
+    const d = doc.data() as { archived?: boolean; lastName?: string; firstName?: string };
+    if (d.archived) return false;
+    const full = playerDisplayName(d);
+    return !normalizeString(full).startsWith("ZZ ");
+  });
+
   for (const d of aliasesSnap.docs) {
     const data = d.data() as {
       normalized_payer_name?: string;
@@ -148,8 +171,9 @@ export async function buildPlayerLookup(
     if (playerDoc) aliasToPlayer.set(payerNorm, playerDoc);
   }
 
-  function findPlayer(item: ImputePaymentItem): DocSnapshot | undefined {
+  function resolvePlayerMatch(item: ImputePaymentItem): PlayerMatchResult {
     const dniCandidates = [
+      digitsOnly(item.dni ?? ""),
       digitsOnly(item.accountKey),
       dniFromAccountRaw(item.accountRaw),
     ].filter((d) => d.length >= 6);
@@ -157,22 +181,81 @@ export async function buildPlayerLookup(
     for (const dni of dniCandidates) {
       for (const key of dniKeys(dni)) {
         const hit = byDni.get(key);
-        if (hit) return hit;
+        if (hit) {
+          const d = hit.data() as { firstName?: string; lastName?: string };
+          return {
+            doc: hit,
+            kind: "dni",
+            targetName: imputeTargetNames(item)[0],
+            matchedName: playerDisplayName(d),
+          };
+        }
       }
     }
 
-    const names = [nameFromAccountRaw(item.accountRaw), item.payerRaw].filter(Boolean);
-    for (const name of names) {
+    for (const name of imputeTargetNames(item)) {
       for (const key of payerNameKeys(name)) {
         const hit = byName.get(key);
-        if (hit) return hit;
+        if (hit) {
+          const d = hit.data() as { firstName?: string; lastName?: string };
+          return { doc: hit, kind: "exact", targetName: name, matchedName: playerDisplayName(d) };
+        }
+      }
+      for (const key of nameSearchKeys(name)) {
+        const hit = byName.get(key);
+        if (hit) {
+          const d = hit.data() as { firstName?: string; lastName?: string };
+          return { doc: hit, kind: "exact", targetName: name, matchedName: playerDisplayName(d) };
+        }
       }
       const aliasHit = aliasToPlayer.get(normalizeName(name));
-      if (aliasHit) return aliasHit;
+      if (aliasHit) {
+        const d = aliasHit.data() as { firstName?: string; lastName?: string };
+        return {
+          doc: aliasHit,
+          kind: "alias",
+          targetName: name,
+          matchedName: playerDisplayName(d),
+        };
+      }
     }
 
-    return undefined;
+    for (const name of imputeTargetNames(item)) {
+      const scored = activePlayerDocs
+        .map((doc) => {
+          const d = doc.data() as { firstName?: string; lastName?: string };
+          const display = playerDisplayName(d);
+          return { doc, score: fuzzyNameScore(name, display), display };
+        })
+        .filter((x) => x.score >= 0.72)
+        .sort((a, b) => b.score - a.score);
+
+      if (scored.length === 0) continue;
+
+      const best = scored[0]!;
+      const second = scored[1];
+      if (
+        !second ||
+        best.score - second.score >= 0.1 ||
+        normalizeLegalName(best.display) === normalizeLegalName(second.display)
+      ) {
+        return {
+          doc: best.doc,
+          kind: "fuzzy",
+          score: best.score,
+          targetName: name,
+          matchedName: best.display,
+        };
+      }
+    }
+
+    return { kind: "none", targetName: imputeTargetNames(item)[0] };
   }
 
-  return { findPlayer };
+  function findPlayer(item: ImputePaymentItem): DocSnapshot | undefined {
+    const m = resolvePlayerMatch(item);
+    return m.doc;
+  }
+
+  return { findPlayer, resolvePlayerMatch };
 }
