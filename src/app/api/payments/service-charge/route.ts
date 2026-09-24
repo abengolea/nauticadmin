@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { playerId, schoolId, concept, amount, currency, method } = parsed.data;
+    const { playerId, schoolId, concept, amount, currency } = parsed.data;
     const periodMonth = parsed.data.period ?? `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
     const db = getAdminFirestore();
@@ -88,7 +88,6 @@ export async function POST(request: Request) {
       status: 'approved',
       paidAt: now,
       paymentType: 'service',
-      method: method ?? 'unknown',
       metadata: {
         concept,
         servicePeriod: periodMonth,

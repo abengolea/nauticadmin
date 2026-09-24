@@ -31,7 +31,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { Loader2, FileText } from "lucide-react";
 import { PaymentDocumentoAdjunto } from "@/components/payments/PaymentDocumentoAdjunto";
-import { FacturaDownloadButton } from "@/components/payments/FacturaDownloadButton";
 import { ClientSelectCombobox } from "@/components/players/ClientSelectCombobox";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -39,11 +38,6 @@ import { useCollection } from "@/firebase";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Payment, Player } from "@/lib/types";
-import {
-  getPaymentMethodLabel,
-  PAYMENT_METHOD_LABELS,
-  REGISTER_PAYMENT_METHODS,
-} from "@/lib/payments/payment-method";
 
 /** Pago con nombre de jugador enriquecido por la API */
 type PaymentWithPlayerName = Payment & {
@@ -52,10 +46,6 @@ type PaymentWithPlayerName = Payment & {
   facturado?: boolean;
   documentoAdjuntoStoragePath?: string;
   documentoAdjuntoNombre?: string;
-  facturaStoragePath?: string;
-  facturaNumero?: number;
-  facturaPtoVta?: number;
-  facturaTipo?: string;
 };
 
 interface PaymentsTabProps {
@@ -75,15 +65,12 @@ const STATUS_LABELS: Record<string, string> = {
   refunded: "Reembolsado",
 };
 
-const PAYMENT_METHOD_FILTER_OPTIONS = [
-  "transfer",
-  "cash",
-  "cheque",
-  "mercadopago",
-  "card",
-  "excel_import",
-  "manual",
-] as const;
+const PROVIDER_LABELS: Record<string, string> = {
+  mercadopago: "MercadoPago",
+  dlocal: "DLocal",
+  manual: "Manual",
+  excel_import: "Excel",
+};
 
 const REGISTRATION_PERIOD = "inscripcion";
 
@@ -143,7 +130,7 @@ export function PaymentsTab({
   const [filters, setFilters] = useState({
     period: "",
     status: "",
-    method: "",
+    provider: "",
     facturado: "",
   });
   const [manualOpenLocal, setManualOpenLocal] = useState(false);
@@ -152,7 +139,6 @@ export function PaymentsTab({
   const [manualPlayerId, setManualPlayerId] = useState("");
   const [manualPeriod, setManualPeriod] = useState(currentPeriod());
   const [manualAmount, setManualAmount] = useState("15000");
-  const [manualMethod, setManualMethod] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [unpaidPeriods, setUnpaidPeriods] = useState<{ period: string; amount: number; currency: string; label: string }[]>([]);
   const [unpaidLoading, setUnpaidLoading] = useState(false);
@@ -187,7 +173,7 @@ export function PaymentsTab({
     const params = new URLSearchParams({ schoolId, limit: "500" });
     if (filters.period) params.set("period", filters.period);
     if (filters.status) params.set("status", filters.status);
-    if (filters.method) params.set("method", filters.method);
+    if (filters.provider) params.set("provider", filters.provider);
     if (filters.facturado) params.set("facturado", filters.facturado);
     try {
       const res = await fetch(`/api/payments?${params}`, {
@@ -212,7 +198,7 @@ export function PaymentsTab({
     } finally {
       setLoading(false);
     }
-  }, [schoolId, filters.period, filters.status, filters.method, filters.facturado, getToken]);
+  }, [schoolId, filters.period, filters.status, filters.provider, filters.facturado, getToken]);
 
   useEffect(() => {
     fetchPayments();
@@ -410,10 +396,6 @@ export function PaymentsTab({
       toast({ variant: "destructive", title: "Completá el período para la cuota mensual." });
       return;
     }
-    if (!manualMethod) {
-      toast({ variant: "destructive", title: "Elegí el medio de pago." });
-      return;
-    }
     setManualSubmitting(true);
     const token = await getToken();
     if (!token) {
@@ -434,7 +416,6 @@ export function PaymentsTab({
           period,
           amount,
           currency: "ARS",
-          method: manualMethod,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -446,7 +427,6 @@ export function PaymentsTab({
       setManualPlayerId("");
       setManualPeriod(currentPeriod());
       setManualAmount("15000");
-      setManualMethod("");
       fetchPayments();
     } catch (e) {
       toast({
@@ -570,16 +550,15 @@ export function PaymentsTab({
           </SelectContent>
         </Select>
         <Select
-          value={filters.method || "all"}
-          onValueChange={(v) => setFilters((f) => ({ ...f, method: v === "all" ? "" : v }))}
+          value={filters.provider}
+          onValueChange={(v) => setFilters((f) => ({ ...f, provider: v }))}
         >
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Medio de pago" />
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Proveedor" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {PAYMENT_METHOD_FILTER_OPTIONS.map((k) => (
-              <SelectItem key={k} value={k}>{PAYMENT_METHOD_LABELS[k]}</SelectItem>
+            {Object.entries(PROVIDER_LABELS).map(([k, v]) => (
+              <SelectItem key={k} value={k}>{v}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -656,7 +635,7 @@ export function PaymentsTab({
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap">Período</TableHead>
                 <TableHead className="text-xs sm:text-sm">Cliente</TableHead>
                 <TableHead className="text-xs sm:text-sm">Monto</TableHead>
-                <TableHead className="text-xs sm:text-sm whitespace-nowrap">Medio de pago</TableHead>
+                <TableHead className="text-xs sm:text-sm">Proveedor</TableHead>
                 <TableHead className="text-xs sm:text-sm">Estado</TableHead>
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap">Facturado</TableHead>
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap w-20">Adj.</TableHead>
@@ -698,7 +677,12 @@ export function PaymentsTab({
                       {p.currency} {p.amount.toLocaleString("es-AR")}
                     </TableCell>
                     <TableCell>
-                      {getPaymentMethodLabel(p)}
+                      {p.provider === "manual"
+                        ? (p.metadata as { collectedByDisplayName?: string; collectedByEmail?: string } | undefined)
+                            ?.collectedByDisplayName ||
+                          (p.metadata as { collectedByEmail?: string } | undefined)?.collectedByEmail ||
+                          "Manual"
+                        : PROVIDER_LABELS[p.provider] ?? p.provider}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -715,20 +699,9 @@ export function PaymentsTab({
                     </TableCell>
                     <TableCell>
                       {(p as PaymentWithPlayerName).facturado ? (
-                        <div className="flex items-center gap-1">
-                          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                            Sí
-                          </Badge>
-                          <FacturaDownloadButton
-                            paymentId={p.id}
-                            schoolId={schoolId}
-                            getToken={getToken}
-                            facturaTipo={p.facturaTipo}
-                            facturaPtoVta={p.facturaPtoVta}
-                            facturaNumero={p.facturaNumero}
-                            hasPdf={!!(p.facturaStoragePath || (p.facturaNumero && p.facturaPtoVta))}
-                          />
-                        </div>
+                        <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                          Sí
+                        </Badge>
                       ) : (
                         <span className="text-muted-foreground text-sm">No</span>
                       )}
@@ -845,21 +818,6 @@ export function PaymentsTab({
                 placeholder="15000"
                 className="mt-1"
               />
-            </div>
-            <div>
-              <Label htmlFor="manual-method">Medio de pago</Label>
-              <Select value={manualMethod} onValueChange={setManualMethod}>
-                <SelectTrigger id="manual-method" className="mt-1">
-                  <SelectValue placeholder="Elegí el medio de pago" />
-                </SelectTrigger>
-                <SelectContent>
-                  {REGISTER_PAYMENT_METHODS.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {PAYMENT_METHOD_LABELS[k]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <DialogFooter>

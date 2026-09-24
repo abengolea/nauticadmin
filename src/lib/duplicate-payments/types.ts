@@ -94,7 +94,7 @@ export interface IngestPaymentInput {
   amount: number;
   currency: string;
   paidAt: Date;
-  method?: 'card' | 'transfer' | 'cash' | 'cheque' | 'mercadopago' | 'unknown';
+  method?: 'card' | 'transfer' | 'cash' | 'unknown';
   reference?: string | null;
   status?: 'received' | 'accredited' | 'cancelled' | 'refunded';
 }
