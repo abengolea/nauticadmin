@@ -135,42 +135,6 @@ export default function ReconciliationPage() {
     }
   }, [relations, payments, user, schoolId, toast]);
 
-  const handleSaveRule = useCallback(
-    async (payerRaw: string, accountKey: string, accountRaw: string) => {
-      if (!user) return;
-      const token = await user.getIdToken();
-      const res = await fetch(
-        `/api/reconciliacion-excel/save-rule?schoolId=${encodeURIComponent(schoolId)}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ payerRaw, accountKey, accountRaw }),
-        }
-      );
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "Error al guardar");
-      }
-      setRelations((prev) => [
-        ...prev.filter(
-          (r) => !(r.payerKey === normalizePayer(payerRaw) && r.accountKey === accountKey)
-        ),
-        {
-          accountKey,
-          payerKey: normalizePayer(payerRaw),
-          payerRaw,
-          accountRaw,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-      toast({ title: "Regla guardada" });
-    },
-    [user, schoolId, toast]
-  );
-
   const handleReset = useCallback(async () => {
     if (!user) return;
     setResetting(true);
@@ -312,7 +276,6 @@ export default function ReconciliationPage() {
           results={results}
           relations={relations}
           imputePeriod={imputePeriod}
-          onSaveRule={handleSaveRule}
         />
       )}
     </div>

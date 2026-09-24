@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckCircle2, AlertCircle, XCircle, Loader2, Save, UserCheck, FlaskConical, HelpCircle } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, UserCheck, FlaskConical, HelpCircle, Link2, Undo2 } from "lucide-react";
 import { PAYMENT_FILE_KIND_LABEL } from "@/lib/reconciliacion-excel/types";
 import type { ImputePaymentItem } from "@/lib/reconciliacion-excel/types";
 import {
@@ -92,7 +92,6 @@ type ReconciliationResultsProps = {
   results: ReconciliationResult[];
   relations: RelationRow[];
   imputePeriod: string;
-  onSaveRule: (payerRaw: string, accountKey: string, accountRaw: string) => Promise<void>;
 };
 
 export function ReconciliationResults({
@@ -100,12 +99,12 @@ export function ReconciliationResults({
   results,
   relations,
   imputePeriod,
-  onSaveRule,
 }: ReconciliationResultsProps) {
   const { user } = useUser();
   const { toast } = useToast();
   const [manualSelections, setManualSelections] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState<string | null>(null);
+  /** Pagador → cliente del listado, solo para esta conciliación */
+  const [manualResolved, setManualResolved] = useState<Record<string, string>>({});
   const [confirmImpute, setConfirmImpute] = useState(false);
   const [imputing, setImputing] = useState(false);
   const [simulating, setSimulating] = useState(false);
@@ -118,62 +117,95 @@ export function ReconciliationResults({
   const review = results.filter((r) => r.status === "REVIEW");
   const unmatched = results.filter((r) => r.status === "UNMATCHED");
 
+  type ResolvedRow = ReconciliationResult & {
+    effectiveAccountKey: string;
+    isManual: boolean;
+  };
+
+  const allResolved = useMemo((): ResolvedRow[] => {
+    const auto: ResolvedRow[] = matched
+      .filter((r) => r.matchedAccountKey)
+      .map((r) => ({
+        ...r,
+        effectiveAccountKey: r.matchedAccountKey!,
+        isManual: false,
+      }));
+    const manualSources = [...review, ...unmatched];
+    const manual: ResolvedRow[] = manualSources
+      .filter((r) => manualResolved[r.paymentRowId])
+      .map((r) => ({
+        ...r,
+        effectiveAccountKey: manualResolved[r.paymentRowId],
+        isManual: true,
+      }));
+    return [...auto, ...manual];
+  }, [matched, review, unmatched, manualResolved]);
+
+  const openReview = review.filter((r) => !manualResolved[r.paymentRowId]);
+  const openUnmatched = unmatched.filter((r) => !manualResolved[r.paymentRowId]);
+  const pendingManualCount = openReview.length + openUnmatched.length;
+
   const handleManualSelect = useCallback((rowId: string, accountKey: string) => {
     setManualSelections((prev) => ({ ...prev, [rowId]: accountKey }));
   }, []);
 
-  const handleSaveRule = useCallback(
-    async (r: ReconciliationResult) => {
-      const accountKey = manualSelections[r.paymentRowId];
-      if (!accountKey) {
-        toast({ variant: "destructive", title: "Seleccioná una cuenta" });
-        return;
-      }
-      const cand = r.candidateAccounts.find((c) => c.accountKey === accountKey);
-      const accountRaw = cand?.accountRaw ?? relations.find((rel) => rel.accountKey === accountKey)?.accountRaw ?? accountKey;
-      setSaving(r.paymentRowId);
-      try {
-        await onSaveRule(r.payerRaw, accountKey, accountRaw);
-        toast({ title: "Regla guardada" });
-      } catch (err) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: err instanceof Error ? err.message : "No se pudo guardar",
-        });
-      } finally {
-        setSaving(null);
-      }
-    },
-    [manualSelections, onSaveRule, toast, relations]
-  );
-
   const getAccountRaw = (accountKey: string) =>
     relations.find((r) => r.accountKey === accountKey)?.accountRaw ?? accountKey;
 
-  const findRelationForResult = (r: ReconciliationResult) =>
+  const findRelationForAccount = (accountKey: string, cardLast4?: string) =>
     relations.find(
       (rel) =>
-        rel.accountKey === r.matchedAccountKey &&
-        (!rel.cardLast4 || !r.cardLast4 || rel.cardLast4 === r.cardLast4)
-    ) ?? relations.find((rel) => rel.accountKey === r.matchedAccountKey);
+        rel.accountKey === accountKey &&
+        (!rel.cardLast4 || !cardLast4 || rel.cardLast4 === cardLast4)
+    ) ?? relations.find((rel) => rel.accountKey === accountKey);
+
+  const handleManualResolve = useCallback(
+    (r: ReconciliationResult, accountKey: string) => {
+      if (!accountKey) {
+        toast({ variant: "destructive", title: "Elegí el cliente del listado (col G)" });
+        return;
+      }
+      setManualResolved((prev) => ({ ...prev, [r.paymentRowId]: accountKey }));
+      setManualSelections((prev) => {
+        const next = { ...prev };
+        delete next[r.paymentRowId];
+        return next;
+      });
+      setImputeSummary(null);
+      toast({
+        title: "Conciliado",
+        description: `${r.payerRaw} → ${getAccountRaw(accountKey)}`,
+      });
+    },
+    [toast, relations]
+  );
+
+  const handleUndoManual = useCallback((paymentRowId: string) => {
+    setManualResolved((prev) => {
+      const next = { ...prev };
+      delete next[paymentRowId];
+      return next;
+    });
+    setImputeSummary(null);
+  }, []);
 
   const formatAmount = (n: number) =>
     `$ ${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const matchedTotal = matched.reduce((s, r) => s + (r.amount ?? 0), 0);
+  const resolvedTotal = allResolved.reduce((s, r) => s + (r.amount ?? 0), 0);
+  const manualResolvedCount = allResolved.filter((r) => r.isManual).length;
 
   const buildImputeItems = useCallback((): ImputePaymentItem[] => {
-    return matched
-      .filter((r) => r.matchedAccountKey && (r.amount ?? 0) > 0)
+    return allResolved
+      .filter((r) => (r.amount ?? 0) > 0)
       .map((r) => {
-        const rel = findRelationForResult(r);
+        const rel = findRelationForAccount(r.effectiveAccountKey, r.cardLast4);
         return {
           paymentRowId: r.paymentRowId,
           payerRaw: r.payerRaw,
           amount: r.amount ?? 0,
-          accountKey: r.matchedAccountKey!,
-          accountRaw: rel?.accountRaw ?? getAccountRaw(r.matchedAccountKey!),
+          accountKey: r.effectiveAccountKey,
+          accountRaw: rel?.accountRaw ?? getAccountRaw(r.effectiveAccountKey),
           sourceKind: r.sourceKind,
           aplicada: r.aplicada,
           cardLast4: r.cardLast4,
@@ -183,7 +215,7 @@ export function ReconciliationResults({
           imputeToRaw: rel?.imputeToRaw,
         };
       });
-  }, [matched, relations]);
+  }, [allResolved, relations]);
 
   const handleSimulate = useCallback(async () => {
     if (!user) {
@@ -306,15 +338,17 @@ export function ReconciliationResults({
       <CardHeader>
         <CardTitle>Resultados de conciliación</CardTitle>
         <CardDescription>
-          {matched.length} conciliados · {review.length} a revisar · {unmatched.length} sin conciliar
-          {matched.length > 0 ? ` · total pagado ${formatAmount(matchedTotal)}` : ""}
+          {allResolved.length} conciliados
+          {manualResolvedCount > 0 ? ` (${manualResolvedCount} manual)` : ""}
+          {pendingManualCount > 0 ? ` · ${pendingManualCount} sin conciliar` : ""}
+          {allResolved.length > 0 ? ` · total pagado ${formatAmount(resolvedTotal)}` : ""}
           {pendingDoubtful > 0 ? ` · ${pendingDoubtful} dudosos sin confirmar` : ""}
         </CardDescription>
         <p className="text-xs text-muted-foreground pt-1">
-          Cliente del listado (col G) = quien recibe la cuota y la factura. Simulá primero; los matches
-          aproximados van a «A confirmar».
+          Cliente del listado (col G) = quien recibe la cuota y la factura. En «Sin conciliar» asigná pagador →
+          cliente una vez; entra en simular/imputar. Los matches aproximados van a «A confirmar».
         </p>
-        {matched.length > 0 ? (
+        {allResolved.length > 0 ? (
           <div className="pt-2 flex flex-wrap items-end gap-3">
             <p className="text-sm text-muted-foreground">
               Cuota seleccionada: <strong>{imputePeriod}</strong>
@@ -400,23 +434,28 @@ export function ReconciliationResults({
             </AlertDescription>
           </Alert>
         ) : null}
-        <Tabs defaultValue={pendingDoubtful > 0 ? "doubtful" : "matched"} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs
+          defaultValue={
+            pendingManualCount > 0
+              ? "unmatched"
+              : pendingDoubtful > 0
+                ? "doubtful"
+                : "matched"
+          }
+          className="w-full"
+        >
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="matched" className="gap-1">
               <CheckCircle2 className="h-4 w-4" />
-              Conciliados ({matched.length})
+              Conciliados ({allResolved.length})
             </TabsTrigger>
             <TabsTrigger value="doubtful" className="gap-1">
               <HelpCircle className="h-4 w-4" />
               A confirmar ({doubtfulList.length || pendingDoubtful})
             </TabsTrigger>
-            <TabsTrigger value="review" className="gap-1">
-              <AlertCircle className="h-4 w-4" />
-              A Revisar ({review.length})
-            </TabsTrigger>
             <TabsTrigger value="unmatched" className="gap-1">
               <XCircle className="h-4 w-4" />
-              Sin Conciliar ({unmatched.length})
+              Sin conciliar ({pendingManualCount})
             </TabsTrigger>
           </TabsList>
           <TabsContent value="doubtful" className="mt-4 space-y-3">
@@ -487,15 +526,16 @@ export function ReconciliationResults({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Pagador</TableHead>
+                    <TableHead>Pagador (rendición)</TableHead>
                     <TableHead>Origen</TableHead>
                     <TableHead className="text-right">Importe</TableHead>
-                    <TableHead>Imputar a</TableHead>
+                    <TableHead>Cliente listado (col G)</TableHead>
                     <TableHead>Tipo</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {matched.map((r) => (
+                  {allResolved.map((r) => (
                     <TableRow key={r.paymentRowId}>
                       <TableCell>{r.payerRaw}</TableCell>
                       <TableCell>
@@ -508,158 +548,155 @@ export function ReconciliationResults({
                       <TableCell className="text-right font-medium tabular-nums">
                         {formatAmount(r.amount ?? 0)}
                       </TableCell>
+                      <TableCell>{getAccountRaw(r.effectiveAccountKey)}</TableCell>
                       <TableCell>
-                        {r.matchedAccountKey
-                          ? getAccountRaw(r.matchedAccountKey)
-                          : "—"}
+                        {r.isManual ? (
+                          <Badge variant="outline">Manual</Badge>
+                        ) : (
+                          r.matchType
+                        )}
                       </TableCell>
-                      <TableCell>{r.matchType}</TableCell>
+                      <TableCell>
+                        {r.isManual ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleUndoManual(r.paymentRowId)}
+                                >
+                                  <Undo2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Deshacer conciliación manual</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : null}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
           </TabsContent>
-          <TabsContent value="review" className="mt-4">
-            <div className="space-y-4">
-              {review.map((r) => (
-                <div
-                  key={r.paymentRowId}
-                  className="border rounded-lg p-4 space-y-2"
-                >
-                  <p className="font-medium flex flex-wrap items-center gap-2">
-                    {r.payerRaw}
-                    <span className="tabular-nums">{formatAmount(r.amount ?? 0)}</span>
-                    {r.sourceKind ? (
-                      <Badge variant="secondary">{PAYMENT_FILE_KIND_LABEL[r.sourceKind]}</Badge>
-                    ) : null}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Candidatos (score): {r.candidateAccounts.map((c) => `${c.accountRaw} (${c.score})`).join(", ")}
-                  </p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Select
-                      value={manualSelections[r.paymentRowId] ?? ""}
-                      onValueChange={(v) => handleManualSelect(r.paymentRowId, v)}
-                    >
-                      <SelectTrigger className="w-[220px]">
-                        <SelectValue placeholder="Elegir cuenta…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {r.candidateAccounts.map((c) => (
-                          <SelectItem key={c.accountKey} value={c.accountKey}>
-                            {c.accountRaw} ({c.score})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSaveRule(r)}
-                            disabled={
-                              !manualSelections[r.paymentRowId] ||
-                              saving === r.paymentRowId
-                            }
-                          >
-                            {saving === r.paymentRowId ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Save className="h-4 w-4 mr-1" />
-                            )}
-                            Guardar regla
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Guarda esta relación Pagador → Cuenta.</p>
-                          <p className="text-xs mt-1">En próximas conciliaciones se asociará automáticamente.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-              ))}
-              {review.length === 0 && (
-                <p className="text-muted-foreground py-8 text-center">
-                  No hay casos a revisar.
-                </p>
-              )}
-            </div>
-          </TabsContent>
-          <TabsContent value="unmatched" className="mt-4">
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Elegí la cuenta/cliente para cada pagador y guardá la regla. Se usará en futuras conciliaciones.
+          <TabsContent value="unmatched" className="mt-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Pagador = nombre en la rendición Visa. Cliente = columna G del listado (quien recibe cuota y
+              factura). Asigná una vez; el pago pasa a conciliados y entra en simular/imputar.
+            </p>
+            {uniqueAccounts.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                Cargá el listado interno (paso 1) para ver los clientes disponibles.
               </p>
-              {unmatched.map((r) => (
-                <div
-                  key={r.paymentRowId}
-                  className="border rounded-lg p-4 space-y-2"
-                >
-                  <p className="font-medium flex flex-wrap items-center gap-2">
-                    {r.payerRaw}
-                    <span className="tabular-nums">{formatAmount(r.amount ?? 0)}</span>
-                    {r.sourceKind ? (
-                      <Badge variant="secondary">{PAYMENT_FILE_KIND_LABEL[r.sourceKind]}</Badge>
-                    ) : null}
-                  </p>
-                  {uniqueAccounts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Cargá primero el archivo de relaciones para poder asignar manualmente.
-                    </p>
-                  ) : (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Select
-                        value={manualSelections[r.paymentRowId] ?? ""}
-                        onValueChange={(v) => handleManualSelect(r.paymentRowId, v)}
-                      >
-                        <SelectTrigger className="w-[220px]">
-                          <SelectValue placeholder="Elegir cuenta/cliente…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {uniqueAccounts.map((rel) => (
-                            <SelectItem key={rel.accountKey} value={rel.accountKey}>
-                              {rel.accountRaw}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="sm"
-                              onClick={() => handleSaveRule(r)}
-                              disabled={
-                                !manualSelections[r.paymentRowId] ||
-                                saving === r.paymentRowId
-                              }
+            ) : pendingManualCount === 0 ? (
+              <p className="text-muted-foreground py-8 text-center">
+                No hay pagos sin conciliar.
+              </p>
+            ) : (
+              <div className="rounded border overflow-x-auto max-h-[28rem]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Pagador (rendición)</TableHead>
+                      <TableHead className="text-right">Importe</TableHead>
+                      <TableHead>Cliente listado (col G)</TableHead>
+                      <TableHead className="w-32" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...openReview, ...openUnmatched].map((r) => {
+                      const suggestedKey =
+                        r.status === "REVIEW" && r.candidateAccounts[0]?.accountKey
+                          ? r.candidateAccounts[0].accountKey
+                          : "";
+                      const selectedKey =
+                        manualSelections[r.paymentRowId] ?? suggestedKey;
+                      const accountOptions =
+                        r.status === "REVIEW" && r.candidateAccounts.length > 0
+                          ? [
+                              ...r.candidateAccounts.map((c) => ({
+                                accountKey: c.accountKey,
+                                accountRaw: c.accountRaw,
+                                hint: `${c.score}`,
+                              })),
+                              ...uniqueAccounts
+                                .filter(
+                                  (rel) =>
+                                    !r.candidateAccounts.some(
+                                      (c) => c.accountKey === rel.accountKey
+                                    )
+                                )
+                                .map((rel) => ({
+                                  accountKey: rel.accountKey,
+                                  accountRaw: rel.accountRaw,
+                                  hint: null as string | null,
+                                })),
+                            ]
+                          : uniqueAccounts.map((rel) => ({
+                              accountKey: rel.accountKey,
+                              accountRaw: rel.accountRaw,
+                              hint: null as string | null,
+                            }));
+
+                      return (
+                        <TableRow key={r.paymentRowId}>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <p>{r.payerRaw}</p>
+                              {r.sourceKind ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  {PAYMENT_FILE_KIND_LABEL[r.sourceKind]}
+                                </Badge>
+                              ) : null}
+                              {r.status === "REVIEW" && r.candidateAccounts.length > 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Sugerido: {r.candidateAccounts[0].accountRaw}
+                                </p>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums font-medium">
+                            {formatAmount(r.amount ?? 0)}
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={selectedKey}
+                              onValueChange={(v) => handleManualSelect(r.paymentRowId, v)}
                             >
-                              {saving === r.paymentRowId ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Save className="h-4 w-4 mr-1" />
-                              )}
-                              Guardar regla
+                              <SelectTrigger className="w-full min-w-[220px] max-w-md">
+                                <SelectValue placeholder="Elegir cliente del listado…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {accountOptions.map((opt) => (
+                                  <SelectItem key={opt.accountKey} value={opt.accountKey}>
+                                    {opt.accountRaw}
+                                    {opt.hint ? ` (${opt.hint})` : ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={!selectedKey}
+                              onClick={() => handleManualResolve(r, selectedKey)}
+                            >
+                              <Link2 className="h-4 w-4 mr-1" />
+                              Conciliar
                             </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Guarda Pagador → Cuenta para futuras conciliaciones.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {unmatched.length === 0 && (
-                <p className="text-muted-foreground py-8 text-center">
-                  No hay pagos sin conciliar.
-                </p>
-              )}
-            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </CardContent>
@@ -670,7 +707,7 @@ export function ReconciliationResults({
         <AlertDialogHeader>
           <AlertDialogTitle>Imputar pagos a clientes</AlertDialogTitle>
           <AlertDialogDescription>
-            Se van a acreditar {matched.length} pagos conciliados en la cuota de{" "}
+            Se van a acreditar {allResolved.length} pagos conciliados en la cuota de{" "}
             <strong>{imputePeriod}</strong>. Busca el cliente por DNI o nombre. Si ya pagó ese mes o el
             cobro ya se imputó, no se duplica.
           </AlertDialogDescription>
