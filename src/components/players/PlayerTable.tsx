@@ -19,7 +19,7 @@ import Link from "next/link";
 import { useCollection, useUserProfile } from "@/firebase";
 import { Skeleton } from "../ui/skeleton";
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { FileDown, CreditCard, CheckCircle, Loader2, Search, Mail, FileX, FileCheck } from "lucide-react";
+import { FileDown, CreditCard, CheckCircle, Loader2, Search, Mail, FileX, FileCheck, TrendingUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
@@ -348,7 +348,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   };
 
   const hasInviteColumn = canInviteAccess;
-  const colCount = 6 + (hasInviteColumn ? 1 : 0) + (canSeePaymentStatus ? 1 : 0);
+  const colCount = 6 + (hasInviteColumn ? 1 : 0) + (canSeePaymentStatus ? 2 : 0);
 
   // Mostrar loading cuando: perfil no listo, datos cargando, o staff sin náutica seleccionada
   const isWaitingForSchool = canListPlayers && !schoolId;
@@ -476,6 +476,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
               <TableHead className="text-xs sm:text-sm whitespace-nowrap pl-1">Ubicación</TableHead>
               <TableHead className="text-xs sm:text-sm whitespace-nowrap">Estado</TableHead>
               {canSeePaymentStatus && <TableHead className="text-xs sm:text-sm whitespace-nowrap">Pagos</TableHead>}
+              {canSeePaymentStatus && <TableHead className="text-xs sm:text-sm whitespace-nowrap">Cta. cte.</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -591,6 +592,16 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                       Al día
                     </span>
                   )}
+                </TableCell>
+              )}
+              {canSeePaymentStatus && schoolId && (
+                <TableCell className="py-2 sm:py-3" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="sm" className="h-7 px-2" asChild>
+                    <Link href={`/dashboard/players/${player.id}/account?schoolId=${schoolId}`}>
+                      <TrendingUp className="h-3.5 w-3.5 mr-1" />
+                      Ver
+                    </Link>
+                  </Button>
                 </TableCell>
               )}
             </TableRow>

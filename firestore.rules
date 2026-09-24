@@ -512,6 +512,10 @@ service cloud.firestore {
       allow read: if isStaffOfSchool(schoolId);
       allow write: if false;  // Solo Admin SDK vía API
     }
+    match /schools/{schoolId}/incomeEntries/{entryId} {
+      allow read: if isStaffOfSchool(schoolId);
+      allow write: if false;  // Solo Admin SDK vía API
+    }
 
     // --- Notas (posts) ---
     // Lectura: públicos si published; staff de la escuela si draft/archived

@@ -343,7 +343,7 @@ export default function VendorAccountPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link href={`/dashboard/expenses?schoolId=${schoolId}`}>
+          <Link href={`/dashboard/expenses/vendors?schoolId=${schoolId}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>

@@ -22,6 +22,8 @@ import {
   Receipt,
   ClipboardCheck,
   BarChart3,
+  Calculator,
+  Truck,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -41,13 +43,49 @@ import { useUserProfile, useDoc, useFirebase } from "@/firebase";
 import { isPlayerProfileComplete } from "@/lib/utils";
 import type { Player } from "@/lib/types";
 import { getAuth } from "firebase/auth";
-// Orden por importancia: núcleo operativo → comunicación → administración
-const schoolUserMenuItems = [
+/** Menú operador: operación diaria + soporte */
+const operadorMenuItems = [
   { href: "/dashboard", label: "Panel Principal", icon: Home },
   { href: "/dashboard/players", label: "Clientes", icon: Users },
   { href: "/dashboard/solicitudes", label: "Solicitudes embarcaciones", icon: Ship },
   { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
 ];
+
+function isSidebarItemActive(
+  href: string,
+  pathname: string,
+  searchParams: ReturnType<typeof useSearchParams>
+): boolean {
+  if (href.includes("tab=mensualidad")) {
+    return pathname === "/dashboard/payments" && searchParams.get("tab") === "mensualidad";
+  }
+  if (href === "/dashboard/payments") {
+    return pathname === "/dashboard/payments" && searchParams.get("tab") !== "mensualidad";
+  }
+  if (href === "/dashboard/expenses") {
+    return pathname === "/dashboard/expenses";
+  }
+  if (href === "/dashboard/expenses/vendors") {
+    return (
+      pathname === "/dashboard/expenses/vendors" ||
+      pathname.startsWith("/dashboard/expenses/vendor/")
+    );
+  }
+  if (href === "/dashboard/accounting") {
+    return pathname === "/dashboard/accounting";
+  }
+  if (href === "/dashboard") {
+    return (
+      pathname === "/dashboard" &&
+      (!searchParams.get("tab") || searchParams.get("tab") === "schools")
+    );
+  }
+  if (href.startsWith("/dashboard?tab=")) {
+    return pathname === "/dashboard" && searchParams.get("tab") === href.split("tab=")[1];
+  }
+  const base = href.split("?")[0];
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
 
 const superAdminMenuItems = [
     { href: "/dashboard", label: "Náuticas", icon: Building },
@@ -122,38 +160,31 @@ export function SidebarNav() {
         { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
       ];
     }
-  } else {
-    // Start with the base items for any school user (operador / school_admin)
-    menuItems = [...schoolUserMenuItems];
-    // Add Pagos, Mensajes y Gestionar Náutica solo para school_admin, en orden de importancia
-    if (profile?.role === 'school_admin' && profile.activeSchoolId) {
-      const pagos = { href: "/dashboard/payments", label: "Ventas y pagos", icon: Banknote };
-      const mensualidades = { href: "/dashboard/payments?tab=mensualidad", label: "Mensualidades", icon: Building2 };
-      const conciliacion = { href: "/dashboard/reconciliation", label: "Conciliación", icon: FileSpreadsheet };
-      const gastos = { href: "/dashboard/expenses", label: "Gastos", icon: Receipt };
-      const mensajes = { href: "/dashboard/messages", label: "Mensajes", icon: Mail };
-      const gestionarNautica = {
+  } else if (profile?.role === "school_admin" && profile.activeSchoolId) {
+    // Admin: operación → cobranzas → contabilidad → soporte → configuración
+    menuItems = [
+      { href: "/dashboard", label: "Panel Principal", icon: Home },
+      { href: "/dashboard/players", label: "Clientes", icon: Users },
+      { href: "/dashboard/solicitudes", label: "Solicitudes embarcaciones", icon: Ship },
+      { href: "/dashboard/payments", label: "Ventas y pagos", icon: Banknote },
+      { href: "/dashboard/reconciliation", label: "Conciliación", icon: FileSpreadsheet },
+      { href: "/dashboard/expenses", label: "Gastos", icon: Receipt },
+      { href: "/dashboard/expenses/vendors", label: "Proveedores", icon: Truck },
+      { href: "/dashboard/accounting", label: "Contabilidad", icon: Calculator },
+      { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
+      { href: "/dashboard/messages", label: "Mensajes", icon: Mail },
+      {
         href: `/dashboard/schools/${profile.activeSchoolId}`,
         label: "Gestionar Náutica",
-        icon: Shield
-      };
-      menuItems = [
-        ...menuItems.slice(0, 2), // Panel Principal, Clientes
-        pagos,
-        conciliacion,
-        gastos,
-        ...menuItems.slice(2),   // Centro de Soporte
-        mensajes,
-        gestionarNautica,
-        mensualidades
-      ];
-    }
+        icon: Shield,
+      },
+      { href: "/dashboard/payments?tab=mensualidad", label: "Mensualidades", icon: Building2 },
+    ];
+  } else {
+    menuItems = [...operadorMenuItems];
   }
 
-  // Evitar ítems duplicados por href (claves únicas y menú sin duplicados)
-  const uniqueMenuItems = Array.from(
-    new Map(menuItems.map((item) => [item.href, item])).values()
-  );
+  const uniqueMenuItems = menuItems;
 
   return (
     <>
@@ -175,17 +206,7 @@ export function SidebarNav() {
                 <SidebarMenuItem key={`${item.href}-${item.label}`}>
                 <Link href={item.href} className="relative flex items-center" onClick={closeMobileSidebar}>
                     <SidebarMenuButton
-                    isActive={
-                      item.href.includes("tab=mensualidad")
-                        ? pathname === "/dashboard/payments" && searchParams.get("tab") === "mensualidad"
-                        : item.href === "/dashboard/payments"
-                          ? pathname === "/dashboard/payments" && searchParams.get("tab") !== "mensualidad"
-                          : item.href === "/dashboard"
-                            ? pathname === "/dashboard" && (!searchParams.get("tab") || searchParams.get("tab") === "schools")
-                            : item.href.startsWith("/dashboard?tab=")
-                              ? pathname === "/dashboard" && searchParams.get("tab") === item.href.split("tab=")[1]
-                              : pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href.split("?")[0]))
-                    }
+                    isActive={isSidebarItemActive(item.href, pathname, searchParams)}
                     tooltip={item.label}
                     className="font-headline w-full"
                     >

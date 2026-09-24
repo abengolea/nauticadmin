@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExpenseCapture } from '@/components/expenses/ExpenseCapture';
 import { ExpenseConfirmDialog } from '@/components/expenses/ExpenseConfirmDialog';
 import { VendorPaymentDialog } from '@/components/expenses/VendorPaymentDialog';
-import { Pencil, Plus, List, ExternalLink, Filter, Banknote, Trash2, Receipt, Wallet, Download, FileText, FileSpreadsheet, ChevronDown, Loader2, Users } from 'lucide-react';
+import { Pencil, Plus, List, ExternalLink, Filter, Banknote, Trash2, Receipt, Wallet, Download, FileText, FileSpreadsheet, ChevronDown, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +30,6 @@ import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Expense } from '@/lib/expenses/types';
 import type { AIExtractedExpense } from '@/lib/expenses/schemas';
-import { VendorsTab } from '@/components/expenses/VendorsTab';
 
 export default function ExpensesPage() {
   const { toast } = useToast();
@@ -244,10 +243,6 @@ export default function ExpensesPage() {
             <Plus className="h-4 w-4 mr-2" />
             Cargar factura
           </TabsTrigger>
-          <TabsTrigger value="vendors">
-            <Users className="h-4 w-4 mr-2" />
-            Proveedores
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="list" className="mt-4">
@@ -301,9 +296,6 @@ export default function ExpensesPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="vendors" className="mt-4">
-          <VendorsTab schoolId={schoolId} />
-        </TabsContent>
       </Tabs>
 
       <ExpenseConfirmDialog
