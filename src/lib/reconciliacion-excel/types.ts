@@ -2,6 +2,8 @@
  * Tipos para el módulo de conciliación Excel/CSV.
  */
 
+export type PaymentFileKind = "credit" | "debit";
+
 export type RelationRow = {
   accountKey: string;
   payerKey: string;
@@ -10,9 +12,9 @@ export type RelationRow = {
   createdAt: string;
   /** Últimos 4 de la tarjeta, para cruzar con la rendición DA. */
   cardLast4?: string;
+  /** Listado de crédito o débito; se cruza solo con esa rendición. */
+  kind?: PaymentFileKind;
 };
-
-export type PaymentFileKind = "credit" | "debit";
 
 export type ExtraMappedField = {
   id: string;

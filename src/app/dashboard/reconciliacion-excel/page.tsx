@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 export default function ReconciliacionExcelRedirect() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/dashboard/reconciliation?tab=excel");
+    router.replace("/dashboard/reconciliation");
   }, [router]);
   return null;
 }

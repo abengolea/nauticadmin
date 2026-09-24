@@ -23,16 +23,30 @@ function buildCardIndex(relations: RelationRow[]): Map<string, RelationRow[]> {
   return index;
 }
 
+function relationsForPayment(
+  relations: RelationRow[],
+  kind: PaymentRow["kind"]
+): RelationRow[] {
+  const forKind = relations.filter((r) => r.kind === kind);
+  if (forKind.length > 0) return forKind;
+  return relations.filter((r) => !r.kind);
+}
+
 export function runReconciliation(
   relations: RelationRow[],
   payments: PaymentRow[]
 ): ReconciliationResult[] {
-  const payerIndex = buildPayerIndex(relations);
-  const cardIndex = buildCardIndex(relations);
+  const creditPool = relationsForPayment(relations, "credit");
+  const debitPool = relationsForPayment(relations, "debit");
+  const indexes = {
+    credit: { payer: buildPayerIndex(creditPool), card: buildCardIndex(creditPool) },
+    debit: { payer: buildPayerIndex(debitPool), card: buildCardIndex(debitPool) },
+  };
   const results: ReconciliationResult[] = [];
   const now = new Date().toISOString();
 
   for (const pay of payments) {
+    const { payer: payerIndex, card: cardIndex } = indexes[pay.kind] ?? indexes.credit;
     let match = reconcileSingle(pay.payerRaw, pay.reference, payerIndex);
 
     if (match.status === "UNMATCHED") {

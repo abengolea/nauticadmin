@@ -2,13 +2,9 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useUserProfile, useUser } from "@/firebase";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { FileSpreadsheet, Banknote, Loader2, GitMerge, Info, ChevronDown, ChevronUp } from "lucide-react";
-import { ReconciliationImport } from "@/components/reconciliation/ReconciliationImport";
-import { ReconciliationReview } from "@/components/reconciliation/ReconciliationReview";
-import { ImportAliasesFromExcel } from "@/components/payments/ImportAliasesFromExcel";
+import { Loader2, GitMerge } from "lucide-react";
 import { ImportRelations } from "@/components/reconciliacion/ImportRelations";
 import { ImportPayments } from "@/components/reconciliacion/ImportPayments";
 import { ReconciliationResults } from "@/components/reconciliacion/ReconciliationResults";
@@ -29,26 +25,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ReconciliationPage() {
   const { profile, isReady, activeSchoolId } = useUserProfile();
   const { user } = useUser();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [tab, setTab] = useState<"excel" | "banco">("excel");
   const [relations, setRelations] = useState<RelationRow[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [results, setResults] = useState<ReconciliationResult[] | null>(null);
   const [reconciling, setReconciling] = useState(false);
-  const [infoOpen, setInfoOpen] = useState(false);
 
   const schoolId = activeSchoolId ?? "";
   const canAccess = profile?.role === "school_admin" && !!schoolId;
@@ -64,12 +51,33 @@ export default function ReconciliationPage() {
   }, []);
 
   const handleConciliar = useCallback(async () => {
-    if (relations.length === 0) {
-      toast({ variant: "destructive", title: "Cargá primero el archivo de relaciones" });
+    const creditPayments = payments.filter((p) => p.kind === "credit");
+    const debitPayments = payments.filter((p) => p.kind === "debit");
+    const creditRelations = relations.filter((r) => r.kind === "credit");
+    const debitRelations = relations.filter((r) => r.kind === "debit");
+
+    if (payments.length === 0) {
+      toast({ variant: "destructive", title: "Cargá primero la rendición de crédito o débito" });
       return;
     }
-    if (payments.length === 0) {
-      toast({ variant: "destructive", title: "Cargá primero un archivo de créditos o débitos" });
+    if (creditPayments.length > 0 && creditRelations.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Falta el listado de crédito",
+        description: "Subí el Excel 9 VISA CREDITO… en el paso 1.",
+      });
+      return;
+    }
+    if (debitPayments.length > 0 && debitRelations.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Falta el listado de débito",
+        description: "Subí el Excel 9 VISA DEBITO… en el paso 1.",
+      });
+      return;
+    }
+    if (relations.length === 0) {
+      toast({ variant: "destructive", title: "Cargá el listado de a quién imputar" });
       return;
     }
     setReconciling(true);
@@ -143,164 +151,65 @@ export default function ReconciliationPage() {
   );
 
   useEffect(() => {
-    const t = searchParams.get("tab");
-    if (t === "banco") setTab("banco");
-    else if (t === "excel") setTab("excel");
-  }, [searchParams]);
-
-  useEffect(() => {
     if (isReady && !canAccess) router.replace("/dashboard");
   }, [isReady, canAccess, router]);
 
   if (!isReady) return null;
   if (!canAccess) return null;
 
-  const batchId = searchParams.get("batch");
-
   return (
     <div className="flex flex-col gap-6 min-w-0">
-      <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">
-        Conciliación de Pagos
-      </h1>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight font-headline sm:text-3xl">
+          Conciliación de Pagos
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          Paso 1: listados internos de crédito y débito (a quién imputar). Paso 2: rendiciones Visa de crédito y débito.
+        </p>
+      </div>
 
-      <Collapsible open={infoOpen} onOpenChange={setInfoOpen}>
-        <Alert className="border-muted bg-muted/30">
-          <Info className="h-4 w-4" />
-          <div className="flex-1 space-y-1">
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-2 text-left font-medium hover:underline focus:outline-none focus:underline"
+      <ImportRelations onRelationsLoaded={handleRelationsLoaded} />
+
+      <ImportPayments
+        schoolId={schoolId}
+        onPaymentsLoaded={handlePaymentsLoaded}
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={handleConciliar}
+                disabled={
+                  reconciling ||
+                  relations.length === 0 ||
+                  payments.length === 0
+                }
               >
-                <span>¿Por qué hay dos opciones? (Excel/CSV vs Formato banco)</span>
-                {infoOpen ? (
-                  <ChevronUp className="h-4 w-4 shrink-0 opacity-70" />
+                {reconciling ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+                  <GitMerge className="h-4 w-4 mr-2" />
                 )}
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <AlertDescription asChild>
-                <div className="mt-3 space-y-4 text-sm text-muted-foreground">
-                  <div>
-                    <p className="font-medium text-foreground">Excel / CSV</p>
-                    <p>
-                      Para archivos genéricos de cualquier origen: home banking, planillas propias, exportaciones de tarjetas, etc.
-                      Subís dos archivos: uno con relaciones (Cuenta ↔ Pagador) y otro con los pagos. Mapeás las columnas manualmente
-                      y el sistema concilia con matching exacto y fuzzy. Los resultados se guardan en auditoría. Ideal cuando cada
-                      banco o proveedor exporta en formato distinto.
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Formato banco</p>
-                    <p>
-                      Para archivos en el formato estándar del banco: dos Excel (Clientes + Pagos) con estructura predefinida.
-                      El sistema importa, hace matching automático y te pide confirmar o asignar manualmente los casos dudosos.
-                      Los datos se persisten en Firestore. Ideal cuando ya tenés plantillas o exports recurrentes en ese formato.
-                    </p>
-                  </div>
-                  <p className="text-xs border-t pt-3">
-                    <strong>Auditoría:</strong> En Excel/CSV cada conciliación se registra en recExcelAudit. En Formato banco,
-                    los matches y alias se guardan en recMatches y recPayerAliases para trazabilidad.
-                  </p>
-                </div>
-              </AlertDescription>
-            </CollapsibleContent>
-          </div>
-        </Alert>
-      </Collapsible>
+                Conciliar
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Cruza el listado con los pagos de Visa.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
 
-      <Tabs
-        value={tab}
-        onValueChange={(v) => {
-          const t = v as "excel" | "banco";
-          setTab(t);
-          router.replace(`/dashboard/reconciliation?tab=${t}`, { scroll: false });
-        }}
-        className="w-full"
-      >
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="excel" className="gap-2">
-            <FileSpreadsheet className="h-4 w-4" />
-            Excel / CSV
-          </TabsTrigger>
-          <TabsTrigger value="banco" className="gap-2">
-            <Banknote className="h-4 w-4" />
-            Formato banco
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="excel" className="space-y-6 mt-6">
-          <p className="text-sm text-muted-foreground">
-            El primer archivo dice a quién imputar el cobro. El segundo son los pagos que informó Visa (crédito y débito por separado).
-          </p>
-
-          <ImportRelations
-            schoolId={schoolId}
-            onRelationsLoaded={handleRelationsLoaded}
-            initialRelations={relations}
-          />
-
-          <ImportPayments
-            schoolId={schoolId}
-            onPaymentsLoaded={handlePaymentsLoaded}
-          />
-
-          <p className="text-sm text-muted-foreground">
-            Con el listado y los pagos de Visa cargados, ejecutá la conciliación.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={handleConciliar}
-                    disabled={
-                      reconciling ||
-                      relations.length === 0 ||
-                      payments.length === 0
-                    }
-                  >
-                    {reconciling ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <GitMerge className="h-4 w-4 mr-2" />
-                    )}
-                    Conciliar
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Cruza el listado con los pagos de Visa.</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-
-          {results && results.length > 0 && (
-            <ReconciliationResults
-              schoolId={schoolId}
-              results={results}
-              relations={relations}
-              onSaveRule={handleSaveRule}
-            />
-          )}
-        </TabsContent>
-
-        <TabsContent value="banco" className="space-y-8 mt-6">
-          <p className="text-sm text-muted-foreground">
-            Importá archivos en formato banco (Clientes + Pagos) y revisá la conciliación automática.
-          </p>
-
-          <ReconciliationImport schoolId={schoolId} />
-
-          <div className="border-t pt-6">
-            <ImportAliasesFromExcel schoolId={schoolId} />
-          </div>
-
-          <ReconciliationReview schoolId={schoolId} initialBatchId={batchId} />
-        </TabsContent>
-      </Tabs>
+      {results && results.length > 0 && (
+        <ReconciliationResults
+          schoolId={schoolId}
+          results={results}
+          relations={relations}
+          onSaveRule={handleSaveRule}
+        />
+      )}
     </div>
   );
 }

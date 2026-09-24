@@ -107,6 +107,15 @@ function looksLikeNumericCode(value: string): boolean {
   return /^\d{6,}$/.test(value.replace(/[.\s]/g, ""));
 }
 
+function looksLikeCardNumber(value: string): boolean {
+  return value.replace(/\D/g, "").length >= 13;
+}
+
+function looksLikeAmount(value: string): boolean {
+  const n = parseFloat(String(value ?? "").replace(/[^\d.,\-]/g, "").replace(",", "."));
+  return Number.isFinite(n) && n > 0;
+}
+
 export function cardLast4(card: string): string {
   const digits = String(card ?? "").replace(/\D/g, "");
   return digits.length >= 4 ? digits.slice(-4) : "";
@@ -122,7 +131,8 @@ export function isVisaListado(rows: string[][]): boolean {
       looksLikePersonName(row[0] ?? "") &&
       looksLikePersonName(row[1] ?? "") &&
       looksLikeNumericCode(row[2] ?? "") &&
-      looksLikeNumericCode(row[4] ?? "")
+      looksLikeCardNumber(row[3] ?? "") &&
+      looksLikeAmount(row[4] ?? "")
     ) {
       hits++;
     }
@@ -130,7 +140,10 @@ export function isVisaListado(rows: string[][]): boolean {
   return hits >= Math.min(2, sample.length);
 }
 
-export function parseRelationsFromRows(rows: string[][]): ParseRelationsResult {
+export function parseRelationsFromRows(
+  rows: string[][],
+  kind?: PaymentFileKind
+): ParseRelationsResult {
   if (isVisaListado(rows)) {
     const now = new Date().toISOString();
     const relations: RelationRow[] = [];
@@ -152,6 +165,7 @@ export function parseRelationsFromRows(rows: string[][]): ParseRelationsResult {
         accountRaw: label,
         createdAt: now,
         cardLast4: cardLast4(card) || undefined,
+        kind,
       });
     }
     return {
@@ -196,6 +210,7 @@ export function parseRelationsFromRows(rows: string[][]): ParseRelationsResult {
       payerRaw,
       accountRaw: accountRaw || "—",
       createdAt: now,
+      kind,
     });
   }
 
@@ -206,9 +221,12 @@ export function parseRelationsFromRows(rows: string[][]): ParseRelationsResult {
   };
 }
 
-export async function parseRelationsFile(file: File): Promise<ParseRelationsResult> {
+export async function parseRelationsFile(
+  file: File,
+  kind?: PaymentFileKind
+): Promise<ParseRelationsResult> {
   const rows = await parseRowsFromFile(file);
-  return parseRelationsFromRows(rows);
+  return parseRelationsFromRows(rows, kind);
 }
 
 export type ParsePaymentsResult = {

@@ -82,6 +82,53 @@ describe("listado Visa interno + rendición DA", () => {
     expect(results[1]?.amount).toBe(306000);
   });
 
+  it("detecta listado de débito con importes chicos", async () => {
+    const { parseRelationsFromRows, isVisaListado } = await import("./parser");
+    const listado = [["ALARCON", "PABLO A.", "36549582", "4517650690643903", "52000"]];
+    expect(isVisaListado(listado)).toBe(true);
+    const { relations, error } = parseRelationsFromRows(listado, "debit");
+    expect(error).toBeUndefined();
+    expect(relations).toHaveLength(1);
+    expect(relations[0]?.kind).toBe("debit");
+  });
+
+  it("no cruza débito con listado de crédito", async () => {
+    const { parseRelationsFromRows } = await import("./parser");
+    const { runReconciliation } = await import("./reconcile");
+    const { relations: creditRelations } = parseRelationsFromRows(
+      [["ABRAMOR", "HECTOR E.", "18350968", "4338310009563899", "275000"]],
+      "credit"
+    );
+    const mapping = detectColumnMapping(DA_HEADERS);
+    const { payments } = buildPaymentsFromRows(
+      DA_HEADERS,
+      [["ABRAMOR", "HECTOR E.", "43383100XXXX3899", "275000.00", "Si", ""]],
+      mapping,
+      "debit"
+    );
+    const results = runReconciliation(creditRelations, payments);
+    expect(results[0]?.status).toBe("UNMATCHED");
+  });
+
+  it("cruza débito solo con su listado", async () => {
+    const { parseRelationsFromRows } = await import("./parser");
+    const { runReconciliation } = await import("./reconcile");
+    const { relations } = parseRelationsFromRows(
+      [["ALARCON", "PABLO A.", "36549582", "4517650690643903", "52000"]],
+      "debit"
+    );
+    const mapping = detectColumnMapping(DA_HEADERS);
+    const { payments } = buildPaymentsFromRows(
+      DA_HEADERS,
+      [["ALARCON", "PABLO A.", "45176506XXXX3903", "52000.00", "Si", ""]],
+      mapping,
+      "debit"
+    );
+    const results = runReconciliation(relations, payments);
+    expect(results[0]?.status).toBe("MATCHED");
+    expect(results[0]?.matchedAccountKey).toContain("36549582");
+  });
+
   it("si el nombre no coincide, cruza por últimos 4 de la tarjeta", async () => {
     const { parseRelationsFromRows } = await import("./parser");
     const { runReconciliation } = await import("./reconcile");
