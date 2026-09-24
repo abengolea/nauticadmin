@@ -6,7 +6,7 @@
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
 import { normalizeAccount, normalizePayer } from "./normalize";
-import type { RelationRow, PaymentRow } from "./types";
+import type { ColumnMapping, PaymentFileKind, PaymentRow, RelationRow } from "./types";
 
 const RELATION_COL_PATTERNS = {
   account: ["ayb (cuenta)", "ayb", "cuenta", "columna a", "col a", "a+b"],
@@ -155,36 +155,22 @@ export type ParsePaymentsResult = {
   totalRows: number;
 };
 
-export async function parsePaymentsFile(
-  file: File,
-  mapping: { payer: string; amount: string; date: string; reference: string }
-): Promise<ParsePaymentsResult> {
-  const rows = await parseRowsFromFile(file);
-  const headers = (rows[0] ?? []).map((h) => String(h ?? "").trim());
-  const dataRows = rows.slice(1);
-
+export function buildPaymentsFromRows(
+  headers: string[],
+  dataRows: string[][],
+  mapping: ColumnMapping,
+  kind: PaymentFileKind = "credit"
+): { payments: PaymentRow[]; error?: string } {
   const colPayer = headers.indexOf(mapping.payer);
   const colAmount = headers.indexOf(mapping.amount);
   const colDate = mapping.date ? headers.indexOf(mapping.date) : -1;
   const colRef = mapping.reference ? headers.indexOf(mapping.reference) : -1;
 
   if (colPayer < 0) {
-    return {
-      payments: [],
-      headers,
-      preview: rows.slice(0, 21),
-      totalRows: rows.length,
-      error: "Columna Pagador no encontrada en el mapeo",
-    };
+    return { payments: [], error: "Columna Pagador no encontrada en el mapeo" };
   }
   if (colAmount < 0) {
-    return {
-      payments: [],
-      headers,
-      preview: rows.slice(0, 21),
-      totalRows: rows.length,
-      error: "Columna Monto no encontrada en el mapeo",
-    };
+    return { payments: [], error: "Columna Monto no encontrada en el mapeo" };
   }
 
   function parseAmount(val: unknown): number {
@@ -195,6 +181,14 @@ export async function parsePaymentsFile(
     return Number.isNaN(n) ? 0 : n;
   }
 
+  const extraCols = (mapping.extras ?? [])
+    .filter((e) => e.label.trim() && e.column.trim())
+    .map((e) => ({
+      label: e.label.trim(),
+      index: headers.indexOf(e.column),
+    }))
+    .filter((e) => e.index >= 0);
+
   const payments: PaymentRow[] = [];
   for (let i = 0; i < dataRows.length; i++) {
     const row = dataRows[i] ?? [];
@@ -202,21 +196,41 @@ export async function parsePaymentsFile(
     const amount = parseAmount(row[colAmount]);
     const date = colDate >= 0 ? String(row[colDate] ?? "").trim() : "";
     const reference = colRef >= 0 ? String(row[colRef] ?? "").trim() : "";
+    const extras: Record<string, string> = {};
+    for (const extra of extraCols) {
+      extras[extra.label] = String(row[extra.index] ?? "").trim();
+    }
 
     payments.push({
-      rowId: `pay-${i + 1}`,
+      rowId: `${kind}-${i + 1}`,
       payerRaw,
       amount,
       date,
       reference,
+      kind,
+      extras,
     });
   }
 
+  return { payments };
+}
+
+export async function parsePaymentsFile(
+  file: File,
+  mapping: ColumnMapping,
+  kind: PaymentFileKind = "credit"
+): Promise<ParsePaymentsResult> {
+  const rows = await parseRowsFromFile(file);
+  const headers = (rows[0] ?? []).map((h) => String(h ?? "").trim());
+  const dataRows = rows.slice(1);
+  const built = buildPaymentsFromRows(headers, dataRows, mapping, kind);
+
   return {
-    payments,
+    payments: built.payments,
     headers,
     preview: rows.slice(0, 21),
     totalRows: rows.length,
+    error: built.error,
   };
 }
 
@@ -224,4 +238,21 @@ export function getHeadersFromFile(file: File): Promise<string[]> {
   return parseRowsFromFile(file).then((rows) =>
     (rows[0] ?? []).map((h) => String(h ?? "").trim())
   );
+}
+
+export async function getPaymentsFilePreview(file: File): Promise<{
+  headers: string[];
+  sampleRows: string[][];
+  preview: string[][];
+  totalRows: number;
+}> {
+  const rows = await parseRowsFromFile(file);
+  const headers = (rows[0] ?? []).map((h) => String(h ?? "").trim());
+  const dataRows = rows.slice(1);
+  return {
+    headers,
+    sampleRows: dataRows.slice(0, 5),
+    preview: rows.slice(0, 21),
+    totalRows: rows.length,
+  };
 }

@@ -12,7 +12,9 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, AlertCircle, XCircle, Loader2, Save } from "lucide-react";
+import { PAYMENT_FILE_KIND_LABEL } from "@/lib/reconciliacion-excel/types";
 import {
   Table,
   TableBody,
@@ -133,6 +135,7 @@ export function ReconciliationResults({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Pagador</TableHead>
+                    <TableHead>Origen</TableHead>
                     <TableHead>Cuenta asignada</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Score</TableHead>
@@ -142,6 +145,13 @@ export function ReconciliationResults({
                   {matched.map((r) => (
                     <TableRow key={r.paymentRowId}>
                       <TableCell>{r.payerRaw}</TableCell>
+                      <TableCell>
+                        {r.sourceKind ? (
+                          <Badge variant="secondary">{PAYMENT_FILE_KIND_LABEL[r.sourceKind]}</Badge>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
                       <TableCell>
                         {r.matchedAccountKey
                           ? getAccountRaw(r.matchedAccountKey)
@@ -162,7 +172,12 @@ export function ReconciliationResults({
                   key={r.paymentRowId}
                   className="border rounded-lg p-4 space-y-2"
                 >
-                  <p className="font-medium">{r.payerRaw}</p>
+                  <p className="font-medium flex flex-wrap items-center gap-2">
+                    {r.payerRaw}
+                    {r.sourceKind ? (
+                      <Badge variant="secondary">{PAYMENT_FILE_KIND_LABEL[r.sourceKind]}</Badge>
+                    ) : null}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     Candidatos (score): {r.candidateAccounts.map((c) => `${c.accountRaw} (${c.score})`).join(", ")}
                   </p>
@@ -227,7 +242,12 @@ export function ReconciliationResults({
                   key={r.paymentRowId}
                   className="border rounded-lg p-4 space-y-2"
                 >
-                  <p className="font-medium">{r.payerRaw}</p>
+                  <p className="font-medium flex flex-wrap items-center gap-2">
+                    {r.payerRaw}
+                    {r.sourceKind ? (
+                      <Badge variant="secondary">{PAYMENT_FILE_KIND_LABEL[r.sourceKind]}</Badge>
+                    ) : null}
+                  </p>
                   {uniqueAccounts.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       Cargá primero el archivo de relaciones para poder asignar manualmente.

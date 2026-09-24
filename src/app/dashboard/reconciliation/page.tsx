@@ -21,7 +21,6 @@ import type {
   RelationRow,
   PaymentRow,
   ReconciliationResult,
-  ColumnMapping,
 } from "@/lib/reconciliacion-excel/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,15 +63,13 @@ export default function ReconciliationPage() {
     setResults(null);
   }, []);
 
-  const handleMappingReady = useCallback((_m: ColumnMapping) => {}, []);
-
   const handleConciliar = useCallback(async () => {
     if (relations.length === 0) {
       toast({ variant: "destructive", title: "Cargá primero el archivo de relaciones" });
       return;
     }
     if (payments.length === 0) {
-      toast({ variant: "destructive", title: "Cargá primero el archivo de pagos" });
+      toast({ variant: "destructive", title: "Cargá primero un archivo de créditos o débitos" });
       return;
     }
     setReconciling(true);
@@ -253,7 +250,7 @@ export default function ReconciliationPage() {
 
         <TabsContent value="excel" className="space-y-6 mt-6">
           <p className="text-sm text-muted-foreground">
-            Cargá relaciones (Cuenta ↔ Pagador) y pagos desde Excel o CSV. Mapeá las columnas y conciliá.
+            Cargá relaciones (Cuenta ↔ Pagador) y extractos de crédito y/o débito. La IA arma el mapeo y lo podés guardar con nombre.
           </p>
 
           <ImportRelations
@@ -263,8 +260,8 @@ export default function ReconciliationPage() {
           />
 
           <ImportPayments
+            schoolId={schoolId}
             onPaymentsLoaded={handlePaymentsLoaded}
-            onMappingReady={handleMappingReady}
           />
 
           <p className="text-sm text-muted-foreground">

@@ -36,6 +36,7 @@ export function runReconciliation(
       status: match.status,
       candidateAccounts: match.candidates,
       timestamp: now,
+      sourceKind: pay.kind,
     });
   }
 
