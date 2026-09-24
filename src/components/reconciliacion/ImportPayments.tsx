@@ -97,8 +97,8 @@ export function ImportPayments({ schoolId, onPaymentsLoaded }: ImportPaymentsPro
       <CardHeader>
         <CardTitle>Paso 2: Archivos de créditos y débitos</CardTitle>
         <CardDescription>
-          Usá el Excel de Rendición DA (Apellido, Nombre, Nro Tarjeta, Importe, Aplicada, Observaciones).
-          Si más adelante hay otra columna, agregala y guardá el mapeo.
+          El Excel es el mismo (Rendición DA). Cargalos por separado para identificar la forma de pago:
+          crédito o débito. Si más adelante hay otra columna, agregala y guardá el mapeo.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -296,10 +296,10 @@ function PaymentFileSlot({
     <div className="rounded-lg border p-4 space-y-4">
       <div className="flex items-center gap-2">
         <KindIcon className="h-4 w-4" />
-        <h3 className="font-medium">{PAYMENT_FILE_KIND_LABEL[kind]}</h3>
+        <h3 className="font-medium">Forma de pago: {kind === "credit" ? "Crédito" : "Débito"}</h3>
       </div>
       <p className="text-sm text-muted-foreground">
-        Subí la rendición. Los campos se arman con el formato del sistema.
+        Subí acá solo la rendición de {kind === "credit" ? "crédito" : "débito"}. Queda marcada esa forma de pago.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">

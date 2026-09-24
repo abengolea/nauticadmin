@@ -250,7 +250,7 @@ export default function ReconciliationPage() {
 
         <TabsContent value="excel" className="space-y-6 mt-6">
           <p className="text-sm text-muted-foreground">
-            Cargá relaciones (Cuenta ↔ Pagador) y la rendición DA de crédito y/o débito. Los campos ya salen del Excel del sistema.
+            Cargá relaciones (Cuenta ↔ Pagador) y las rendiciones DA. Crédito y débito se cargan aparte para identificar la forma de pago.
           </p>
 
           <ImportRelations
