@@ -12,7 +12,7 @@ import { fuzzyNameScore, normalizeLegalName } from "./name-fuzzy";
 const normalizeName = normalizeString;
 type DocSnapshot = admin.firestore.DocumentSnapshot;
 
-export type PlayerMatchKind = "dni" | "exact" | "alias" | "fuzzy" | "none";
+export type PlayerMatchKind = "dni" | "exact" | "alias" | "fuzzy" | "manual" | "none";
 
 export type PlayerMatchResult = {
   doc?: DocSnapshot;
@@ -27,6 +27,7 @@ export type PlayerMatchResult = {
 export type PlayerLookup = {
   findPlayer: (item: ImputePaymentItem) => DocSnapshot | undefined;
   resolvePlayerMatch: (item: ImputePaymentItem) => PlayerMatchResult;
+  getPlayerById: (playerId: string) => DocSnapshot | undefined;
 };
 
 function dniKeys(dni: string): string[] {
@@ -208,15 +209,17 @@ export async function buildPlayerLookup(
           return { doc: hit, kind: "exact", targetName: name, matchedName: playerDisplayName(d) };
         }
       }
-      const aliasHit = aliasToPlayer.get(normalizeName(name));
-      if (aliasHit) {
-        const d = aliasHit.data() as { firstName?: string; lastName?: string };
-        return {
-          doc: aliasHit,
-          kind: "alias",
-          targetName: name,
-          matchedName: playerDisplayName(d),
-        };
+      for (const aliasKey of [normalizeName(name), ...payerNameKeys(name)]) {
+        const aliasHit = aliasToPlayer.get(aliasKey);
+        if (aliasHit) {
+          const d = aliasHit.data() as { firstName?: string; lastName?: string };
+          return {
+            doc: aliasHit,
+            kind: "alias",
+            targetName: name,
+            matchedName: playerDisplayName(d),
+          };
+        }
       }
     }
 
@@ -257,5 +260,9 @@ export async function buildPlayerLookup(
     return m.doc;
   }
 
-  return { findPlayer, resolvePlayerMatch };
+  function getPlayerById(playerId: string): DocSnapshot | undefined {
+    return playersById.get(playerId);
+  }
+
+  return { findPlayer, resolvePlayerMatch, getPlayerById };
 }

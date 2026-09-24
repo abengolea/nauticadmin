@@ -79,6 +79,8 @@ export type ImputePaymentItem = {
   listadoLastName?: string;
   listadoFirstName?: string;
   imputeToRaw?: string;
+  /** Asignación manual admin → ficha en NauticAdmin (esta sesión). */
+  playerIdOverride?: string;
 };
 
 export type ColumnMappingCoreField =

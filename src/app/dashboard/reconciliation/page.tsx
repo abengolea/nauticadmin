@@ -4,18 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useUserProfile, useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, GitMerge, RotateCcw } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Loader2, GitMerge } from "lucide-react";
 import { ImportRelations } from "@/components/reconciliacion/ImportRelations";
 import { ImportPayments } from "@/components/reconciliacion/ImportPayments";
 import { ReconciliationResults } from "@/components/reconciliacion/ReconciliationResults";
@@ -32,6 +21,8 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { RecExcelSession } from "@/lib/reconciliacion-excel/session-types";
 import {
   Tooltip,
   TooltipContent,
@@ -54,9 +45,15 @@ export default function ReconciliationPage() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [results, setResults] = useState<ReconciliationResult[] | null>(null);
   const [reconciling, setReconciling] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [sessionKey, setSessionKey] = useState(0);
   const [imputePeriod, setImputePeriod] = useState(defaultImputePeriod);
+  const [pendingSessions, setPendingSessions] = useState<RecExcelSession[]>([]);
+  const [resumeKey, setResumeKey] = useState(0);
+  const [sessionManualResolved, setSessionManualResolved] = useState<
+    Record<string, string>
+  >({});
+  const [sessionManualPlayers, setSessionManualPlayers] = useState<
+    Record<string, string>
+  >({});
 
   const schoolId = activeSchoolId ?? "";
   const canAccess = profile?.role === "school_admin" && !!schoolId;
@@ -70,6 +67,80 @@ export default function ReconciliationPage() {
     setPayments(p);
     setResults(null);
   }, []);
+
+  const refreshPendingSessions = useCallback(async () => {
+    if (!user || !schoolId) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `/api/reconciliacion-excel/session?schoolId=${encodeURIComponent(schoolId)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.sessions)) {
+        setPendingSessions(data.sessions as RecExcelSession[]);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [user, schoolId]);
+
+  const saveSession = useCallback(
+    async (payload: {
+      manualResolved: Record<string, string>;
+      manualPlayerAssignments: Record<string, string>;
+      imputedCount: number;
+      pendingAssignCount: number;
+      totalConciliated: number;
+    }) => {
+      if (!user || !schoolId || !results) return;
+      const token = await user.getIdToken();
+      const creditCount = payments.filter((p) => p.kind === "credit").length;
+      const debitCount = payments.filter((p) => p.kind === "debit").length;
+      await fetch(
+        `/api/reconciliacion-excel/session?schoolId=${encodeURIComponent(schoolId)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            session: {
+              period: imputePeriod,
+              status: "in_progress",
+              relations,
+              payments,
+              results,
+              manualResolved: payload.manualResolved,
+              manualPlayerAssignments: payload.manualPlayerAssignments,
+              totalConciliated: payload.totalConciliated,
+              imputedCount: payload.imputedCount,
+              pendingAssignCount: payload.pendingAssignCount,
+              creditCount,
+              debitCount,
+            } satisfies Omit<RecExcelSession, "updatedAt" | "updatedBy">,
+          }),
+        }
+      );
+      await refreshPendingSessions();
+    },
+    [user, schoolId, results, relations, payments, imputePeriod, refreshPendingSessions]
+  );
+
+  const handleContinueSession = useCallback((session: RecExcelSession) => {
+    setImputePeriod(session.period);
+    setRelations(session.relations);
+    setPayments(session.payments);
+    setResults(session.results);
+    setSessionManualResolved(session.manualResolved ?? {});
+    setSessionManualPlayers(session.manualPlayerAssignments ?? {});
+    setResumeKey((k) => k + 1);
+    toast({
+      title: "Sesión reanudada",
+      description: `Cuota ${session.period}: ${session.pendingAssignCount} pagos por asignar, ${session.imputedCount} ya acreditados.`,
+    });
+  }, [toast]);
 
   const handleConciliar = useCallback(async () => {
     const creditPayments = payments.filter((p) => p.kind === "credit");
@@ -120,10 +191,46 @@ export default function ReconciliationPage() {
           }
         );
       }
+      const matched = res.filter((r) => r.status === "MATCHED").length;
       toast({
         title: "Conciliación completada",
-        description: `${res.filter((r) => r.status === "MATCHED").length} conciliados, ${res.filter((r) => r.status === "REVIEW").length} a revisar, ${res.filter((r) => r.status === "UNMATCHED").length} sin conciliar`,
+        description: `${matched} conciliados, ${res.filter((r) => r.status === "REVIEW").length} a revisar, ${res.filter((r) => r.status === "UNMATCHED").length} sin conciliar`,
       });
+      setSessionManualResolved({});
+      setSessionManualPlayers({});
+      setResumeKey((k) => k + 1);
+      if (user) {
+        const token = await user.getIdToken();
+        const creditCount = payments.filter((p) => p.kind === "credit").length;
+        const debitCount = payments.filter((p) => p.kind === "debit").length;
+        await fetch(
+          `/api/reconciliacion-excel/session?schoolId=${encodeURIComponent(schoolId)}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              session: {
+                period: imputePeriod,
+                status: "in_progress",
+                relations,
+                payments,
+                results: res,
+                manualResolved: {},
+                manualPlayerAssignments: {},
+                totalConciliated: matched,
+                imputedCount: 0,
+                pendingAssignCount: matched,
+                creditCount,
+                debitCount,
+              },
+            }),
+          }
+        );
+        await refreshPendingSessions();
+      }
     } catch (err) {
       toast({
         variant: "destructive",
@@ -133,41 +240,15 @@ export default function ReconciliationPage() {
     } finally {
       setReconciling(false);
     }
-  }, [relations, payments, user, schoolId, toast]);
-
-  const handleReset = useCallback(async () => {
-    if (!user) return;
-    setResetting(true);
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch(
-        `/api/reconciliacion-excel/reset?schoolId=${encodeURIComponent(schoolId)}`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "No se pudo reiniciar");
-      setRelations([]);
-      setPayments([]);
-      setResults(null);
-      setSessionKey((k) => k + 1);
-      toast({ title: "Listo para empezar de nuevo", description: data.message });
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: err instanceof Error ? err.message : "No se pudo reiniciar",
-      });
-    } finally {
-      setResetting(false);
-    }
-  }, [user, schoolId, toast]);
+  }, [relations, payments, user, schoolId, toast, imputePeriod, refreshPendingSessions]);
 
   useEffect(() => {
     if (isReady && !canAccess) router.replace("/dashboard");
   }, [isReady, canAccess, router]);
+
+  useEffect(() => {
+    if (canAccess && user) void refreshPendingSessions();
+  }, [canAccess, user, refreshPendingSessions]);
 
   if (!isReady) return null;
   if (!canAccess) return null;
@@ -179,8 +260,9 @@ export default function ReconciliationPage() {
           Conciliación de Pagos
         </h1>
         <p className="text-sm text-muted-foreground mt-2">
-          Paso 1: listados internos de crédito y débito (a quién imputar). Paso 2: rendiciones Visa de crédito y débito.
-          Indicá qué cuota estás cargando. El cliente (col G del listado) es quien recibe la cuota y la factura.
+          <strong>1.</strong> Cargá listados internos y rendiciones Visa ·{" "}
+          <strong>2.</strong> Conciliar · <strong>3.</strong> Revisar clientes ·{" "}
+          <strong>4.</strong> Acreditar la cuota. El cliente (col G) recibe la cuota y la factura.
         </p>
       </div>
 
@@ -200,13 +282,46 @@ export default function ReconciliationPage() {
         </div>
       </div>
 
-      <ImportRelations key={`relations-${sessionKey}`} onRelationsLoaded={handleRelationsLoaded} />
+      {pendingSessions.filter(
+        (s) => !(results && results.length > 0 && s.period === imputePeriod)
+      ).length > 0 ? (
+        <div className="space-y-3">
+          {pendingSessions
+            .filter((s) => !(results && results.length > 0 && s.period === imputePeriod))
+            .map((session) => (
+            <Alert key={session.period} className="border-amber-500/40 bg-amber-50/50 dark:bg-amber-950/20">
+              <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm">
+                  <strong>Cuota {session.period}</strong> — pendiente de terminar:{" "}
+                  <strong>{session.pendingAssignCount}</strong> pagos por asignar cliente
+                  {session.imputedCount > 0 ? (
+                    <> · <strong>{session.imputedCount}</strong> ya acreditados</>
+                  ) : null}
+                  {session.creditCount > 0 || session.debitCount > 0 ? (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      ({session.creditCount} crédito
+                      {session.debitCount > 0 ? `, ${session.debitCount} débito` : ""})
+                    </span>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleContinueSession(session)}
+                >
+                  Continuar
+                </Button>
+              </AlertDescription>
+            </Alert>
+            ))}
+        </div>
+      ) : null}
 
-      <ImportPayments
-        key={`payments-${sessionKey}`}
-        schoolId={schoolId}
-        onPaymentsLoaded={handlePaymentsLoaded}
-      />
+      <ImportRelations onRelationsLoaded={handleRelationsLoaded} />
+
+      <ImportPayments schoolId={schoolId} onPaymentsLoaded={handlePaymentsLoaded} />
 
       <div className="flex flex-wrap items-center gap-3">
         <TooltipProvider>
@@ -214,12 +329,7 @@ export default function ReconciliationPage() {
             <TooltipTrigger asChild>
               <Button
                 onClick={handleConciliar}
-                disabled={
-                  reconciling ||
-                  resetting ||
-                  relations.length === 0 ||
-                  payments.length === 0
-                }
+                disabled={reconciling || relations.length === 0 || payments.length === 0}
               >
                 {reconciling ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -234,48 +344,18 @@ export default function ReconciliationPage() {
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline" disabled={resetting || reconciling}>
-              {resetting ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <RotateCcw className="h-4 w-4 mr-2" />
-              )}
-              Empezar de nuevo
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Empezar de nuevo?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Borra los pagos que se hayan imputado desde esta conciliación Visa y limpia
-                la pantalla para cargar los Excel otra vez. Los clientes y otros pagos del
-                sistema no se tocan.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={(e) => {
-                  e.preventDefault();
-                  void handleReset();
-                }}
-              >
-                Borrar y reiniciar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
 
       {results && results.length > 0 && (
         <ReconciliationResults
+          key={resumeKey}
           schoolId={schoolId}
           results={results}
           relations={relations}
           imputePeriod={imputePeriod}
+          initialManualResolved={sessionManualResolved}
+          initialManualPlayerAssignments={sessionManualPlayers}
+          onSaveSession={saveSession}
         />
       )}
     </div>

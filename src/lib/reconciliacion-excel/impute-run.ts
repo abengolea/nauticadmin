@@ -20,6 +20,7 @@ import {
   parseAplicadaFlag,
 } from "./impute-match";
 import { buildPlayerLookup } from "./player-lookup";
+import { buildPersistedAliasNames, savePlayerAliases } from "./save-player-alias";
 
 export type ImputePlanEntry = {
   paymentRowId: string;
@@ -40,12 +41,21 @@ export type DoubtfulImputeEntry = {
   score: number;
 };
 
+export type NotFoundImputeEntry = {
+  paymentRowId: string;
+  payerRaw: string;
+  amount: number;
+  targetName: string;
+  accountRaw: string;
+};
+
 export type ImputeRunResult = {
   applied: number;
   already: number;
   alreadyPaidPeriod: number;
   period: string;
   notFound: string[];
+  notFoundItems: NotFoundImputeEntry[];
   notFoundCount: number;
   skipped: string[];
   skippedCount: number;
@@ -104,13 +114,14 @@ export async function runImputePlan(
   const config = await getOrCreatePaymentConfig(db, schoolId);
   const currency = config.currency || DEFAULT_CURRENCY;
   const approvedPaymentsMap = await getAllApprovedPaymentsForSchool(db, schoolId);
-  const { resolvePlayerMatch } = await buildPlayerLookup(db, schoolId);
+  const { resolvePlayerMatch, getPlayerById } = await buildPlayerLookup(db, schoolId);
 
   let applied = 0;
   let already = 0;
   let alreadyPaidPeriod = 0;
   let totalAmount = 0;
   const notFound: string[] = [];
+  const notFoundItems: NotFoundImputeEntry[] = [];
   const skipped: string[] = [];
   const wouldApply: ImputePlanEntry[] = [];
   const doubtful: DoubtfulImputeEntry[] = [];
@@ -129,9 +140,31 @@ export async function runImputePlan(
       continue;
     }
 
-    const match = resolvePlayerMatch(item);
+    let match = resolvePlayerMatch(item);
+    if (item.playerIdOverride) {
+      const overrideDoc = getPlayerById(item.playerIdOverride);
+      if (overrideDoc) {
+        const d = overrideDoc.data() as { firstName?: string; lastName?: string };
+        match = {
+          doc: overrideDoc,
+          kind: "manual",
+          targetName: match.targetName ?? item.accountRaw,
+          matchedName: playerDisplayName(d),
+        };
+      }
+    }
     if (match.kind === "none" || !match.doc) {
-      notFound.push(item.accountRaw || item.payerRaw);
+      const label = item.accountRaw || item.payerRaw;
+      notFound.push(label);
+      if (notFoundItems.length < 200) {
+        notFoundItems.push({
+          paymentRowId: item.paymentRowId,
+          payerRaw: item.payerRaw,
+          amount,
+          targetName: match.targetName ?? label,
+          accountRaw: item.accountRaw,
+        });
+      }
       continue;
     }
 
@@ -228,6 +261,20 @@ export async function runImputePlan(
     );
 
     await updatePlayerStatus(db, schoolId, playerDoc.id, "active");
+
+    if (item.playerIdOverride && collectedByUid) {
+      try {
+        await savePlayerAliases(db, {
+          schoolId,
+          playerId: playerDoc.id,
+          aliasNames: buildPersistedAliasNames(item),
+          uid: collectedByUid,
+        });
+      } catch (e) {
+        console.warn("[impute-run] No se pudo guardar alias para próxima conciliación", e);
+      }
+    }
+
     applied++;
     totalAmount += amount;
 
@@ -264,6 +311,7 @@ export async function runImputePlan(
     alreadyPaidPeriod,
     period,
     notFound: notFound.slice(0, 80),
+    notFoundItems,
     notFoundCount: notFound.length,
     skipped: skipped.slice(0, 40),
     skippedCount: skipped.length,
