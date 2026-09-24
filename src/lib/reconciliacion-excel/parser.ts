@@ -161,16 +161,19 @@ export function buildPaymentsFromRows(
   mapping: ColumnMapping,
   kind: PaymentFileKind = "credit"
 ): { payments: PaymentRow[]; error?: string } {
-  const colPayer = headers.indexOf(mapping.payer);
+  const colLastName = mapping.lastName ? headers.indexOf(mapping.lastName) : -1;
+  const colFirstName = mapping.firstName ? headers.indexOf(mapping.firstName) : -1;
+  const colPayer = mapping.payer ? headers.indexOf(mapping.payer) : -1;
   const colAmount = headers.indexOf(mapping.amount);
   const colDate = mapping.date ? headers.indexOf(mapping.date) : -1;
   const colRef = mapping.reference ? headers.indexOf(mapping.reference) : -1;
+  const hasSplitName = colLastName >= 0 || colFirstName >= 0;
 
-  if (colPayer < 0) {
-    return { payments: [], error: "Columna Pagador no encontrada en el mapeo" };
+  if (!hasSplitName && colPayer < 0) {
+    return { payments: [], error: "Columna Pagador / Apellido no encontrada en el mapeo" };
   }
   if (colAmount < 0) {
-    return { payments: [], error: "Columna Monto no encontrada en el mapeo" };
+    return { payments: [], error: "Columna Importe no encontrada en el mapeo" };
   }
 
   function parseAmount(val: unknown): number {
@@ -192,7 +195,13 @@ export function buildPaymentsFromRows(
   const payments: PaymentRow[] = [];
   for (let i = 0; i < dataRows.length; i++) {
     const row = dataRows[i] ?? [];
-    const payerRaw = String(row[colPayer] ?? "").trim();
+    const lastName = colLastName >= 0 ? String(row[colLastName] ?? "").trim() : "";
+    const firstName = colFirstName >= 0 ? String(row[colFirstName] ?? "").trim() : "";
+    const singlePayer = colPayer >= 0 ? String(row[colPayer] ?? "").trim() : "";
+    const payerRaw = hasSplitName
+      ? [lastName, firstName].filter(Boolean).join(" ")
+      : singlePayer;
+    if (!payerRaw) continue;
     const amount = parseAmount(row[colAmount]);
     const date = colDate >= 0 ? String(row[colDate] ?? "").trim() : "";
     const reference = colRef >= 0 ? String(row[colRef] ?? "").trim() : "";

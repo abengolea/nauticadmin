@@ -9,11 +9,15 @@ import {
   shouldInviteNewProfileName,
   namesClash,
   mappingProfileId,
+  isRendicionDa,
 } from "./column-mapping";
+import { buildPaymentsFromRows } from "./parser";
 import type { ColumnMapping, MappingProfile } from "./types";
+import { RENDICION_DA_HEADERS } from "./types";
 
 const CREDIT_HEADERS = ["Titular", "Importe", "Fecha", "Comercio", "Autorización"];
 const DEBIT_HEADERS = ["Cuenta", "Monto", "Fecha operación", "Referencia", "CBU"];
+const DA_HEADERS = [...RENDICION_DA_HEADERS];
 
 describe("detectColumnMapping", () => {
   it("detecta columnas típicas de crédito", () => {
@@ -30,6 +34,37 @@ describe("detectColumnMapping", () => {
     expect(m.amount).toBe("Monto");
     expect(m.date).toBe("Fecha operación");
     expect(m.reference).toBe("Referencia");
+  });
+
+  it("arma los campos del Excel Rendición DA", () => {
+    expect(isRendicionDa(DA_HEADERS)).toBe(true);
+    const m = detectColumnMapping(DA_HEADERS);
+    expect(m.lastName).toBe("Dato Opcional 1");
+    expect(m.firstName).toBe("Dato Opcional 2");
+    expect(m.payer).toBe("");
+    expect(m.amount).toBe("Importe");
+    expect(m.reference).toBe("Observaciones");
+    expect(m.extras.map((e) => e.column)).toEqual(["Nro Tarjeta", "Aplicada"]);
+    expect(unusedHeaders(DA_HEADERS, m)).toEqual([]);
+  });
+});
+
+describe("buildPaymentsFromRows Rendición DA", () => {
+  it("junta apellido y nombre como pagador", () => {
+    const mapping = detectColumnMapping(DA_HEADERS);
+    const { payments, error } = buildPaymentsFromRows(
+      DA_HEADERS,
+      [["ABRAMOR", "HECTOR E.", "43383100XXXX3899", "275000.00", "Si", "token"]],
+      mapping,
+      "credit"
+    );
+    expect(error).toBeUndefined();
+    expect(payments).toHaveLength(1);
+    expect(payments[0]?.payerRaw).toBe("ABRAMOR HECTOR E.");
+    expect(payments[0]?.amount).toBe(275000);
+    expect(payments[0]?.reference).toBe("token");
+    expect(payments[0]?.extras["Nro Tarjeta"]).toBe("43383100XXXX3899");
+    expect(payments[0]?.extras["Aplicada"]).toBe("Si");
   });
 });
 

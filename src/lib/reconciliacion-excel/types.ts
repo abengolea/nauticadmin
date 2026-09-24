@@ -45,15 +45,33 @@ export type ReconciliationResult = {
   sourceKind?: PaymentFileKind;
 };
 
-export type ColumnMappingCoreField = "payer" | "amount" | "date" | "reference";
+export type ColumnMappingCoreField =
+  | "payer"
+  | "lastName"
+  | "firstName"
+  | "amount"
+  | "date"
+  | "reference";
 
 export type ColumnMapping = {
   payer: string;
+  lastName?: string;
+  firstName?: string;
   amount: string;
   date: string;
   reference: string;
   extras: ExtraMappedField[];
 };
+
+/** Encabezados del Excel Rendición DA (Visa crédito/débito). */
+export const RENDICION_DA_HEADERS = [
+  "Dato Opcional 1",
+  "Dato Opcional 2",
+  "Nro Tarjeta",
+  "Importe",
+  "Aplicada",
+  "Observaciones",
+] as const;
 
 export const PAYMENT_FILE_KIND_LABEL: Record<PaymentFileKind, string> = {
   credit: "Créditos",

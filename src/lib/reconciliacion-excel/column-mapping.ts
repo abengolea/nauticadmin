@@ -11,18 +11,28 @@ import type {
 
 export const EMPTY_COLUMN_MAPPING: ColumnMapping = {
   payer: "",
+  lastName: "",
+  firstName: "",
   amount: "",
   date: "",
   reference: "",
   extras: [],
 };
 
-const CORE_PATTERNS: Record<keyof Omit<ColumnMapping, "extras">, RegExp> = {
-  payer: /pagador|titular|payer/i,
-  amount: /monto|importe|amount/i,
-  date: /fecha|date/i,
-  reference: /referencia|ref|obs/i,
-};
+function findHeader(headers: string[], patterns: RegExp[]): string {
+  for (const pattern of patterns) {
+    const hit = headers.find((h) => pattern.test(h.trim()));
+    if (hit) return hit;
+  }
+  return "";
+}
+
+export function isRendicionDa(headers: string[]): boolean {
+  return Boolean(
+    findHeader(headers, [/dato opcional 1/i, /^apellido$/i]) &&
+      findHeader(headers, [/importe/i])
+  );
+}
 
 export function newExtraField(label = "", column = ""): ExtraMappedField {
   const id =
@@ -33,13 +43,31 @@ export function newExtraField(label = "", column = ""): ExtraMappedField {
 }
 
 export function detectColumnMapping(headers: string[]): ColumnMapping {
+  const lastName = findHeader(headers, [/dato opcional 1/i, /^apellido$/i]);
+  const firstName = findHeader(headers, [/dato opcional 2/i, /^nombre$/i, /^nombres$/i]);
+  const payer = lastName ? "" : findHeader(headers, [/pagador/i, /titular/i, /payer/i]);
+  const amount = findHeader(headers, [/importe/i, /monto/i, /amount/i]);
+  const date = findHeader(headers, [/fecha/i, /date/i]);
+  const reference = findHeader(headers, [/observaciones/i, /referencia/i, /^ref$/i]);
+  const extras: ExtraMappedField[] = [];
+  const card = findHeader(headers, [/nro tarjeta/i, /tarjeta/i]);
+  const applied = findHeader(headers, [/aplicada/i]);
+  if (card) extras.push({ id: "cardNumber", label: "Nro Tarjeta", column: card });
+  if (applied) extras.push({ id: "applied", label: "Aplicada", column: applied });
+
   return {
-    payer: headers.find((x) => CORE_PATTERNS.payer.test(x)) ?? "",
-    amount: headers.find((x) => CORE_PATTERNS.amount.test(x)) ?? "",
-    date: headers.find((x) => CORE_PATTERNS.date.test(x)) ?? "",
-    reference: headers.find((x) => CORE_PATTERNS.reference.test(x)) ?? "",
-    extras: [],
+    payer,
+    lastName,
+    firstName,
+    amount,
+    date,
+    reference,
+    extras,
   };
+}
+
+export function hasPayerMapping(mapping: ColumnMapping): boolean {
+  return Boolean(mapping.lastName?.trim() || mapping.payer.trim());
 }
 
 function pickSavedColumn(savedCol: string, headers: string[], fallback: string): string {
@@ -60,6 +88,8 @@ export function applySavedColumnMapping(
 
   return {
     payer: pickSavedColumn(saved.payer, headers, detected.payer),
+    lastName: pickSavedColumn(saved.lastName ?? "", headers, detected.lastName ?? ""),
+    firstName: pickSavedColumn(saved.firstName ?? "", headers, detected.firstName ?? ""),
     amount: pickSavedColumn(saved.amount, headers, detected.amount),
     date: pickSavedColumn(saved.date, headers, detected.date),
     reference: pickSavedColumn(saved.reference, headers, detected.reference),
@@ -75,7 +105,15 @@ export function applySavedColumnMapping(
 
 export function unusedHeaders(headers: string[], mapping: ColumnMapping): string[] {
   const used = new Set(
-    [mapping.payer, mapping.amount, mapping.date, mapping.reference, ...mapping.extras.map((e) => e.column)]
+    [
+      mapping.payer,
+      mapping.lastName ?? "",
+      mapping.firstName ?? "",
+      mapping.amount,
+      mapping.date,
+      mapping.reference,
+      ...mapping.extras.map((e) => e.column),
+    ]
       .map((h) => h.trim())
       .filter(Boolean)
   );
@@ -128,6 +166,8 @@ export function mappingFromAiResult(
   const detected = detectColumnMapping(headers);
   return fillUnusedAsExtras(headers, {
     payer: payer || detected.payer,
+    lastName: detected.lastName,
+    firstName: detected.firstName,
     amount: amount || detected.amount,
     date: date || detected.date,
     reference: reference || detected.reference,
@@ -136,14 +176,25 @@ export function mappingFromAiResult(
 }
 
 function mappedColumns(mapping: ColumnMapping): string[] {
-  return [mapping.payer, mapping.amount, mapping.date, mapping.reference, ...mapping.extras.map((e) => e.column)]
+  return [
+    mapping.payer,
+    mapping.lastName ?? "",
+    mapping.firstName ?? "",
+    mapping.amount,
+    mapping.date,
+    mapping.reference,
+    ...mapping.extras.map((e) => e.column),
+  ]
     .map((h) => h.trim())
     .filter(Boolean);
 }
 
 export function scoreProfile(headers: string[], profile: MappingProfile): number {
   const headerSet = new Set(headers);
-  if (profile.mapping.payer && !headerSet.has(profile.mapping.payer)) return 0;
+  const hasPayerCol =
+    (profile.mapping.lastName && headerSet.has(profile.mapping.lastName)) ||
+    (profile.mapping.payer && headerSet.has(profile.mapping.payer));
+  if (!hasPayerCol && (profile.mapping.payer || profile.mapping.lastName)) return 0;
   if (profile.mapping.amount && !headerSet.has(profile.mapping.amount)) return 0;
   return mappedColumns(profile.mapping).filter((c) => headerSet.has(c)).length;
 }
@@ -252,6 +303,8 @@ export function normalizeColumnMapping(raw: unknown): ColumnMapping | null {
 
   return {
     payer: String(m.payer ?? "").trim(),
+    lastName: String(m.lastName ?? "").trim(),
+    firstName: String(m.firstName ?? "").trim(),
     amount: String(m.amount ?? "").trim(),
     date: String(m.date ?? "").trim(),
     reference: String(m.reference ?? "").trim(),

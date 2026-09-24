@@ -250,7 +250,7 @@ export default function ReconciliationPage() {
 
         <TabsContent value="excel" className="space-y-6 mt-6">
           <p className="text-sm text-muted-foreground">
-            Cargá relaciones (Cuenta ↔ Pagador) y extractos de crédito y/o débito. La IA arma el mapeo y lo podés guardar con nombre.
+            Cargá relaciones (Cuenta ↔ Pagador) y la rendición DA de crédito y/o débito. Los campos ya salen del Excel del sistema.
           </p>
 
           <ImportRelations
