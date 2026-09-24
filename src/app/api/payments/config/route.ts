@@ -64,6 +64,10 @@ const PutBodySchema = z.object({
   clothingAmount: z.number().min(0).optional(),
   /** Número de cuotas para el pago de ropa. Default 2. */
   clothingInstallments: z.number().int().min(1).max(24).optional(),
+  transferCbu: z.string().max(30).optional(),
+  transferAlias: z.string().max(50).optional(),
+  transferBankName: z.string().max(100).optional(),
+  transferNotifyEmail: z.string().email().optional().or(z.literal('')),
 });
 
 export async function PUT(request: Request) {
@@ -99,6 +103,10 @@ export async function PUT(request: Request) {
       registrationCancelsMonthFee,
       clothingAmount,
       clothingInstallments,
+      transferCbu,
+      transferAlias,
+      transferBankName,
+      transferNotifyEmail,
     } = parsed.data;
     const db = getAdminFirestore();
     const admin = await import('firebase-admin');
@@ -122,6 +130,12 @@ export async function PUT(request: Request) {
     if (registrationCancelsMonthFee !== undefined) update.registrationCancelsMonthFee = registrationCancelsMonthFee;
     if (clothingAmount !== undefined) update.clothingAmount = clothingAmount;
     if (clothingInstallments !== undefined) update.clothingInstallments = clothingInstallments;
+    if (transferCbu !== undefined) update.transferCbu = transferCbu.trim() || null;
+    if (transferAlias !== undefined) update.transferAlias = transferAlias.trim() || null;
+    if (transferBankName !== undefined) update.transferBankName = transferBankName.trim() || null;
+    if (transferNotifyEmail !== undefined) {
+      update.transferNotifyEmail = transferNotifyEmail.trim() || null;
+    }
 
     await db
       .collection('schools')

@@ -16,7 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CreditCard, CheckCircle2, AlertTriangle, Layers } from "lucide-react";
+import { CreditCard, CheckCircle2, AlertTriangle, Layers, Landmark } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CATEGORY_ORDER } from "@/lib/utils";
 
@@ -42,6 +42,10 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
   const [saving, setSaving] = useState(false);
   const [mpConnected, setMpConnected] = useState<boolean | null>(null);
   const [mpConnecting, setMpConnecting] = useState(false);
+  const [transferCbu, setTransferCbu] = useState("");
+  const [transferAlias, setTransferAlias] = useState("");
+  const [transferBankName, setTransferBankName] = useState("");
+  const [transferNotifyEmail, setTransferNotifyEmail] = useState("");
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
@@ -102,6 +106,10 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
           setProratePercent(String(data.proratePercent ?? 50));
           setDelinquencyDaysEmail(String(data.delinquencyDaysEmail ?? 10));
           setDelinquencyDaysSuspension(String(data.delinquencyDaysSuspension ?? 30));
+          setTransferCbu(String(data.transferCbu ?? ""));
+          setTransferAlias(String(data.transferAlias ?? ""));
+          setTransferBankName(String(data.transferBankName ?? ""));
+          setTransferNotifyEmail(String(data.transferNotifyEmail ?? ""));
         }
         if (statusRes.ok) {
           const status = await statusRes.json();
@@ -200,6 +208,10 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
           proratePercent: proratePct,
           delinquencyDaysEmail: daysEmail,
           delinquencyDaysSuspension: daysSusp,
+          transferCbu: transferCbu.trim(),
+          transferAlias: transferAlias.trim(),
+          transferBankName: transferBankName.trim(),
+          transferNotifyEmail: transferNotifyEmail.trim(),
         }),
       });
       if (!res.ok) throw new Error("Error al guardar");
@@ -497,6 +509,57 @@ export function PaymentConfigTab({ schoolId, getToken }: PaymentConfigTabProps) 
               max={365}
               value={delinquencyDaysSuspension}
               onChange={(e) => setDelinquencyDaysSuspension(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Landmark className="h-5 w-5" />
+            Transferencia bancaria (clientes)
+          </CardTitle>
+          <CardDescription>
+            Estos datos se muestran a los clientes mientras no haya Mercado Pago conectado. Incluí CBU, alias y el email donde deben enviar el comprobante.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="transferBankName">Banco (opcional)</Label>
+            <Input
+              id="transferBankName"
+              value={transferBankName}
+              onChange={(e) => setTransferBankName(e.target.value)}
+              placeholder="Ej: Banco Nación"
+            />
+          </div>
+          <div>
+            <Label htmlFor="transferCbu">CBU</Label>
+            <Input
+              id="transferCbu"
+              value={transferCbu}
+              onChange={(e) => setTransferCbu(e.target.value)}
+              placeholder="0000000000000000000000"
+            />
+          </div>
+          <div>
+            <Label htmlFor="transferAlias">Alias (opcional)</Label>
+            <Input
+              id="transferAlias"
+              value={transferAlias}
+              onChange={(e) => setTransferAlias(e.target.value)}
+              placeholder="mi.nautica.alias"
+            />
+          </div>
+          <div>
+            <Label htmlFor="transferNotifyEmail">Email para informar transferencias</Label>
+            <Input
+              id="transferNotifyEmail"
+              type="email"
+              value={transferNotifyEmail}
+              onChange={(e) => setTransferNotifyEmail(e.target.value)}
+              placeholder="cobranzas@nautica.com"
             />
           </div>
         </CardContent>

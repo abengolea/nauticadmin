@@ -235,10 +235,10 @@ export function PlayerPaymentStatusCard({ getToken, playerId: propPlayerId, scho
                   {creatingLink ? "Generando…" : "Crear link de pago"}
                 </Button>
               ) : (
-                <Button asChild>
+                <Button variant="outline" asChild>
                   <Link href="/dashboard/payments">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Pagar
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Ver instrucciones de pago
                   </Link>
                 </Button>
               )}

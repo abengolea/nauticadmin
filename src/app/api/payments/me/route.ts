@@ -7,7 +7,14 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth, getAdminFirestore } from '@/lib/firebase-admin';
 import { verifyIdToken } from '@/lib/auth-server';
-import { listPayments, computeDelinquents, getOrCreatePaymentConfig, getExpectedAmountForPeriod, getClothingPendingForPlayer } from '@/lib/payments/db';
+import {
+  listPayments,
+  computeDelinquents,
+  getOrCreatePaymentConfig,
+  getExpectedAmountForPeriod,
+  getClothingPendingForPlayer,
+  getMercadoPagoAccessToken,
+} from '@/lib/payments/db';
 import type { DelinquentInfo } from '@/lib/types/payments';
 
 export async function GET(request: Request) {
@@ -55,6 +62,9 @@ export async function GET(request: Request) {
         ? myDelinquent.amount
         : await getExpectedAmountForPeriod(db, schoolId, playerId, suggestedPeriod, config);
 
+    const mercadopagoToken = await getMercadoPagoAccessToken(db, schoolId);
+    const onlinePaymentEnabled = Boolean(mercadopagoToken);
+
     return NextResponse.json({
       schoolId,
       playerId,
@@ -74,6 +84,13 @@ export async function GET(request: Request) {
       suggestedAmount,
       suggestedCurrency: config.currency,
       clothingPending,
+      onlinePaymentEnabled,
+      transferInfo: {
+        cbu: config.transferCbu ?? '',
+        alias: config.transferAlias ?? '',
+        bankName: config.transferBankName ?? '',
+        notifyEmail: config.transferNotifyEmail ?? '',
+      },
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

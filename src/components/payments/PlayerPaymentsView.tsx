@@ -30,6 +30,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Payment } from "@/lib/types/payments";
 import type { DelinquentInfo } from "@/lib/types/payments";
 import { getPaymentMethodLabel } from "@/lib/payments/payment-method";
+import {
+  TransferPaymentInstructions,
+  type TransferInfo,
+} from "@/components/payments/TransferPaymentInstructions";
 
 const STATUS_LABELS: Record<string, string> = {
   approved: "Aprobado",
@@ -63,11 +67,13 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
   const [suggestedPeriod, setSuggestedPeriod] = useState<string>("");
   const [suggestedAmount, setSuggestedAmount] = useState<number>(0);
   const [suggestedCurrency, setSuggestedCurrency] = useState<string>("ARS");
+  const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
+  const [transferInfo, setTransferInfo] = useState<TransferInfo>({});
   const [loading, setLoading] = useState(true);
   const [indexBuilding, setIndexBuilding] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [paying, setPaying] = useState(false);
-  const [showRegistrationDialog, setShowRegistrationDialog] = useState(false);
+  const [showRegistrationInfo, setShowRegistrationInfo] = useState(false);
   const [showAlDiaDialog, setShowAlDiaDialog] = useState(false);
   const [showRetryPrompt, setShowRetryPrompt] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -84,7 +90,10 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
         ? pendingPayments
         : payments;
 
-  // Si la carga tarda más de 8 segundos, mostrar opción de reintentar
+  const pendingAmount = delinquent?.amount ?? 0;
+  const pendingCurrency = delinquent?.currency ?? suggestedCurrency;
+  const pendingPeriodLabel = delinquent ? formatPeriodDisplay(delinquent.period) : undefined;
+
   useEffect(() => {
     if (!loading) {
       setShowRetryPrompt(false);
@@ -139,6 +148,8 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
       setSuggestedPeriod(body.suggestedPeriod ?? "");
       setSuggestedAmount(body.suggestedAmount ?? 0);
       setSuggestedCurrency(body.suggestedCurrency ?? "ARS");
+      setOnlinePaymentEnabled(body.onlinePaymentEnabled === true);
+      setTransferInfo(body.transferInfo ?? {});
     } catch (e) {
       console.error(e);
       const isNetworkError =
@@ -166,23 +177,22 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
     fetchData();
   }, [fetchData]);
 
-  // Pop-up de inscripción: se abre cuando el sistema detecta inscripción pendiente
   useEffect(() => {
-    if (!loading && delinquent?.period === REGISTRATION_PERIOD) {
-      setShowRegistrationDialog(true);
+    if (!loading && delinquent?.period === REGISTRATION_PERIOD && !onlinePaymentEnabled) {
+      setShowRegistrationInfo(true);
     }
-  }, [loading, delinquent?.period]);
+  }, [loading, delinquent?.period, onlinePaymentEnabled]);
 
   const handlePayCuota = useCallback(
-    async (onSuccess?: () => void, overridePeriod?: string, overrideAmount?: number, overrideCurrency?: string) => {
+    async () => {
       const token = await getToken();
       if (!token || !schoolId || !playerId) {
         toast({ title: "Error", description: "No se pudo iniciar el pago.", variant: "destructive" });
         return;
       }
-      const period = overridePeriod ?? (delinquent ? delinquent.period : suggestedPeriod);
-      const amount = overrideAmount ?? (delinquent ? delinquent.amount : suggestedAmount);
-      const currency = overrideCurrency ?? (delinquent ? delinquent.currency : suggestedCurrency);
+      const period = delinquent ? delinquent.period : suggestedPeriod;
+      const amount = delinquent ? delinquent.amount : suggestedAmount;
+      const currency = delinquent ? delinquent.currency : suggestedCurrency;
       if (amount <= 0) {
         toast({
           title: "Sin monto configurado",
@@ -210,7 +220,6 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          // 409 = ya está al día (no es error, es confirmación positiva)
           if (res.status === 409) {
             setShowAlDiaDialog(true);
             fetchData(true);
@@ -229,7 +238,6 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
             title: "Link generado",
             description: "Se abrió la ventana de pago. Si no se abrió, revisá el bloqueador de ventanas.",
           });
-          onSuccess?.();
         }
       } catch (e) {
         toast({
@@ -349,71 +357,77 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
         <div>
           <h1 className="text-3xl font-bold tracking-tight font-headline">Mis pagos</h1>
           <p className="text-muted-foreground">
-            Historial de cuotas y estado de tu cuenta
+            Estado de cuotas, historial e instrucciones de pago
           </p>
         </div>
-        <div className="shrink-0">
-          <Button
-            variant="destructive"
-            size="sm"
-            className="gap-2 font-headline"
-            disabled={paying || (suggestedAmount <= 0 && !delinquent)}
-            onClick={() => handlePayCuota()}
-          >
-            {paying ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CreditCard className="h-4 w-4" />
-                )}
-            {hasRegistrationPending ? "Pagar inscripción" : "Pagar cuota"}
-          </Button>
-        </div>
+        {onlinePaymentEnabled && (
+          <div className="shrink-0">
+            <Button
+              variant="destructive"
+              size="sm"
+              className="gap-2 font-headline"
+              disabled={paying || (suggestedAmount <= 0 && !delinquent)}
+              onClick={() => handlePayCuota()}
+            >
+              {paying ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CreditCard className="h-4 w-4" />
+              )}
+              {hasRegistrationPending ? "Pagar inscripción" : "Pagar cuota online"}
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Estado actual: al día o cuota vencida */}
       {delinquent ? (
-        <Alert variant="destructive" className="border-destructive/50">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>
-            {delinquent.period === REGISTRATION_PERIOD ? "Inscripción pendiente" : "Cuota vencida"}
-          </AlertTitle>
-          <AlertDescription>
-            Tenés {delinquent.period === REGISTRATION_PERIOD ? "el derecho de inscripción" : "una cuota"} pendiente: <strong>{formatPeriodDisplay(delinquent.period)}</strong>.
-            Vencimiento: {format(new Date(delinquent.dueDate), "d 'de' MMMM yyyy", { locale: es })}.
-            {delinquent.daysOverdue > 0 && (
-              <> ({delinquent.daysOverdue} {delinquent.daysOverdue === 1 ? "día" : "días"} de demora)</>
-            )}
-            {" "}
-            Monto: {delinquent.currency} {delinquent.amount.toLocaleString("es-AR")}.
-            Podés pagar online con el botón de arriba.
-            {hasRegistrationPending && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3 border-destructive/50 hover:bg-destructive/10"
-                onClick={() => setShowRegistrationDialog(true)}
-              >
-                <CreditCard className="h-4 w-4 mr-2" />
-                Pagar inscripción
-              </Button>
-            )}
-          </AlertDescription>
-        </Alert>
+        <>
+          <Alert variant="destructive" className="border-destructive/50">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>
+              {delinquent.period === REGISTRATION_PERIOD ? "Inscripción pendiente" : "Cuota vencida"}
+            </AlertTitle>
+            <AlertDescription>
+              Tenés {delinquent.period === REGISTRATION_PERIOD ? "el derecho de inscripción" : "una cuota"} pendiente:{" "}
+              <strong>{formatPeriodDisplay(delinquent.period)}</strong>.
+              Vencimiento: {format(new Date(delinquent.dueDate), "d 'de' MMMM yyyy", { locale: es })}.
+              {delinquent.daysOverdue > 0 && (
+                <> ({delinquent.daysOverdue} {delinquent.daysOverdue === 1 ? "día" : "días"} de demora)</>
+              )}{" "}
+              Monto: {delinquent.currency} {delinquent.amount.toLocaleString("es-AR")}.
+              {!onlinePaymentEnabled && (
+                <> Realizá la transferencia bancaria y enviá el comprobante por email.</>
+              )}
+            </AlertDescription>
+          </Alert>
+          {!onlinePaymentEnabled && (
+            <TransferPaymentInstructions
+              transferInfo={transferInfo}
+              amount={pendingAmount}
+              currency={pendingCurrency}
+              periodLabel={pendingPeriodLabel}
+            />
+          )}
+        </>
       ) : (
-        <Card className="border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-green-800 dark:text-green-200 text-lg">
-              <CheckCircle className="h-5 w-5" />
-              Al día
-            </CardTitle>
-            <CardDescription>
-              No tenés cuotas vencidas. Tu cuenta está al día.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <>
+          <Card className="border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-green-800 dark:text-green-200 text-lg">
+                <CheckCircle className="h-5 w-5" />
+                Al día
+              </CardTitle>
+              <CardDescription>
+                No tenés cuotas vencidas. Tu cuenta está al día.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          {!onlinePaymentEnabled && (
+            <TransferPaymentInstructions transferInfo={transferInfo} />
+          )}
+        </>
       )}
 
-      {/* Pop-up cuando ya está al día */}
       <Dialog open={showAlDiaDialog} onOpenChange={setShowAlDiaDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -426,20 +440,17 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => setShowAlDiaDialog(false)}>
-              Entendido
-            </Button>
+            <Button onClick={() => setShowAlDiaDialog(false)}>Entendido</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Pop-up de inscripción pendiente */}
-      <Dialog open={showRegistrationDialog && hasRegistrationPending} onOpenChange={setShowRegistrationDialog}>
+      <Dialog open={showRegistrationInfo && hasRegistrationPending} onOpenChange={setShowRegistrationInfo}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Pagá la inscripción
+              Inscripción pendiente
             </DialogTitle>
             <DialogDescription>
               {delinquent && (
@@ -448,24 +459,13 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
                   <strong className="text-foreground">
                     {delinquent.currency} {delinquent.amount.toLocaleString("es-AR")}
                   </strong>
-                  .
+                  . Realizá la transferencia y enviá el comprobante por email.
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              onClick={() => handlePayCuota(() => setShowRegistrationDialog(false))}
-              disabled={paying}
-              className="w-full"
-            >
-              {paying ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <CreditCard className="h-4 w-4 mr-2" />
-              )}
-              Pagar
-            </Button>
+            <Button onClick={() => setShowRegistrationInfo(false)}>Entendido</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -502,16 +502,13 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
         </Card>
       </div>
 
-      {/* Historial de pagos */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <History className="h-5 w-5" />
             Historial de pagos
           </CardTitle>
-          <CardDescription>
-            Cuotas abonadas y movimientos de tu cuenta
-          </CardDescription>
+          <CardDescription>Cuotas abonadas y movimientos de tu cuenta</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs value={paymentFilter} onValueChange={(v) => setPaymentFilter(v as typeof paymentFilter)}>
@@ -541,36 +538,40 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
                     <TableHead className="text-xs sm:text-sm">Medio</TableHead>
                   </TableRow>
                 </TableHeader>
-              <TableBody>
-                {filteredPayments.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">
-                      {formatPeriodDisplay(p.period)}
-                    </TableCell>
-                    <TableCell>
-                      {p.currency} {p.amount.toLocaleString("es-AR")}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={p.status === "approved" ? "default" : p.status === "rejected" ? "destructive" : "secondary"}
-                      >
-                        {STATUS_LABELS[p.status] ?? p.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {p.paidAt
-                        ? format(new Date(p.paidAt), "d/MM/yyyy", { locale: es })
-                        : p.createdAt
-                          ? format(new Date(p.createdAt), "d/MM/yyyy", { locale: es })
-                          : "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {getPaymentMethodLabel(p)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                <TableBody>
+                  {filteredPayments.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{formatPeriodDisplay(p.period)}</TableCell>
+                      <TableCell>
+                        {p.currency} {p.amount.toLocaleString("es-AR")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            p.status === "approved"
+                              ? "default"
+                              : p.status === "rejected"
+                                ? "destructive"
+                                : "secondary"
+                          }
+                        >
+                          {STATUS_LABELS[p.status] ?? p.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {p.paidAt
+                          ? format(new Date(p.paidAt), "d/MM/yyyy", { locale: es })
+                          : p.createdAt
+                            ? format(new Date(p.createdAt), "d/MM/yyyy", { locale: es })
+                            : "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {getPaymentMethodLabel(p)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>

@@ -132,6 +132,14 @@ export interface PaymentConfig {
     delinquencySubject?: string;
     suspensionSubject?: string;
   };
+  /** CBU para transferencias bancarias (visible al cliente). */
+  transferCbu?: string;
+  /** Alias CBU/CVU (visible al cliente). */
+  transferAlias?: string;
+  /** Nombre del banco (opcional, visible al cliente). */
+  transferBankName?: string;
+  /** Email donde el cliente informa comprobantes de transferencia. */
+  transferNotifyEmail?: string;
   updatedAt: Date;
   updatedBy: string;
 }
