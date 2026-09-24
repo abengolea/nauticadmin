@@ -8,6 +8,8 @@ export type RelationRow = {
   payerRaw: string;
   accountRaw: string;
   createdAt: string;
+  /** Últimos 4 de la tarjeta, para cruzar con la rendición DA. */
+  cardLast4?: string;
 };
 
 export type PaymentFileKind = "credit" | "debit";
@@ -36,6 +38,7 @@ export type ReconciliationResult = {
   paymentRowId: string;
   payerRaw: string;
   payerKey: string;
+  amount: number;
   matchedAccountKey: string | null;
   matchType: MatchType;
   score: number;
@@ -43,6 +46,19 @@ export type ReconciliationResult = {
   candidateAccounts: Array<{ accountKey: string; accountRaw: string; score: number }>;
   timestamp: string;
   sourceKind?: PaymentFileKind;
+  aplicada?: string;
+  cardLast4?: string;
+};
+
+export type ImputePaymentItem = {
+  paymentRowId: string;
+  payerRaw: string;
+  amount: number;
+  accountKey: string;
+  accountRaw: string;
+  sourceKind?: PaymentFileKind;
+  aplicada?: string;
+  cardLast4?: string;
 };
 
 export type ColumnMappingCoreField =

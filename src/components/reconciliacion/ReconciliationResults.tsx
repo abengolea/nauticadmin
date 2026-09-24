@@ -13,8 +13,20 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertCircle, XCircle, Loader2, Save } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CheckCircle2, AlertCircle, XCircle, Loader2, Save, UserCheck } from "lucide-react";
 import { PAYMENT_FILE_KIND_LABEL } from "@/lib/reconciliacion-excel/types";
+import type { ImputePaymentItem } from "@/lib/reconciliacion-excel/types";
 import {
   Table,
   TableBody,
@@ -39,16 +51,27 @@ import {
 import type {
   ReconciliationResult,
   RelationRow,
-  AuditLogEntry,
 } from "@/lib/reconciliacion-excel/types";
 
+type ImputeSummary = {
+  applied: number;
+  already: number;
+  notFoundCount: number;
+  notFound: string[];
+  skippedCount: number;
+  skipped: string[];
+  message: string;
+};
+
 type ReconciliationResultsProps = {
+  schoolId: string;
   results: ReconciliationResult[];
   relations: RelationRow[];
   onSaveRule: (payerRaw: string, accountKey: string, accountRaw: string) => Promise<void>;
 };
 
 export function ReconciliationResults({
+  schoolId,
   results,
   relations,
   onSaveRule,
@@ -57,6 +80,9 @@ export function ReconciliationResults({
   const { toast } = useToast();
   const [manualSelections, setManualSelections] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [confirmImpute, setConfirmImpute] = useState(false);
+  const [imputing, setImputing] = useState(false);
+  const [imputeSummary, setImputeSummary] = useState<ImputeSummary | null>(null);
 
   const matched = results.filter((r) => r.status === "MATCHED");
   const review = results.filter((r) => r.status === "REVIEW");
@@ -95,7 +121,65 @@ export function ReconciliationResults({
   const getAccountRaw = (accountKey: string) =>
     relations.find((r) => r.accountKey === accountKey)?.accountRaw ?? accountKey;
 
+  const formatAmount = (n: number) =>
+    `$ ${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const matchedTotal = matched.reduce((s, r) => s + (r.amount ?? 0), 0);
+
   /** Cuentas únicas para asignación manual en Sin Conciliar */
+  const handleImpute = useCallback(async () => {
+    if (!user) {
+      toast({ variant: "destructive", title: "Tenés que iniciar sesión" });
+      return;
+    }
+    const items: ImputePaymentItem[] = matched
+      .filter((r) => r.matchedAccountKey && (r.amount ?? 0) > 0)
+      .map((r) => ({
+        paymentRowId: r.paymentRowId,
+        payerRaw: r.payerRaw,
+        amount: r.amount ?? 0,
+        accountKey: r.matchedAccountKey!,
+        accountRaw: getAccountRaw(r.matchedAccountKey!),
+        sourceKind: r.sourceKind,
+        aplicada: r.aplicada,
+        cardLast4: r.cardLast4,
+      }));
+    if (items.length === 0) {
+      toast({ variant: "destructive", title: "No hay pagos conciliados para imputar" });
+      return;
+    }
+    setImputing(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `/api/reconciliacion-excel/impute?schoolId=${encodeURIComponent(schoolId)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ items }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "No se pudo imputar");
+      }
+      setImputeSummary(data);
+      toast({ title: "Pagos imputados", description: data.message });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error al imputar",
+        description: err instanceof Error ? err.message : "No se pudo imputar",
+      });
+    } finally {
+      setImputing(false);
+      setConfirmImpute(false);
+    }
+  }, [user, matched, schoolId, toast, relations]);
+
   const uniqueAccounts = useMemo(() => {
     const seen = new Set<string>();
     return relations.filter((r) => {
@@ -106,14 +190,48 @@ export function ReconciliationResults({
   }, [relations]);
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Resultados de conciliación</CardTitle>
         <CardDescription>
           {matched.length} conciliados · {review.length} a revisar · {unmatched.length} sin conciliar
+          {matched.length > 0 ? ` · total pagado ${formatAmount(matchedTotal)}` : ""}
         </CardDescription>
+        {matched.length > 0 ? (
+          <div className="pt-2">
+            <Button onClick={() => setConfirmImpute(true)} disabled={imputing}>
+              {imputing ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <UserCheck className="h-4 w-4 mr-2" />
+              )}
+              Imputar {matched.length} pagos a clientes
+            </Button>
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent>
+        {imputeSummary ? (
+          <Alert className="mb-4">
+            <AlertDescription>
+              <p>{imputeSummary.message}</p>
+              {imputeSummary.notFound.length > 0 ? (
+                <p className="mt-2 text-sm">
+                  Sin cliente: {imputeSummary.notFound.slice(0, 12).join(" · ")}
+                  {imputeSummary.notFoundCount > 12
+                    ? ` y ${imputeSummary.notFoundCount - 12} más`
+                    : ""}
+                </p>
+              ) : null}
+              {imputeSummary.skipped.length > 0 ? (
+                <p className="mt-1 text-sm">
+                  Omitidos: {imputeSummary.skipped.slice(0, 8).join(" · ")}
+                </p>
+              ) : null}
+            </AlertDescription>
+          </Alert>
+        ) : null}
         <Tabs defaultValue="matched" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="matched" className="gap-1">
@@ -136,9 +254,9 @@ export function ReconciliationResults({
                   <TableRow>
                     <TableHead>Pagador</TableHead>
                     <TableHead>Origen</TableHead>
-                    <TableHead>Cuenta asignada</TableHead>
+                    <TableHead className="text-right">Importe</TableHead>
+                    <TableHead>Imputar a</TableHead>
                     <TableHead>Tipo</TableHead>
-                    <TableHead>Score</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -152,13 +270,15 @@ export function ReconciliationResults({
                           "—"
                         )}
                       </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        {formatAmount(r.amount ?? 0)}
+                      </TableCell>
                       <TableCell>
                         {r.matchedAccountKey
                           ? getAccountRaw(r.matchedAccountKey)
                           : "—"}
                       </TableCell>
                       <TableCell>{r.matchType}</TableCell>
-                      <TableCell>{Math.round(r.score * 100)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -174,6 +294,7 @@ export function ReconciliationResults({
                 >
                   <p className="font-medium flex flex-wrap items-center gap-2">
                     {r.payerRaw}
+                    <span className="tabular-nums">{formatAmount(r.amount ?? 0)}</span>
                     {r.sourceKind ? (
                       <Badge variant="secondary">{PAYMENT_FILE_KIND_LABEL[r.sourceKind]}</Badge>
                     ) : null}
@@ -244,6 +365,7 @@ export function ReconciliationResults({
                 >
                   <p className="font-medium flex flex-wrap items-center gap-2">
                     {r.payerRaw}
+                    <span className="tabular-nums">{formatAmount(r.amount ?? 0)}</span>
                     {r.sourceKind ? (
                       <Badge variant="secondary">{PAYMENT_FILE_KIND_LABEL[r.sourceKind]}</Badge>
                     ) : null}
@@ -307,5 +429,31 @@ export function ReconciliationResults({
         </Tabs>
       </CardContent>
     </Card>
+
+    <AlertDialog open={confirmImpute} onOpenChange={setConfirmImpute}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Imputar pagos a clientes</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se van a acreditar {matched.length} pagos conciliados en la cuota más vieja
+            de cada cliente (por DNI o nombre). Si el cobro ya se imputó, no se duplica.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={imputing}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={imputing}
+            onClick={(e) => {
+              e.preventDefault();
+              void handleImpute();
+            }}
+          >
+            {imputing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Imputar pagos
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

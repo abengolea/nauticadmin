@@ -142,28 +142,11 @@ export default function ReconciliationPage() {
     [user, schoolId, toast]
   );
 
-  const loadStoredRelations = useCallback(async () => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    const res = await fetch(
-      `/api/reconciliation/payer-mappings?schoolId=${encodeURIComponent(schoolId)}&targetType=account`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      setRelations(data.relations ?? []);
-    }
-  }, [user, schoolId]);
-
   useEffect(() => {
     const t = searchParams.get("tab");
     if (t === "banco") setTab("banco");
     else if (t === "excel") setTab("excel");
   }, [searchParams]);
-
-  useEffect(() => {
-    if (canAccess && tab === "excel") loadStoredRelations();
-  }, [loadStoredRelations, canAccess, tab]);
 
   useEffect(() => {
     if (isReady && !canAccess) router.replace("/dashboard");
@@ -250,7 +233,7 @@ export default function ReconciliationPage() {
 
         <TabsContent value="excel" className="space-y-6 mt-6">
           <p className="text-sm text-muted-foreground">
-            Cargá relaciones (Cuenta ↔ Pagador) y las rendiciones DA. Crédito y débito se cargan aparte para identificar la forma de pago.
+            El primer archivo dice a quién imputar el cobro. El segundo son los pagos que informó Visa (crédito y débito por separado).
           </p>
 
           <ImportRelations
@@ -265,7 +248,7 @@ export default function ReconciliationPage() {
           />
 
           <p className="text-sm text-muted-foreground">
-            Con relaciones y pagos cargados, ejecutá la conciliación. Si ya tenés relaciones guardadas, podés cargarlas sin subir el archivo de nuevo.
+            Con el listado y los pagos de Visa cargados, ejecutá la conciliación.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <TooltipProvider>
@@ -288,19 +271,7 @@ export default function ReconciliationPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Ejecuta el matching entre pagos y relaciones.</p>
-                  <p className="text-xs mt-1">Usa coincidencia exacta y fuzzy (Jaro-Winkler).</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={loadStoredRelations}>
-                    Cargar relaciones guardadas
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Trae las relaciones que guardaste antes.</p>
-                  <p className="text-xs mt-1">Útil si no subís el archivo de relaciones en esta sesión.</p>
+                  <p>Cruza el listado con los pagos de Visa.</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -308,6 +279,7 @@ export default function ReconciliationPage() {
 
           {results && results.length > 0 && (
             <ReconciliationResults
+              schoolId={schoolId}
               results={results}
               relations={relations}
               onSaveRule={handleSaveRule}

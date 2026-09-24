@@ -28,29 +28,59 @@ export function ColumnMappingComponent({
   mapping,
   onChange,
 }: ColumnMappingProps) {
-  const options = [NONE_VALUE, ...headers];
   const extras = mapping.extras ?? [];
   const unused = unusedHeaders(headers, { ...mapping, extras });
-  const daLayout = isRendicionDa(headers);
-  const showPayer = !daLayout || Boolean(mapping.payer);
-  const showDate = Boolean(mapping.date) || headers.some((h) => /fecha|date/i.test(h));
 
-  const resolveValue = (column: string) =>
-    column === "" ? NONE_VALUE : column || NONE_VALUE;
+  if (isRendicionDa(headers)) {
+    return (
+      <RendicionDaColumns
+        headers={headers}
+        unused={unused}
+        extras={extras}
+        mapping={mapping}
+        onChange={onChange}
+      />
+    );
+  }
 
-  const actualColumn = (value: string) =>
-    value === NONE_VALUE || value === EMPTY_HEADER_VALUE ? "" : value;
+  return (
+    <GenericColumnMapping
+      headers={headers}
+      mapping={mapping}
+      extras={extras}
+      unused={unused}
+      onChange={onChange}
+    />
+  );
+}
 
-  const handleCoreChange = (field: ColumnMappingCoreField, value: string) => {
-    onChange({ ...mapping, extras, [field]: actualColumn(value) });
-  };
+function RendicionDaColumns({
+  headers,
+  unused,
+  extras,
+  mapping,
+  onChange,
+}: {
+  headers: string[];
+  unused: string[];
+  extras: ColumnMapping["extras"];
+  mapping: ColumnMapping;
+  onChange: (mapping: ColumnMapping) => void;
+}) {
+  const defaultExtraIds = new Set(["cardNumber", "applied"]);
+  const addedExtras = extras.filter((e) => !defaultExtraIds.has(e.id));
 
-  const handleExtraColumn = (id: string, value: string) => {
+  const handleAdd = (column = "", label = "") => {
     onChange({
       ...mapping,
-      extras: extras.map((e) =>
-        e.id === id ? { ...e, column: actualColumn(value) } : e
-      ),
+      extras: [...extras, newExtraField(label || column, column)],
+    });
+  };
+
+  const handleRemove = (id: string) => {
+    onChange({
+      ...mapping,
+      extras: extras.filter((e) => e.id !== id),
     });
   };
 
@@ -61,43 +91,124 @@ export function ColumnMappingComponent({
     });
   };
 
-  const handleAddExtra = (column = "", label = "") => {
+  const handleExtraColumn = (id: string, column: string) => {
     onChange({
       ...mapping,
-      extras: [...extras, newExtraField(label || column, column)],
+      extras: extras.map((e) => (e.id === id ? { ...e, column } : e)),
     });
   };
 
-  const handleRemoveExtra = (id: string) => {
-    onChange({
-      ...mapping,
-      extras: extras.filter((e) => e.id !== id),
-    });
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">Columnas del archivo</p>
+      <ul className="text-sm rounded-md border divide-y">
+        {headers.filter((h) => h.trim()).map((h) => (
+          <li key={h} className="px-3 py-2">
+            {h}
+          </li>
+        ))}
+      </ul>
+
+      {addedExtras.length > 0 && (
+        <div className="space-y-2">
+          {addedExtras.map((extra) => (
+            <div key={extra.id} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="space-y-1 flex-1 min-w-0">
+                <Label htmlFor={`extra-label-${extra.id}`}>Campo</Label>
+                <Input
+                  id={`extra-label-${extra.id}`}
+                  value={extra.label}
+                  onChange={(e) => handleExtraLabel(extra.id, e.target.value)}
+                />
+              </div>
+              <div className="space-y-1 flex-1 min-w-0">
+                <Label>Columna</Label>
+                <Select
+                  value={extra.column || NONE_VALUE}
+                  onValueChange={(v) => handleExtraColumn(extra.id, v === NONE_VALUE ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Columna…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>(ninguna)</SelectItem>
+                    {headers.map((h) => (
+                      <SelectItem key={h} value={h || EMPTY_HEADER_VALUE}>
+                        {h || "(vacía)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => handleRemove(extra.id)}
+                aria-label="Quitar campo"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={() => handleAdd()}>
+          <Plus className="h-4 w-4 mr-1" />
+          Agregar campo
+        </Button>
+        {unused.map((h) => (
+          <Button key={h} type="button" variant="secondary" size="sm" onClick={() => handleAdd(h, h)}>
+            <Plus className="h-3 w-3 mr-1" />
+            {h}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GenericColumnMapping({
+  headers,
+  mapping,
+  extras,
+  unused,
+  onChange,
+}: {
+  headers: string[];
+  mapping: ColumnMapping;
+  extras: ColumnMapping["extras"];
+  unused: string[];
+  onChange: (mapping: ColumnMapping) => void;
+}) {
+  const options = [NONE_VALUE, ...headers];
+  const actualColumn = (value: string) =>
+    value === NONE_VALUE || value === EMPTY_HEADER_VALUE ? "" : value;
+
+  const handleCoreChange = (field: ColumnMappingCoreField, value: string) => {
+    onChange({ ...mapping, extras, [field]: actualColumn(value) });
   };
 
-  const coreFields: Array<{ field: ColumnMappingCoreField; label: string; required?: boolean }> = [
-    { field: "lastName", label: "Apellido", required: daLayout },
+  const fields: Array<{ field: ColumnMappingCoreField; label: string; required?: boolean }> = [
+    { field: "lastName", label: "Apellido" },
     { field: "firstName", label: "Nombre" },
-    ...(showPayer ? [{ field: "payer" as const, label: "Pagador", required: !daLayout }] : []),
+    { field: "payer", label: "Pagador" },
     { field: "amount", label: "Importe", required: true },
     { field: "reference", label: "Observaciones" },
-    ...(showDate ? [{ field: "date" as const, label: "Fecha" }] : []),
   ];
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Campos del Excel de Rendición DA. Si aparece una columna nueva, agregala y guardá el mapeo.
-      </p>
-
-      {coreFields.map(({ field, label, required }) => (
+      {fields.map(({ field, label, required }) => (
         <div key={field} className="space-y-2">
           <Label>
             {label}
             {required ? " *" : ""}
           </Label>
           <Select
-            value={resolveValue(mapping[field] ?? "")}
+            value={mapping[field] ? mapping[field]! : NONE_VALUE}
             onValueChange={(v) => handleCoreChange(field, v)}
           >
             <SelectTrigger>
@@ -108,7 +219,7 @@ export function ColumnMappingComponent({
                 const itemValue = h === "" ? EMPTY_HEADER_VALUE : h;
                 return (
                   <SelectItem key={`${field}-${i}-${itemValue}`} value={itemValue}>
-                    {h === NONE_VALUE ? "(ninguna)" : h === "" ? "(columna vacía)" : h}
+                    {h === NONE_VALUE ? "(ninguna)" : h || "(columna vacía)"}
                   </SelectItem>
                 );
               })}
@@ -116,59 +227,15 @@ export function ColumnMappingComponent({
           </Select>
         </div>
       ))}
-
-      {extras.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-sm font-medium">Otros campos</p>
-          {extras.map((extra) => (
-            <div key={extra.id} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="space-y-2 flex-1 min-w-0">
-                <Label htmlFor={`extra-label-${extra.id}`}>Nombre del campo</Label>
-                <Input
-                  id={`extra-label-${extra.id}`}
-                  value={extra.label}
-                  placeholder="Ej. Nro Tarjeta"
-                  onChange={(e) => handleExtraLabel(extra.id, e.target.value)}
-                />
-              </div>
-              <div className="space-y-2 flex-1 min-w-0">
-                <Label>Columna del archivo</Label>
-                <Select
-                  value={resolveValue(extra.column)}
-                  onValueChange={(v) => handleExtraColumn(extra.id, v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar columna…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {options.map((h, i) => {
-                      const itemValue = h === "" ? EMPTY_HEADER_VALUE : h;
-                      return (
-                        <SelectItem key={`${extra.id}-${i}-${itemValue}`} value={itemValue}>
-                          {h === NONE_VALUE ? "(ninguna)" : h === "" ? "(columna vacía)" : h}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="shrink-0"
-                onClick={() => handleRemoveExtra(extra.id)}
-                aria-label={`Quitar campo ${extra.label || "extra"}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => handleAddExtra()}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            onChange({ ...mapping, extras: [...extras, newExtraField()] })
+          }
+        >
           <Plus className="h-4 w-4 mr-1" />
           Agregar campo
         </Button>
@@ -178,7 +245,9 @@ export function ColumnMappingComponent({
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => handleAddExtra(h, h)}
+            onClick={() =>
+              onChange({ ...mapping, extras: [...extras, newExtraField(h, h)] })
+            }
           >
             <Plus className="h-3 w-3 mr-1" />
             {h}

@@ -94,11 +94,75 @@ export type ParseRelationsResult = {
   totalRows: number;
 };
 
-export async function parseRelationsFile(file: File): Promise<ParseRelationsResult> {
-  const rows = await parseRowsFromFile(file);
+function looksLikePersonName(value: string): boolean {
+  const t = value.trim();
+  if (t.length < 2) return false;
+  if (/^(dato opcional|ayb|pagador|importe|apellido|nombre|nro tarjeta|aplicada|observaciones)$/i.test(t)) {
+    return false;
+  }
+  return /[a-zA-ZÁÉÍÓÚÜÑáéíóúüñ]{2,}/.test(t);
+}
+
+function looksLikeNumericCode(value: string): boolean {
+  return /^\d{6,}$/.test(value.replace(/[.\s]/g, ""));
+}
+
+export function cardLast4(card: string): string {
+  const digits = String(card ?? "").replace(/\D/g, "");
+  return digits.length >= 4 ? digits.slice(-4) : "";
+}
+
+/** Listado Visa interno: sin encabezados, Apellido | Nombre | DNI | Tarjeta | Importe. */
+export function isVisaListado(rows: string[][]): boolean {
+  const sample = rows.slice(0, 8).filter((r) => (r[0] ?? "").trim() || (r[1] ?? "").trim());
+  if (sample.length < 1) return false;
+  let hits = 0;
+  for (const row of sample) {
+    if (
+      looksLikePersonName(row[0] ?? "") &&
+      looksLikePersonName(row[1] ?? "") &&
+      looksLikeNumericCode(row[2] ?? "") &&
+      looksLikeNumericCode(row[4] ?? "")
+    ) {
+      hits++;
+    }
+  }
+  return hits >= Math.min(2, sample.length);
+}
+
+export function parseRelationsFromRows(rows: string[][]): ParseRelationsResult {
+  if (isVisaListado(rows)) {
+    const now = new Date().toISOString();
+    const relations: RelationRow[] = [];
+    for (const row of rows) {
+      const lastName = String(row[0] ?? "").trim();
+      const firstName = String(row[1] ?? "").trim();
+      const dni = String(row[2] ?? "").trim();
+      const card = String(row[3] ?? "").trim();
+      const imputeTo = String(row[6] ?? "").trim();
+      const payerRaw = [lastName, firstName].filter(Boolean).join(" ");
+      if (!payerRaw) continue;
+      const label = imputeTo
+        ? `${imputeTo} · DNI ${dni || "—"}`
+        : `${payerRaw} · DNI ${dni || "—"}`;
+      relations.push({
+        accountKey: normalizeAccount(dni || payerRaw),
+        payerKey: normalizePayer(payerRaw),
+        payerRaw,
+        accountRaw: label,
+        createdAt: now,
+        cardLast4: cardLast4(card) || undefined,
+      });
+    }
+    return {
+      relations,
+      preview: rows.slice(0, 21),
+      totalRows: rows.length,
+    };
+  }
+
   const headers = (rows[0] ?? []).map((h) => String(h ?? "").trim());
   const dataRows = rows.slice(1);
-
   const colAccount = findColumnIndex(headers, RELATION_COL_PATTERNS.account);
   const colPayer = findColumnIndex(headers, RELATION_COL_PATTERNS.payer);
 
@@ -122,18 +186,13 @@ export async function parseRelationsFile(file: File): Promise<ParseRelationsResu
   const relations: RelationRow[] = [];
   const now = new Date().toISOString();
 
-  for (let i = 0; i < dataRows.length; i++) {
-    const row = dataRows[i] ?? [];
+  for (const row of dataRows) {
     const accountRaw = String(row[colAccount] ?? "").trim();
     const payerRaw = String(row[colPayer] ?? "").trim();
     if (!payerRaw) continue;
-
-    const accountKey = normalizeAccount(accountRaw || " ");
-    const payerKey = normalizePayer(payerRaw);
-
     relations.push({
-      accountKey,
-      payerKey,
+      accountKey: normalizeAccount(accountRaw || " "),
+      payerKey: normalizePayer(payerRaw),
       payerRaw,
       accountRaw: accountRaw || "—",
       createdAt: now,
@@ -145,6 +204,11 @@ export async function parseRelationsFile(file: File): Promise<ParseRelationsResu
     preview: rows.slice(0, 21),
     totalRows: rows.length,
   };
+}
+
+export async function parseRelationsFile(file: File): Promise<ParseRelationsResult> {
+  const rows = await parseRowsFromFile(file);
+  return parseRelationsFromRows(rows);
 }
 
 export type ParsePaymentsResult = {

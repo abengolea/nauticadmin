@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useUser } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,7 +16,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Upload, Loader2, CheckCircle2 } from "lucide-react";
+import { Upload, Loader2 } from "lucide-react";
 import { parseRelationsFile } from "@/lib/reconciliacion-excel/parser";
 import type { RelationRow } from "@/lib/reconciliacion-excel/types";
 
@@ -32,11 +31,9 @@ export function ImportRelations({
   onRelationsLoaded,
   initialRelations,
 }: ImportRelationsProps) {
-  const { user } = useUser();
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<string[][]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [relations, setRelations] = useState<RelationRow[]>(initialRelations);
@@ -75,55 +72,19 @@ export function ImportRelations({
     [onRelationsLoaded, toast]
   );
 
-  const handleSave = useCallback(async () => {
-    if (!user || relations.length === 0) return;
-    setSaving(true);
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch(
-        `/api/reconciliation/payer-mappings?schoolId=${encodeURIComponent(schoolId)}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            relations: relations.map((r) => ({
-              ...r,
-              createdAt: r.createdAt || new Date().toISOString(),
-            })),
-          }),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Error al guardar");
-      toast({ title: "Guardado", description: data.message ?? `${data.saved} relaciones guardadas` });
-      onRelationsLoaded(relations);
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: err instanceof Error ? err.message : "No se pudieron guardar las relaciones",
-      });
-    } finally {
-      setSaving(false);
-    }
-  }, [user, schoolId, relations, onRelationsLoaded, toast]);
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Paso 1: Archivo de Relaciones</CardTitle>
+        <CardTitle>Paso 1: A quién imputar</CardTitle>
         <CardDescription>
-          Subí el Excel/CSV con columnas &quot;AYB (Cuenta)&quot; y &quot;Pagador (Col G)&quot;. Se toleran variantes de nombre.
+          Subí el listado interno (ej. 9 VISA CREDITO…). Ahí está a quién asignar cada cobro: apellido, nombre, DNI, tarjeta e importe.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Primero subí el archivo con las relaciones Cuenta ↔ Pagador. Luego guardalo para usarlas en la conciliación.
+          Este archivo no es la rendición del banco: es el padrón para imputar. Después cruzamos con los pagos de Visa.
         </p>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <TooltipProvider>
             <label className="cursor-pointer">
               <input
@@ -132,6 +93,7 @@ export function ImportRelations({
                 className="hidden"
                 onChange={handleFileChange}
                 disabled={loading}
+                value=""
               />
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -142,35 +104,25 @@ export function ImportRelations({
                       ) : (
                         <Upload className="h-4 w-4 mr-2" />
                       )}
-                      {file ? file.name : "Seleccionar archivo"}
+                      {relations.length > 0
+                        ? "Actualizar el Excel de relaciones"
+                        : "Seleccionar Excel de relaciones"}
                     </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Subí el Excel/CSV con columnas AYB (Cuenta) y Pagador.</p>
-                  <p className="text-xs mt-1">Se detectan automáticamente variantes de nombre.</p>
+                  <p>Listado interno: apellido, nombre, DNI, tarjeta, importe.</p>
+                  <p className="text-xs mt-1">Si ya cargaste uno, este botón lo reemplaza.</p>
                 </TooltipContent>
               </Tooltip>
             </label>
-            {relations.length > 0 && !error && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button onClick={handleSave} disabled={saving}>
-                    {saving ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                    )}
-                    Guardar {relations.length} relaciones
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Persistí las relaciones en el sistema.</p>
-                  <p className="text-xs mt-1">Se usarán en esta y futuras conciliaciones.</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
           </TooltipProvider>
+          {relations.length > 0 && !error ? (
+            <p className="text-sm text-muted-foreground">
+              {relations.length} personas
+              {file ? ` · ${file.name}` : ""}
+            </p>
+          ) : null}
         </div>
 
         {error && (

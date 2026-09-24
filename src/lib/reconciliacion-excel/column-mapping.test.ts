@@ -49,6 +49,58 @@ describe("detectColumnMapping", () => {
   });
 });
 
+describe("listado Visa interno + rendición DA", () => {
+  it("detecta el listado sin encabezados y cruza por nombre", async () => {
+    const { parseRelationsFromRows, isVisaListado } = await import("./parser");
+    const { runReconciliation } = await import("./reconcile");
+    const listado = [
+      ["ABRAMOR", "HECTOR E.", "18350968", "4338310009563899", "275000"],
+      ["ACEVEDO ", "NICOLAS ", "30844578", "4704550012042284", "306000"],
+    ];
+    expect(isVisaListado(listado)).toBe(true);
+    const { relations, error } = parseRelationsFromRows(listado);
+    expect(error).toBeUndefined();
+    expect(relations).toHaveLength(2);
+    expect(relations[0]?.payerRaw).toBe("ABRAMOR HECTOR E.");
+    expect(relations[0]?.accountRaw).toContain("18350968");
+    expect(relations[0]?.cardLast4).toBe("3899");
+
+    const mapping = detectColumnMapping(DA_HEADERS);
+    const { payments } = buildPaymentsFromRows(
+      DA_HEADERS,
+      [
+        ["ABRAMOR", "HECTOR E.", "43383100XXXX3899", "275000.00", "Si", "token"],
+        ["ACEVEDO", "NICOLAS", "47045500XXXX2284", "306000.00", "Si", ""],
+      ],
+      mapping,
+      "credit"
+    );
+    const results = runReconciliation(relations, payments);
+    expect(results.every((r) => r.status === "MATCHED")).toBe(true);
+    expect(results[0]?.matchedAccountKey).toContain("18350968");
+    expect(results[0]?.amount).toBe(275000);
+    expect(results[1]?.amount).toBe(306000);
+  });
+
+  it("si el nombre no coincide, cruza por últimos 4 de la tarjeta", async () => {
+    const { parseRelationsFromRows } = await import("./parser");
+    const { runReconciliation } = await import("./reconcile");
+    const { relations } = parseRelationsFromRows([
+      ["ABRAMOR", "HECTOR E.", "18350968", "4338310009563899", "275000"],
+    ]);
+    const mapping = detectColumnMapping(DA_HEADERS);
+    const { payments } = buildPaymentsFromRows(
+      DA_HEADERS,
+      [["OTRO", "NOMBRE", "43383100XXXX3899", "275000.00", "Si", ""]],
+      mapping,
+      "credit"
+    );
+    const results = runReconciliation(relations, payments);
+    expect(results[0]?.status).toBe("MATCHED");
+    expect(results[0]?.matchedAccountKey).toContain("18350968");
+  });
+});
+
 describe("buildPaymentsFromRows Rendición DA", () => {
   it("junta apellido y nombre como pagador", () => {
     const mapping = detectColumnMapping(DA_HEADERS);

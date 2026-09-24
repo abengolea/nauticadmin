@@ -10,15 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
@@ -27,11 +18,10 @@ import {
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import {
-  applySavedColumnMapping,
   detectColumnMapping,
   EMPTY_COLUMN_MAPPING,
-  findBestProfile,
   hasPayerMapping,
+  isRendicionDa,
 } from "@/lib/reconciliacion-excel/column-mapping";
 import {
   getPaymentsFilePreview,
@@ -51,8 +41,6 @@ type ImportPaymentsProps = {
   schoolId: string;
   onPaymentsLoaded: (payments: PaymentRow[]) => void;
 };
-
-const NONE_PROFILE = "__none__";
 
 export function ImportPayments({ schoolId, onPaymentsLoaded }: ImportPaymentsProps) {
   const { user } = useUser();
@@ -97,8 +85,8 @@ export function ImportPayments({ schoolId, onPaymentsLoaded }: ImportPaymentsPro
       <CardHeader>
         <CardTitle>Paso 2: Archivos de créditos y débitos</CardTitle>
         <CardDescription>
-          El Excel es el mismo (Rendición DA). Cargalos por separado para identificar la forma de pago:
-          crédito o débito. Si más adelante hay otra columna, agregala y guardá el mapeo.
+          Subí la rendición de crédito y la de débito por separado, para marcar la forma de pago.
+          Las columnas se toman tal cual vienen del Excel.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -106,14 +94,12 @@ export function ImportPayments({ schoolId, onPaymentsLoaded }: ImportPaymentsPro
           <PaymentFileSlot
             kind="credit"
             schoolId={schoolId}
-            profiles={profiles}
             onProfilesChanged={loadProfiles}
             onPaymentsLoaded={handleKindLoaded}
           />
           <PaymentFileSlot
             kind="debit"
             schoolId={schoolId}
-            profiles={profiles}
             onProfilesChanged={loadProfiles}
             onPaymentsLoaded={handleKindLoaded}
           />
@@ -126,7 +112,6 @@ export function ImportPayments({ schoolId, onPaymentsLoaded }: ImportPaymentsPro
 type PaymentFileSlotProps = {
   kind: PaymentFileKind;
   schoolId: string;
-  profiles: MappingProfile[];
   onProfilesChanged: () => Promise<void> | void;
   onPaymentsLoaded: (kind: PaymentFileKind, payments: PaymentRow[]) => void;
 };
@@ -134,7 +119,6 @@ type PaymentFileSlotProps = {
 function PaymentFileSlot({
   kind,
   schoolId,
-  profiles,
   onProfilesChanged,
   onPaymentsLoaded,
 }: PaymentFileSlotProps) {
@@ -143,10 +127,6 @@ function PaymentFileSlot({
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>(EMPTY_COLUMN_MAPPING);
-  const [selectedProfileId, setSelectedProfileId] = useState<string>("");
-  const [profileName, setProfileName] = useState(
-    kind === "credit" ? "Visa Crédito" : "Visa Débito"
-  );
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [preview, setPreview] = useState<string[][]>([]);
   const [totalRows, setTotalRows] = useState(0);
@@ -155,14 +135,10 @@ function PaymentFileSlot({
   const [saving, setSaving] = useState(false);
   const [mappingDone, setMappingDone] = useState(false);
 
-  const kindProfiles = profiles.filter((p) => p.kind === kind);
   const inputId = `payments-file-${kind}`;
-
-  const applyProfile = useCallback((profile: MappingProfile, fileHeaders: string[]) => {
-    setMapping(applySavedColumnMapping(fileHeaders, profile.mapping));
-    setSelectedProfileId(profile.id);
-    setProfileName(profile.name);
-  }, []);
+  const daFile = isRendicionDa(headers);
+  const defaultExtraIds = new Set(["cardNumber", "applied"]);
+  const hasAddedFields = (mapping.extras ?? []).some((e) => !defaultExtraIds.has(e.id));
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -179,35 +155,19 @@ function PaymentFileSlot({
         setPreview(previewData.preview);
         setTotalRows(previewData.totalRows);
 
-        const match = findBestProfile(previewData.headers, profiles, kind);
-        if (match) {
-          applyProfile(match, previewData.headers);
-        } else {
-          setSelectedProfileId("");
-          setMapping(
-            previewData.headers.length > 0
-              ? detectColumnMapping(previewData.headers)
-              : EMPTY_COLUMN_MAPPING
-          );
-        }
+        setMapping(
+          previewData.headers.length > 0
+            ? detectColumnMapping(previewData.headers)
+            : EMPTY_COLUMN_MAPPING
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error al leer");
       } finally {
         setLoading(false);
       }
     },
-    [applyProfile, kind, profiles]
+    []
   );
-
-  const handleSelectProfile = (id: string) => {
-    if (id === NONE_PROFILE) {
-      setSelectedProfileId("");
-      if (headers.length) setMapping(detectColumnMapping(headers));
-      return;
-    }
-    const profile = profiles.find((p) => p.id === id);
-    if (profile) applyProfile(profile, headers);
-  };
 
   const handleApplyMapping = useCallback(async () => {
     if (!file || !hasPayerMapping(mapping) || !mapping.amount) return;
@@ -239,10 +199,8 @@ function PaymentFileSlot({
   }, [file, kind, mapping, onPaymentsLoaded, toast]);
 
   const handleSaveProfile = useCallback(async () => {
-    if (!user || !profileName.trim()) {
-      toast({ variant: "destructive", title: "Poné un nombre al mapeo" });
-      return;
-    }
+    if (!user) return;
+    const name = kind === "credit" ? "Visa Crédito" : "Visa Débito";
     setSaving(true);
     try {
       const token = await user.getIdToken();
@@ -255,8 +213,7 @@ function PaymentFileSlot({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            id: selectedProfileId || undefined,
-            name: profileName.trim(),
+            name,
             kind,
             mapping,
             headers,
@@ -265,9 +222,8 @@ function PaymentFileSlot({
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al guardar");
-      if (data.profile?.id) setSelectedProfileId(data.profile.id);
       await onProfilesChanged();
-      toast({ title: "Mapeo guardado", description: profileName.trim() });
+      toast({ title: "Campos guardados", description: name });
     } catch (err) {
       toast({
         variant: "destructive",
@@ -277,17 +233,7 @@ function PaymentFileSlot({
     } finally {
       setSaving(false);
     }
-  }, [
-    headers,
-    kind,
-    mapping,
-    onProfilesChanged,
-    profileName,
-    schoolId,
-    selectedProfileId,
-    toast,
-    user,
-  ]);
+  }, [headers, kind, mapping, onProfilesChanged, schoolId, toast, user]);
 
   const busy = loading || saving;
   const KindIcon = kind === "credit" ? CreditCard : Banknote;
@@ -334,25 +280,6 @@ function PaymentFileSlot({
         </TooltipProvider>
       </div>
 
-      {kindProfiles.length > 0 && headers.length > 0 && (
-        <div className="space-y-2">
-          <Label>Mapeo guardado</Label>
-          <Select value={selectedProfileId || NONE_PROFILE} onValueChange={handleSelectProfile}>
-            <SelectTrigger>
-              <SelectValue placeholder="Elegir un mapeo guardado…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE_PROFILE}>(formato del sistema)</SelectItem>
-              {kindProfiles.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {loading && (
@@ -366,27 +293,19 @@ function PaymentFileSlot({
         <>
           <ColumnMappingComponent headers={headers} mapping={mapping} onChange={setMapping} />
 
-          <div className="space-y-2">
-            <Label htmlFor={`profile-name-${kind}`}>Nombre del mapeo</Label>
-            <Input
-              id={`profile-name-${kind}`}
-              value={profileName}
-              onChange={(e) => setProfileName(e.target.value)}
-              placeholder={kind === "credit" ? "Visa Crédito" : "Visa Débito"}
-            />
-          </div>
-
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="secondary" onClick={handleSaveProfile} disabled={busy || !profileName.trim()}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Guardar
-            </Button>
+            {(!daFile || hasAddedFields) && (
+              <Button type="button" variant="secondary" onClick={handleSaveProfile} disabled={busy}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Guardar
+              </Button>
+            )}
             <Button
               onClick={handleApplyMapping}
               disabled={busy || !hasPayerMapping(mapping) || !mapping.amount}
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Aplicar mapeo y cargar
+              Cargar
             </Button>
           </div>
         </>
