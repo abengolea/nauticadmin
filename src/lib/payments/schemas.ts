@@ -19,6 +19,8 @@ const periodSchema = z.string().refine(
   { message: 'Período: YYYY-MM, inscripcion, ropa-N o extra-YYYYMM-timestamp' }
 );
 
+const paymentMethodSchema = z.enum(['card', 'transfer', 'cash', 'cheque', 'mercadopago', 'unknown']);
+
 export const serviceChargeSchema = z.object({
   playerId: z.string().min(1, 'Cliente requerido'),
   schoolId: z.string().min(1, 'Escuela requerida'),
@@ -27,6 +29,7 @@ export const serviceChargeSchema = z.object({
   currency: z.string().min(1).default('ARS'),
   /** Mes a facturar YYYY-MM. Default: mes actual */
   period: z.string().regex(PERIOD_REGEX).optional(),
+  method: paymentMethodSchema.optional(),
 });
 
 export const createPaymentIntentSchema = z.object({
@@ -45,6 +48,7 @@ export const markManualPaymentSchema = z.object({
   period: periodSchema,
   amount: z.number().positive(),
   currency: z.string().min(1).default('ARS'),
+  method: paymentMethodSchema.optional(),
 });
 
 export const listPaymentsSchema = z.object({
@@ -56,6 +60,7 @@ export const listPaymentsSchema = z.object({
     status: z.enum(['pending', 'approved', 'rejected', 'refunded']).optional(),
     period: periodSchema.optional(),
     provider: z.enum(['mercadopago', 'dlocal', 'manual', 'excel_import']).optional(),
+    method: z.enum(['transfer', 'cash', 'cheque', 'mercadopago', 'card', 'excel_import', 'manual', 'dlocal']).optional(),
     /** 'yes' = solo facturados, 'no' = solo no facturados, omitir = todos */
     facturado: z.enum(['yes', 'no']).optional(),
   }).optional(),

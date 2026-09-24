@@ -7,6 +7,7 @@ import type admin from 'firebase-admin';
 import { getAdminFirestore, getAdminAuth } from '@/lib/firebase-admin';
 import { COLLECTIONS, REGISTRATION_PERIOD, CLOTHING_PERIOD_PREFIX, MERCADOPAGO_CONNECTION_DOC } from './constants';
 import { getDueDate, isRegistrationPeriod, isClothingPeriod, isServicePeriod } from './schemas';
+import { inferPaymentMethod } from './payment-method';
 import type { Payment, PaymentIntent, PaymentConfig, DelinquentInfo, MercadoPagoConnection } from '@/lib/types/payments';
 import type { Player } from '@/lib/types';
 import { getCategoryLabel } from '@/lib/utils';
@@ -583,6 +584,7 @@ export async function listPayments(
     status?: string;
     period?: string;
     provider?: string;
+    method?: string;
     /** 'yes' = solo facturados, 'no' = solo no facturados */
     facturado?: 'yes' | 'no';
     limit?: number;
@@ -620,6 +622,18 @@ export async function listPayments(
     docs = docs.filter((docSnap) => {
       const facturado = docSnap.data().facturado === true;
       return opts.facturado === 'yes' ? facturado : !facturado;
+    });
+  }
+
+  if (opts.method) {
+    docs = docs.filter((docSnap) => {
+      const d = docSnap.data();
+      return inferPaymentMethod({
+        method: d.method,
+        provider: d.provider,
+        chequeDueDate: d.chequeDueDate,
+        chequeStatus: d.chequeStatus,
+      }) === opts.method;
     });
   }
 

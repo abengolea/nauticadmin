@@ -5,8 +5,12 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { ThemeProvider } from '@/components/ThemeProvider';
 
 export const metadata: Metadata = {
-  title: 'NauticAdmin',
-  description: 'Administración de náutica: clientes, embarcaciones, amarras y pagos',
+  title: {
+    default: 'NauticAdmin | Software de gestión para clubes náuticos y marinas',
+    template: '%s | NauticAdmin',
+  },
+  description:
+    'Administrá embarcaciones, amarras, clientes, servicios, documentación y cobros desde una única plataforma para clubes náuticos, marinas y guarderías.',
 };
 
 export const viewport = {

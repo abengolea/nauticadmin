@@ -108,17 +108,17 @@
     background:
       linear-gradient(180deg, hsl(210 30% 8%) 0%, hsl(210 32% 12%) 46%, hsl(204 28% 16%) 100%);
   }
-  .landing-sheen {
-    background: linear-gradient(
-      105deg,
-      transparent 20%,
-      hsl(0 0% 100% / 0.18) 46%,
-      transparent 62%
-    );
-    animation: landing-sheen 14s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  .landing-fade {
+    animation: landing-fade 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
-  @keyframes landing-sheen {
-    from { transform: translateX(-18%); }
-    to { transform: translateX(18%); }
+  @keyframes landing-fade {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
