@@ -19,6 +19,26 @@ export async function verifyIdToken(authHeader: string | null): Promise<{ uid: s
   }
 }
 
+/** Resuelve schoolId + playerId del cliente autenticado vía playerLogins. */
+export async function resolvePlayerLoginFromAuth(
+  auth: { uid: string; email?: string }
+): Promise<{ schoolId: string; playerId: string } | null> {
+  const { getAdminAuth, getAdminFirestore } = await import('./firebase-admin');
+  const adminAuth = getAdminAuth();
+  const user = await adminAuth.getUser(auth.uid).catch(() => null);
+  const email = user?.email ?? auth.email;
+  if (!email) return null;
+
+  const emailNorm = email.trim().toLowerCase();
+  const db = getAdminFirestore();
+  const loginSnap = await db.collection('playerLogins').doc(emailNorm).get();
+  if (!loginSnap.exists) return null;
+
+  const { schoolId, playerId } = loginSnap.data() as { schoolId?: string; playerId?: string };
+  if (!schoolId?.trim() || !playerId?.trim()) return null;
+  return { schoolId: schoolId.trim(), playerId: playerId.trim() };
+}
+
 /**
  * Verifica que el usuario sea admin de la náutica (school_admin) o super admin.
  * Consulta schools/{schoolId}/users/{uid} y platformUsers/{uid}.

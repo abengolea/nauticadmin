@@ -25,7 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertTriangle, CheckCircle, History, Loader2, CreditCard } from "lucide-react";
+import { AlertTriangle, CheckCircle, History, Loader2, CreditCard, Receipt } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Payment } from "@/lib/types/payments";
 import type { DelinquentInfo } from "@/lib/types/payments";
 import { getPaymentMethodLabel } from "@/lib/payments/payment-method";
@@ -70,9 +71,18 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
   const [showAlDiaDialog, setShowAlDiaDialog] = useState(false);
   const [showRetryPrompt, setShowRetryPrompt] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "pending">("all");
   const { toast } = useToast();
 
   const hasRegistrationPending = delinquent?.period === REGISTRATION_PERIOD;
+  const paidPayments = payments.filter((p) => p.status === "approved");
+  const pendingPayments = payments.filter((p) => p.status !== "approved");
+  const filteredPayments =
+    paymentFilter === "paid"
+      ? paidPayments
+      : paymentFilter === "pending"
+        ? pendingPayments
+        : payments;
 
   // Si la carga tarda más de 8 segundos, mostrar opción de reintentar
   useEffect(() => {
@@ -460,6 +470,38 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
         </DialogContent>
       </Dialog>
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Receipt className="h-5 w-5" />
+              Cuotas pagas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{paidPayments.length}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Total abonado: ARS{" "}
+              {paidPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString("es-AR")}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <History className="h-5 w-5" />
+              Pendientes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{pendingPayments.length + (delinquent ? 1 : 0)}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {delinquent ? "Incluye cuota vencida o pendiente" : "Sin cuotas vencidas"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Historial de pagos */}
       <Card>
         <CardHeader>
@@ -468,13 +510,24 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
             Historial de pagos
           </CardTitle>
           <CardDescription>
-            Cuotas que ya fueron abonadas
+            Cuotas abonadas y movimientos de tu cuenta
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {payments.length === 0 ? (
+        <CardContent className="space-y-4">
+          <Tabs value={paymentFilter} onValueChange={(v) => setPaymentFilter(v as typeof paymentFilter)}>
+            <TabsList>
+              <TabsTrigger value="all">Todas ({payments.length})</TabsTrigger>
+              <TabsTrigger value="paid">Pagadas ({paidPayments.length})</TabsTrigger>
+              <TabsTrigger value="pending">Pendientes ({pendingPayments.length})</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {filteredPayments.length === 0 ? (
             <p className="text-muted-foreground text-sm py-6 text-center">
-              Aún no hay pagos registrados.
+              {paymentFilter === "paid"
+                ? "Aún no hay cuotas pagadas registradas."
+                : paymentFilter === "pending"
+                  ? "No hay pagos pendientes."
+                  : "Aún no hay pagos registrados."}
             </p>
           ) : (
             <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 rounded-md border">
@@ -489,7 +542,7 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
                   </TableRow>
                 </TableHeader>
               <TableBody>
-                {payments.map((p) => (
+                {filteredPayments.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">
                       {formatPeriodDisplay(p.period)}
@@ -519,8 +572,7 @@ export function PlayerPaymentsView({ getToken }: PlayerPaymentsViewProps) {
               </TableBody>
             </Table>
             </div>
-          )
-          }
+          )}
         </CardContent>
       </Card>
     </div>

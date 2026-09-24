@@ -46,7 +46,9 @@ export default function DashboardLayout({
     const isOnProfilePage = pathname === profilePath || pathname?.startsWith(profilePath + "/");
     const isOnPaymentsPage = pathname === "/dashboard/payments";
     const isOnAppointmentsPage = pathname === "/dashboard/appointments";
-    if (!isOnProfilePage && !isOnPaymentsPage && !isOnAppointmentsPage) {
+    const isOnAccountPage = pathname === "/dashboard/account";
+    const isOnReservarPage = pathname === "/dashboard/reservar-lancha";
+    if (!isOnProfilePage && !isOnPaymentsPage && !isOnAppointmentsPage && !isOnAccountPage && !isOnReservarPage) {
       router.replace(`${profilePath}?schoolId=${profile.activeSchoolId}`);
     }
   }, [isReady, profile, player, pathname, router]);

@@ -153,6 +153,8 @@ export async function GET(request: Request) {
         regresoAt: data.regresoAt?.toMillis?.() ?? null,
         salioOperadorNombre: data.salioOperadorNombre,
         regresoOperadorNombre: data.regresoOperadorNombre,
+        arrivalAt: data.arrivalAt?.toMillis?.() ?? null,
+        source: data.source ?? 'kiosk',
       };
     });
 

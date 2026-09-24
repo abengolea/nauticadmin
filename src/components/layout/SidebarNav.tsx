@@ -18,6 +18,7 @@ import {
   Building2,
   CalendarClock,
   Ship,
+  Wallet,
   FileSpreadsheet,
   Receipt,
   ClipboardCheck,
@@ -144,19 +145,23 @@ export function SidebarNav() {
       const tab = (t: string) => `${profileHref}&tab=${t}`;
       menuItems = [
         { href: profileHref, label: "Mi perfil", icon: Users },
+        { href: "/dashboard/reservar-lancha", label: "Pedir lancha", icon: Ship },
         { href: "/dashboard/appointments", label: "Sacar turno", icon: CalendarClock },
         { href: tab("attendance"), label: "Asistencia", icon: ClipboardCheck },
         { href: tab("videoteca"), label: "Galería", icon: Video },
         { href: "/dashboard/payments", label: "Mis pagos", icon: Banknote, badgeOverdue: true },
+        { href: "/dashboard/account", label: "Cuenta corriente", icon: Wallet },
       ];
     } else {
       const tab = (t: string) => `${profileHref}&tab=${t}`;
       menuItems = [
         { href: "/dashboard", label: "Panel Principal", icon: Home },
         { href: profileHref, label: "Mi perfil", icon: Users },
+        { href: "/dashboard/reservar-lancha", label: "Pedir lancha", icon: Ship },
         { href: "/dashboard/appointments", label: "Sacar turno", icon: CalendarClock },
         { href: tab("videoteca"), label: "Galería", icon: Video },
         { href: "/dashboard/payments", label: "Mis pagos", icon: Banknote, badgeOverdue: true },
+        { href: "/dashboard/account", label: "Cuenta corriente", icon: Wallet },
         { href: "/dashboard/support", label: "Centro de Soporte", icon: MessageCircle },
       ];
     }

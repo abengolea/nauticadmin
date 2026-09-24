@@ -42,6 +42,8 @@ type Solicitud = {
   nombreEmbarcacion: string;
   status: string;
   createdAt: number | null;
+  arrivalAt?: number | null;
+  source?: string;
   salioAt: number | null;
   regresoAt: number | null;
   salioOperadorNombre?: string;
@@ -318,7 +320,8 @@ export default function SolicitudesPage() {
                     <TableRow>
                       <TableHead>Cliente</TableHead>
                       <TableHead>Embarcación</TableHead>
-                      <TableHead>Hora</TableHead>
+                      <TableHead>Pedido</TableHead>
+                      <TableHead>Llegada</TableHead>
                       <TableHead className="text-right">Acción</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -329,6 +332,12 @@ export default function SolicitudesPage() {
                         <TableCell>{s.nombreEmbarcacion}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {s.createdAt ? format(new Date(s.createdAt), 'HH:mm', { locale: es }) : '-'}
+                          {s.source === 'portal' && (
+                            <Badge variant="outline" className="ml-2 text-xs">App</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {s.arrivalAt ? format(new Date(s.arrivalAt), 'HH:mm', { locale: es }) : '—'}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
