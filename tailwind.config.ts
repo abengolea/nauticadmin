@@ -10,9 +10,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Lora', 'Georgia', 'serif'],
-        headline: ['Playfair Display', 'Georgia', 'serif'],
-        code: ['Source Code Pro', 'monospace'],
+        body: ['"Source Sans 3"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        headline: ['"Playfair Display"', 'Georgia', 'serif'],
+        code: ['"Source Code Pro"', 'ui-monospace', 'monospace'],
       },
       colors: {
         background: 'hsl(var(--background))',

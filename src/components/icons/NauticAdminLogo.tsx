@@ -1,18 +1,15 @@
-"use client";
-
 import { cn } from "@/lib/utils";
 
-/** Logo placeholder para NauticAdmin. Reemplazar por imagen cuando exista. */
+/** Gallardete náutico — marca de NauticAdmin. */
 export function NauticAdminLogo({ className }: { className?: string }) {
   return (
-    <div
-      className={cn(
-        "flex items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm",
-        className
-      )}
-      title="NauticAdmin"
+    <svg
+      viewBox="0 0 32 32"
+      className={cn("shrink-0 text-primary", className)}
+      aria-hidden
     >
-      NA
-    </div>
+      <rect width="32" height="32" rx="7" fill="currentColor" />
+      <path d="M8 10.5h13.2l-3.8 5.5 3.8 5.5H8V10.5z" fill="hsl(var(--primary-foreground))" />
+    </svg>
   );
 }
