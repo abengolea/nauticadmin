@@ -7,6 +7,7 @@ import {
   nameSearchKeys,
   parseAplicadaFlag,
 } from "./impute-match";
+import { nameVariants, payerNameKeys } from "./player-lookup";
 
 describe("impute-match", () => {
   it("saca solo dígitos del DNI", () => {
@@ -29,6 +30,11 @@ describe("impute-match", () => {
     expect(parseAplicadaFlag("Si")).toBe(true);
     expect(parseAplicadaFlag("No")).toBe(false);
     expect(parseAplicadaFlag("")).toBeNull();
+  });
+
+  it("genera variantes apellido/nombre del pagador Visa", () => {
+    expect(nameVariants("ABRAMOR", "HECTOR E.")).toContain("ABRAMOR HECTOR E");
+    expect(payerNameKeys("ABRAMOR HECTOR E.")).toContain("ABRAMOR HECTOR E");
   });
 
   it("genera la misma clave si se imputa dos veces el mismo cobro", () => {

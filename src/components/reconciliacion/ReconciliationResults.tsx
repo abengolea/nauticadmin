@@ -24,6 +24,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { CheckCircle2, AlertCircle, XCircle, Loader2, Save, UserCheck } from "lucide-react";
 import { PAYMENT_FILE_KIND_LABEL } from "@/lib/reconciliacion-excel/types";
 import type { ImputePaymentItem } from "@/lib/reconciliacion-excel/types";
@@ -56,6 +58,8 @@ import type {
 type ImputeSummary = {
   applied: number;
   already: number;
+  alreadyPaidPeriod?: number;
+  period?: string;
   notFoundCount: number;
   notFound: string[];
   skippedCount: number;
@@ -83,6 +87,10 @@ export function ReconciliationResults({
   const [confirmImpute, setConfirmImpute] = useState(false);
   const [imputing, setImputing] = useState(false);
   const [imputeSummary, setImputeSummary] = useState<ImputeSummary | null>(null);
+  const [imputePeriod, setImputePeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
 
   const matched = results.filter((r) => r.status === "MATCHED");
   const review = results.filter((r) => r.status === "REVIEW");
@@ -159,7 +167,7 @@ export function ReconciliationResults({
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ items }),
+          body: JSON.stringify({ items, period: imputePeriod }),
         }
       );
       const data = await res.json();
@@ -178,7 +186,7 @@ export function ReconciliationResults({
       setImputing(false);
       setConfirmImpute(false);
     }
-  }, [user, matched, schoolId, toast, relations]);
+  }, [user, matched, schoolId, toast, relations, imputePeriod]);
 
   const uniqueAccounts = useMemo(() => {
     const seen = new Set<string>();
@@ -199,7 +207,17 @@ export function ReconciliationResults({
           {matched.length > 0 ? ` · total pagado ${formatAmount(matchedTotal)}` : ""}
         </CardDescription>
         {matched.length > 0 ? (
-          <div className="pt-2">
+          <div className="pt-2 flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="impute-period">Cuota a imputar</Label>
+              <Input
+                id="impute-period"
+                type="month"
+                className="w-[180px]"
+                value={imputePeriod}
+                onChange={(e) => setImputePeriod(e.target.value)}
+              />
+            </div>
             <Button onClick={() => setConfirmImpute(true)} disabled={imputing}>
               {imputing ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -215,18 +233,26 @@ export function ReconciliationResults({
         {imputeSummary ? (
           <Alert className="mb-4">
             <AlertDescription>
-              <p>{imputeSummary.message}</p>
-              {imputeSummary.notFound.length > 0 ? (
+              <p className="font-medium">{imputeSummary.message}</p>
+              {imputeSummary.notFoundCount > 0 ? (
                 <p className="mt-2 text-sm">
-                  Sin cliente: {imputeSummary.notFound.slice(0, 12).join(" · ")}
-                  {imputeSummary.notFoundCount > 12
-                    ? ` y ${imputeSummary.notFoundCount - 12} más`
-                    : ""}
+                  <strong>{imputeSummary.notFoundCount} sin cliente:</strong> no están cargados en la náutica con ese DNI o nombre.
+                  Revisá que tengan el DNI en la ficha del cliente.
+                  {imputeSummary.notFound.length > 0 ? (
+                    <> Ej.: {imputeSummary.notFound.slice(0, 6).join(" · ")}
+                      {imputeSummary.notFoundCount > 6
+                        ? ` y ${imputeSummary.notFoundCount - 6} más`
+                        : ""}
+                    </>
+                  ) : null}
                 </p>
               ) : null}
-              {imputeSummary.skipped.length > 0 ? (
-                <p className="mt-1 text-sm">
-                  Omitidos: {imputeSummary.skipped.slice(0, 8).join(" · ")}
+              {imputeSummary.skippedCount > 0 ? (
+                <p className="mt-2 text-sm">
+                  <strong>{imputeSummary.skippedCount} omitidos:</strong> ya tenían la cuota pagada, el banco marcó &quot;no aplicada&quot;, u otro motivo.
+                  {imputeSummary.skipped.length > 0 ? (
+                    <> Ej.: {imputeSummary.skipped.slice(0, 5).join(" · ")}</>
+                  ) : null}
                 </p>
               ) : null}
             </AlertDescription>
@@ -435,8 +461,9 @@ export function ReconciliationResults({
         <AlertDialogHeader>
           <AlertDialogTitle>Imputar pagos a clientes</AlertDialogTitle>
           <AlertDialogDescription>
-            Se van a acreditar {matched.length} pagos conciliados en la cuota más vieja
-            de cada cliente (por DNI o nombre). Si el cobro ya se imputó, no se duplica.
+            Se van a acreditar {matched.length} pagos conciliados en la cuota de{" "}
+            <strong>{imputePeriod}</strong>. Busca el cliente por DNI o nombre. Si ya pagó ese mes o el
+            cobro ya se imputó, no se duplica.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

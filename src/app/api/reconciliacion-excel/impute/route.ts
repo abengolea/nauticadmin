@@ -11,83 +11,21 @@ import {
   createPayment,
   updatePlayerStatus,
   getOrCreatePaymentConfig,
-  getUnpaidPeriodsForPlayer,
   getAllApprovedPaymentsForSchool,
 } from "@/lib/payments/db";
 import { sendEmailEvent } from "@/lib/payments/email-events";
 import { DEFAULT_CURRENCY } from "@/lib/payments/constants";
-import { normalizeString } from "@/lib/text-normalize";
 import type { ImputePaymentItem } from "@/lib/reconciliacion-excel/types";
 import {
   digitsOnly,
   dniFromAccountRaw,
   imputeIdempotencyKey,
-  nameFromAccountRaw,
-  nameSearchKeys,
   parseAplicadaFlag,
 } from "@/lib/reconciliacion-excel/impute-match";
-
-type DocSnapshot = admin.firestore.DocumentSnapshot;
+import { buildPlayerLookup } from "@/lib/reconciliacion-excel/player-lookup";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-
-function indexPlayers(playersSnap: admin.firestore.QuerySnapshot) {
-  const byDni = new Map<string, DocSnapshot>();
-  const byName = new Map<string, DocSnapshot>();
-
-  for (const doc of playersSnap.docs) {
-    const d = doc.data() as {
-      firstName?: string;
-      lastName?: string;
-      dni?: string;
-      tutorContact?: { name?: string };
-      archived?: boolean;
-    };
-    if (d.archived) continue;
-
-    const dni = digitsOnly(String(d.dni ?? ""));
-    if (dni) byDni.set(dni, doc);
-
-    const fullName = `${d.lastName ?? ""} ${d.firstName ?? ""}`.trim();
-    const tutor = String(d.tutorContact?.name ?? "").trim();
-    for (const raw of [fullName, tutor, `${d.firstName ?? ""} ${d.lastName ?? ""}`.trim()]) {
-      for (const key of nameSearchKeys(raw)) {
-        if (key) byName.set(key, doc);
-      }
-    }
-  }
-
-  return { byDni, byName };
-}
-
-function findPlayer(
-  item: ImputePaymentItem,
-  byDni: Map<string, DocSnapshot>,
-  byName: Map<string, DocSnapshot>
-): DocSnapshot | undefined {
-  const dniCandidates = [
-    digitsOnly(item.accountKey),
-    dniFromAccountRaw(item.accountRaw),
-  ].filter((d) => d.length >= 6);
-
-  for (const dni of dniCandidates) {
-    const hit = byDni.get(dni);
-    if (hit) return hit;
-  }
-
-  const names = [nameFromAccountRaw(item.accountRaw), item.payerRaw].filter(Boolean);
-  for (const name of names) {
-    for (const key of nameSearchKeys(name)) {
-      const hit = byName.get(key);
-      if (hit) return hit;
-    }
-    const exact = byName.get(normalizeString(name));
-    if (exact) return exact;
-  }
-
-  return undefined;
-}
 
 export async function POST(request: Request) {
   try {
@@ -109,15 +47,21 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const items = (body?.items ?? []) as ImputePaymentItem[];
+    const period = String(body?.period ?? "").trim();
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "No hay pagos para imputar" }, { status: 400 });
+    }
+    if (!/^\d{4}-\d{2}$/.test(period)) {
+      return NextResponse.json(
+        { error: "Falta el período a imputar (YYYY-MM, ej. 2026-09)" },
+        { status: 400 }
+      );
     }
 
     const config = await getOrCreatePaymentConfig(db, schoolId);
     const currency = config.currency || DEFAULT_CURRENCY;
     const approvedPaymentsMap = await getAllApprovedPaymentsForSchool(db, schoolId);
-    const playersSnap = await db.collection(`schools/${schoolId}/players`).get();
-    const { byDni, byName } = indexPlayers(playersSnap);
+    const { findPlayer } = await buildPlayerLookup(db, schoolId);
 
     let collectedByDisplayName = auth.email ?? "Usuario";
     const schoolUserSnap2 = await db.doc(`schools/${schoolId}/users/${auth.uid}`).get();
@@ -128,6 +72,7 @@ export async function POST(request: Request) {
 
     let applied = 0;
     let already = 0;
+    let alreadyPaidPeriod = 0;
     const notFound: string[] = [];
     const skipped: string[] = [];
 
@@ -144,9 +89,16 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const playerDoc = findPlayer(item, byDni, byName);
+      const playerDoc = findPlayer(item);
       if (!playerDoc) {
         notFound.push(item.accountRaw || item.payerRaw);
+        continue;
+      }
+
+      const paidPeriods = approvedPaymentsMap.get(playerDoc.id);
+      if (paidPeriods?.has(period)) {
+        alreadyPaidPeriod++;
+        skipped.push(`${item.payerRaw} (ya pagó ${period})`);
         continue;
       }
 
@@ -164,25 +116,13 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const unpaid = await getUnpaidPeriodsForPlayer(
-        db,
-        schoolId,
-        playerDoc.id,
-        approvedPaymentsMap
-      );
-      const targetPeriod = unpaid[0]?.period ?? null;
-      if (!targetPeriod) {
-        skipped.push(`${item.payerRaw} (sin cuotas adeudadas)`);
-        continue;
-      }
-
       const now = new Date();
       await createPayment(
         db,
         {
           playerId: playerDoc.id,
           schoolId,
-          period: targetPeriod,
+          period,
           amount,
           currency,
           provider: "excel_import",
@@ -208,7 +148,7 @@ export async function POST(request: Request) {
         paidSet = new Set();
         approvedPaymentsMap.set(playerDoc.id, paidSet);
       }
-      paidSet.add(targetPeriod);
+      paidSet.add(period);
 
       const playerData = playerDoc.data() as {
         firstName?: string;
@@ -224,7 +164,7 @@ export async function POST(request: Request) {
             type: "payment_receipt",
             playerId: playerDoc.id,
             schoolId,
-            period: targetPeriod,
+            period,
             to: playerData.email,
             playerName,
             amount,
@@ -241,12 +181,14 @@ export async function POST(request: Request) {
       ok: true,
       applied,
       already,
+      alreadyPaidPeriod,
+      period,
       notFound: notFound.slice(0, 80),
       notFoundCount: notFound.length,
       skipped: skipped.slice(0, 40),
       skippedCount: skipped.length,
-      message: `Se acreditaron ${applied} pagos.${already > 0 ? ` ${already} ya estaban imputados.` : ""}${
-        notFound.length > 0 ? ` ${notFound.length} sin cliente.` : ""
+      message: `Se acreditaron ${applied} pagos en ${period}.${already > 0 ? ` ${already} ya estaban imputados.` : ""}${
+        notFound.length > 0 ? ` ${notFound.length} sin cliente en la náutica.` : ""
       }${skipped.length > 0 ? ` ${skipped.length} omitidos.` : ""}`,
     });
   } catch (e) {
