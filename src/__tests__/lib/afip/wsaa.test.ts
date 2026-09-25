@@ -3,7 +3,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseLoginCmsResponse } from '../../../lib/afip/wsaa';
+import {
+  axiosErrorBody,
+  isAlreadyAuthenticatedFault,
+  parseLoginCmsResponse,
+} from '../../../lib/afip/wsaa';
 
 describe('parseLoginCmsResponse', () => {
   it('extrae token y sign de respuesta con loginCmsReturn HTML-encoded', () => {
@@ -57,5 +61,22 @@ describe('parseLoginCmsResponse', () => {
 
     expect(result.token).toBe('a&b');
     expect(result.sign).toBe('x"y');
+  });
+});
+
+describe('axiosErrorBody / alreadyAuthenticated', () => {
+  it('lee el SOAP fault desde un Buffer (como axios en Node)', () => {
+    const xml =
+      '<soap:Fault><faultstring>ns1:coe.alreadyAuthenticated: El CEE ya posee un TA valido</faultstring></soap:Fault>';
+    const body = axiosErrorBody(Buffer.from(xml, 'utf8'));
+    expect(isAlreadyAuthenticatedFault(body)).toBe(true);
+  });
+
+  it('detecta el fault con acento', () => {
+    expect(isAlreadyAuthenticatedFault('ya posee un TA válido para el acceso')).toBe(true);
+  });
+
+  it('no marca como alreadyAuthenticated un 500 genérico', () => {
+    expect(isAlreadyAuthenticatedFault('Internal Server Error')).toBe(false);
   });
 });

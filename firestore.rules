@@ -517,6 +517,11 @@ service cloud.firestore {
       allow write: if false;  // Solo Admin SDK vía API
     }
 
+    // Ticket WSAA (token/sign AFIP). Solo Admin SDK.
+    match /afipWsaaTickets/{id} {
+      allow read, write: if false;
+    }
+
     // --- Notas (posts) ---
     // Lectura: públicos si published; staff de la escuela si draft/archived
     match /posts/{postId} {

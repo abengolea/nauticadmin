@@ -12,6 +12,7 @@ import { promisify } from 'util';
 import axios from 'axios';
 import { getActiveAfipSession } from './session';
 import { getAfipWorkDir } from './credentials';
+import { loadSharedTa, saveSharedTa, type SharedTa } from './ta-store';
 
 /** Agente HTTPS para AFIP producción (usa OPENSSL_CONF=./openssl.cnf con SECLEVEL=0) */
 const afipAgent = new https.Agent({
@@ -49,16 +50,16 @@ interface TaCache {
 }
 
 /** Carga TA desde archivo si existe y es válido (con margen de 10 min) */
-function loadCachedTa(): { token: string; sign: string } | null {
+function loadCachedTa(): TaCache | null {
   return loadCachedTaWithMargin(TA_MARGIN_MS);
 }
 
 /** Carga TA con margen relajado (0 = aceptar hasta el segundo exacto de expiración). Útil cuando AFIP devuelve alreadyAuthenticated. */
-function loadCachedTaRelaxed(): { token: string; sign: string } | null {
+function loadCachedTaRelaxed(): TaCache | null {
   return loadCachedTaWithMargin(0);
 }
 
-function loadCachedTaWithMargin(marginMs: number): { token: string; sign: string } | null {
+function loadCachedTaWithMargin(marginMs: number): TaCache | null {
   const filePath = getTaFilePath();
   if (!fs.existsSync(filePath)) return null;
 
@@ -75,7 +76,7 @@ function loadCachedTaWithMargin(marginMs: number): { token: string; sign: string
     }
 
     console.log('[WSAA] Usando TA desde archivo (válido hasta', ta.expirationTime, ')');
-    return { token: ta.token, sign: ta.sign };
+    return ta;
   } catch {
     return null;
   }
@@ -90,6 +91,42 @@ function saveTaToFile(ta: TaCache): void {
   }
   fs.writeFileSync(filePath, JSON.stringify(ta, null, 2), 'utf8');
   console.log('[WSAA] TA guardado en', filePath);
+}
+
+function rememberTa(ta: SharedTa): { token: string; sign: string } {
+  cache = { token: ta.token, sign: ta.sign };
+  cacheExpiry = Date.now() + CACHE_TTL_MS;
+  return cache;
+}
+
+async function persistTa(ta: TaCache): Promise<void> {
+  saveTaToFile(ta);
+  await saveSharedTa(getActiveAfipSession().production, ta);
+}
+
+/** Extrae el cuerpo de un error axios (string, Buffer o view). */
+export function axiosErrorBody(data: unknown): string {
+  if (data == null) return '';
+  if (typeof data === 'string') return data;
+  if (Buffer.isBuffer(data)) return data.toString('utf8');
+  if (data instanceof ArrayBuffer) return Buffer.from(data).toString('utf8');
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('utf8');
+  }
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return String(data);
+  }
+}
+
+export function isAlreadyAuthenticatedFault(body: string): boolean {
+  const n = body.toLowerCase();
+  return (
+    n.includes('alreadyauthenticated') ||
+    n.includes('ya posee un ta valido') ||
+    n.includes('ya posee un ta válido')
+  );
 }
 
 export class WsaaError extends Error {
@@ -268,14 +305,26 @@ export function parseLoginCmsResponse(xml: string): { token: string; sign: strin
 
 /**
  * Obtiene token WSAA para AFIP usando OpenSSL.
- * Cache: primero archivo (ta_wsfe.json), luego memoria.
+ * Cache: archivo local → Firestore (compartido con App Hosting) → memoria → loginCms.
  */
 export async function getAfipToken(): Promise<{ token: string; sign: string }> {
+  const production = getActiveAfipSession().production;
+
   // 1) Caché en archivo (reutiliza TA si aún válido, evita coe.alreadyAuthenticated)
   const fileTa = loadCachedTa();
-  if (fileTa) return fileTa;
+  if (fileTa) {
+    void saveSharedTa(production, fileTa);
+    return rememberTa(fileTa);
+  }
 
-  // 2) Caché en memoria
+  // 2) Caché compartida (App Hosting no ve C:\secure\afip\cache)
+  const remoteTa = await loadSharedTa(production, TA_MARGIN_MS);
+  if (remoteTa) {
+    saveTaToFile(remoteTa);
+    return rememberTa(remoteTa);
+  }
+
+  // 3) Caché en memoria
   if (cache && Date.now() < cacheExpiry) {
     console.log('[WSAA] Usando token en caché (válido por 10 horas)');
     return cache;
@@ -326,36 +375,36 @@ export async function getAfipToken(): Promise<{ token: string; sign: string }> {
     });
   } catch (err) {
     if (axios.isAxiosError(err)) {
-      const responseData = typeof err.response?.data === 'string' ? err.response.data : String(err.response?.data ?? '');
-      const isAlreadyAuth =
-        responseData.includes('coe.alreadyAuthenticated') ||
-        responseData.includes('ya posee un TA valido');
-
-      if (isAlreadyAuth) {
-        // AFIP dice que ya hay un TA válido: intentar usar el archivo aunque esté cerca de vencer
-        const relaxedTa = loadCachedTaRelaxed();
+      const responseData = axiosErrorBody(err.response?.data);
+      if (isAlreadyAuthenticatedFault(responseData)) {
+        const fileRelaxed = loadCachedTaRelaxed();
+        const relaxedTa = fileRelaxed ?? (await loadSharedTa(production, 0));
         if (relaxedTa) {
-          console.log('[WSAA] AFIP reportó alreadyAuthenticated; usando TA desde archivo');
-          return relaxedTa;
+          console.log('[WSAA] AFIP reportó alreadyAuthenticated; reutilizando TA en caché');
+          if (!fileRelaxed) saveTaToFile(relaxedTa);
+          return rememberTa(relaxedTa);
         }
         throw new WsaaError(
-          'AFIP: Ya existe un TA válido para este certificado. Esperá ~12h o eliminá afip/ta_wsfe.json si está corrupto.',
+          'AFIP ya tiene un ticket vigente para este certificado (pedido desde otra máquina). El servidor no lo tiene en caché: hay que compartir el TA o esperar a que venza (~12h).',
           'ALREADY_AUTHENTICATED',
           { response: responseData.slice(0, 500) }
         );
       }
-      console.error('[WSAA] Error de conexión:', err.response?.data);
+      const fault = responseData.match(/<faultstring[^>]*>([^<]*)<\/faultstring>/i)?.[1];
+      console.error('[WSAA] Error de conexión:', fault ?? responseData.slice(0, 300));
       throw new WsaaError(
-        `Error de conexión AFIP: ${err.message}`,
+        fault
+          ? `Error AFIP: ${fault}`
+          : `Error de conexión AFIP: ${err.message}`,
         'CONNECTION_ERROR',
-        { code: err.code, response: responseData.slice(0, 500) }
+        { code: err.code, status: err.response?.status, response: responseData.slice(0, 500) }
       );
     }
     throw err;
   }
 
   console.log('[WSAA] Paso 6: Parseando respuesta...');
-  const data = typeof response.data === 'string' ? response.data : String(response.data);
+  const data = axiosErrorBody(response.data);
   const parsed = parseLoginCmsResponse(data);
 
   const result = { token: parsed.token, sign: parsed.sign };
@@ -365,14 +414,13 @@ export async function getAfipToken(): Promise<{ token: string; sign: string }> {
     parsed.expirationTime ??
     new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString().replace('Z', '-03:00');
 
-  saveTaToFile({
+  const ta: TaCache = {
     token: parsed.token,
     sign: parsed.sign,
     expirationTime,
-  });
-
-  cache = result;
-  cacheExpiry = Date.now() + CACHE_TTL_MS;
+  };
+  await persistTa(ta);
+  rememberTa(ta);
   console.log('[WSAA] Token obtenido y guardado (válido hasta', expirationTime, ')');
 
   return result;
