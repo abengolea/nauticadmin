@@ -23,9 +23,12 @@ type ClientSelectComboboxProps = {
   fullWidth?: boolean;
 };
 
+const MIN_QUERY_CHARS = 2;
+const MAX_RESULTS = 50;
+
 /**
  * Selector de cliente con búsqueda inline (sin Popover).
- * Pensado para funcionar dentro de Dialog sin pelearse con el focus trap.
+ * El texto tipeado vive en `query` siempre: no se borra si se cierra la lista.
  */
 export function ClientSelectCombobox({
   value,
@@ -42,46 +45,62 @@ export function ClientSelectCombobox({
   const [query, setQuery] = React.useState("");
   const rootRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const prevValueRef = React.useRef(value);
 
   const selectedPlayer = players.find((p) => p.id === value);
 
+  React.useEffect(() => {
+    if (prevValueRef.current === value) return;
+    prevValueRef.current = value;
+    if (!value) {
+      if (document.activeElement !== inputRef.current) {
+        setQuery("");
+        setOpen(false);
+      }
+      return;
+    }
+    if (selectedPlayer && document.activeElement !== inputRef.current) {
+      setQuery(selectedPlayer.displayName);
+    }
+  }, [value, selectedPlayer]);
+
+  const normalizedQuery = normalizeString(query);
+  const canSearch = normalizedQuery.length >= MIN_QUERY_CHARS;
+
   const filtered = React.useMemo(() => {
-    const q = normalizeString(query);
-    if (!q) return players;
-    const tokens = q.split(/\s+/).filter(Boolean);
-    return players.filter((p) => {
+    if (!canSearch) return [];
+    const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+    const matches: ClientSelectOption[] = [];
+    for (const p of players) {
       const name = normalizeString(p.displayName);
-      return tokens.every((t) => name.includes(t));
-    });
-  }, [players, query]);
+      if (tokens.every((t) => name.includes(t))) {
+        matches.push(p);
+        if (matches.length >= MAX_RESULTS) break;
+      }
+    }
+    return matches;
+  }, [players, normalizedQuery, canSearch]);
 
   const handleSelect = (playerId: string) => {
+    const player = players.find((p) => p.id === playerId);
     onChange(playerId);
+    setQuery(player?.displayName ?? "");
     setOpen(false);
-    setQuery("");
     inputRef.current?.blur();
   };
 
-  const closeList = React.useCallback(() => {
-    setOpen(false);
-  }, []);
-
   React.useEffect(() => {
     if (!open) return;
-    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       const el = rootRef.current;
       if (!el) return;
       if (e.target instanceof Node && !el.contains(e.target)) {
-        closeList();
+        setOpen(false);
       }
     };
     document.addEventListener("pointerdown", onPointerDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-    };
-  }, [open, closeList]);
-
-  const inputValue = open ? query : selectedPlayer?.displayName ?? "";
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
 
   return (
     <div
@@ -98,35 +117,24 @@ export function ClientSelectCombobox({
           aria-expanded={open}
           aria-autocomplete="list"
           autoComplete="off"
-          placeholder={open || !selectedPlayer ? searchPlaceholder : placeholder}
-          value={inputValue}
-          onClick={() => {
-            if (disabled) return;
-            if (!open) {
-              setQuery("");
-              setOpen(true);
-            }
-          }}
+          placeholder={selectedPlayer ? placeholder : searchPlaceholder}
+          value={query}
           onChange={(e) => {
-            setOpen(true);
             setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onClick={() => {
+            if (!disabled) setOpen(true);
           }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.preventDefault();
               e.stopPropagation();
               setOpen(false);
-              setQuery("");
-              inputRef.current?.blur();
               return;
             }
             if (e.key === "Tab") {
               setOpen(false);
-              return;
-            }
-            if (e.key === "ArrowDown" && !open) {
-              e.preventDefault();
-              setOpen(true);
               return;
             }
             if (e.key === "Enter" && open && filtered.length === 1) {
@@ -136,16 +144,20 @@ export function ClientSelectCombobox({
           }}
           className={cn(
             "pl-8 pr-9",
-            !selectedPlayer && !open && "text-muted-foreground"
+            !query && "text-muted-foreground"
           )}
         />
         <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
       </div>
 
       {open && (
-        <div className="absolute z-50 mt-1 max-h-[min(280px,50vh)] w-full overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-          {filtered.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
+        <div className="absolute z-50 mt-1 max-h-[min(280px,50vh)] w-full overflow-y-auto rounded-md border bg-background text-popover-foreground shadow-md">
+          {!canSearch ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Escribí al menos {MIN_QUERY_CHARS} letras para buscar
+            </p>
+          ) : filtered.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
               Sin resultados
             </p>
           ) : (
@@ -161,7 +173,6 @@ export function ClientSelectCombobox({
                         selected && "bg-accent"
                       )}
                       onMouseDown={(e) => {
-                        // Evita que el input pierda foco antes del click
                         e.preventDefault();
                       }}
                       onClick={() => handleSelect(p.id)}

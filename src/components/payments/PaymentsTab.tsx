@@ -266,7 +266,7 @@ export function PaymentsTab({
 
   const fetchUnpaidForPlayer = useCallback(async () => {
     if (!manualPlayerId || !schoolId) {
-      setUnpaidPeriods([]);
+      setUnpaidPeriods((prev) => (prev.length === 0 ? prev : []));
       return;
     }
     setUnpaidLoading(true);
@@ -861,11 +861,12 @@ export function PaymentsTab({
       >
         <DialogContent
           className="overflow-visible sm:max-w-lg"
-          onOpenAutoFocus={(e) => {
-            e.preventDefault();
-            requestAnimationFrame(() => {
-              document.getElementById("manual-player")?.focus();
-            });
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.('[role="listbox"], [role="listbox"] *')) {
+              e.preventDefault();
+            }
           }}
         >
           <DialogHeader>
