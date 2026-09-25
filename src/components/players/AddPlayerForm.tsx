@@ -708,9 +708,11 @@ export function AddPlayerForm() {
                             <FormItem>
                                 <FormLabel>CUIT (facturación electrónica)</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Ej: 20-12345678-9" {...field} />
+                                    <Input placeholder="Ej: 30-71460552-2" {...field} />
                                 </FormControl>
-                                <FormDescription>CUIT del cliente para facturación AFIP.</FormDescription>
+                                <FormDescription>
+                                    Opcional para consumidor final con DNI. Obligatorio si es responsable inscripto o monotributista.
+                                </FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}

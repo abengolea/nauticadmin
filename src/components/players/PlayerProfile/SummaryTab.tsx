@@ -66,6 +66,12 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                                     <TableCell className="text-right">{player.dni}</TableCell>
                                 </TableRow>
                             )}
+                            {player.cuit && (
+                                <TableRow>
+                                    <TableCell className="font-medium text-muted-foreground">CUIT</TableCell>
+                                    <TableCell className="text-right">{player.cuit}</TableCell>
+                                </TableRow>
+                            )}
                             {player.email && (
                                 <TableRow>
                                     <TableCell className="font-medium text-muted-foreground">Email (acceso al panel)</TableCell>

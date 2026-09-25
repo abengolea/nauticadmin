@@ -78,6 +78,7 @@ const playerSchema = z.object({
   requiereFactura: z.boolean().optional(),
   personasAutorizadas: z.string().optional(),
   usuarioId: z.string().optional(),
+  cuit: z.string().optional(),
   condicionIVA: z.string().optional(),
   documentacion: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
 });
@@ -130,6 +131,7 @@ export function EditPlayerDialog({
       requiereFactura: player.requiereFactura !== false,
       personasAutorizadas: Array.isArray(player.personasAutorizadas) ? player.personasAutorizadas.join(", ") : (player.personasAutorizadas as string) ?? "",
       usuarioId: player.usuarioId ?? "",
+      cuit: player.cuit ?? "",
       condicionIVA: (player as { condicionIVA?: string }).condicionIVA ?? "Consumidor Final",
       documentacion: (player as { documentacion?: string }).documentacion ?? "",
     },
@@ -185,6 +187,7 @@ export function EditPlayerDialog({
         requiereFactura: player.requiereFactura !== false,
         personasAutorizadas: Array.isArray(player.personasAutorizadas) ? player.personasAutorizadas.join(", ") : (player.personasAutorizadas as string) ?? "",
         usuarioId: player.usuarioId ?? "",
+        cuit: player.cuit ?? "",
         condicionIVA: (player as { condicionIVA?: string }).condicionIVA ?? "Consumidor Final",
         documentacion: (player as { documentacion?: string }).documentacion ?? "",
       });
@@ -232,6 +235,7 @@ export function EditPlayerDialog({
       requiereFactura: values.requiereFactura ?? true,
       personasAutorizadas: personasArr ?? null,
       usuarioId: values.usuarioId?.trim() || null,
+      cuit: values.cuit?.trim() || null,
       condicionIVA: values.condicionIVA?.trim() || null,
       documentacion: values.documentacion?.trim() || null,
     };
@@ -378,10 +382,13 @@ export function EditPlayerDialog({
                     name="dni"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>DNI (Opcional)</FormLabel>
+                        <FormLabel>DNI (facturación)</FormLabel>
                         <FormControl>
-                          <Input placeholder="40.123.456" {...field} />
+                          <Input placeholder="Ej: 18350968" {...field} />
                         </FormControl>
+                        <FormDescription>
+                          Para consumidor final alcanza con el DNI. Completá CUIT solo si el cliente es responsable inscripto o monotributista.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -718,6 +725,22 @@ export function EditPlayerDialog({
                       )}
                     />
                   )}
+                  <FormField
+                    control={form.control}
+                    name="cuit"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CUIT (facturación electrónica)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ej: 30-71460552-2" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Opcional para consumidor final con DNI. Obligatorio si es responsable inscripto o monotributista.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="condicionIVA"
