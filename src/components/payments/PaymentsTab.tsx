@@ -204,7 +204,8 @@ export function PaymentsTab({
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [facturando, setFacturando] = useState(false);
-  const [modoSimulacion, setModoSimulacion] = useState(true);
+  const [modoSimulacion, setModoSimulacion] = useState(false);
+  const [cancelaUsd, setCancelaUsd] = useState(false);
   const [enviarPorEmail, setEnviarPorEmail] = useState(false);
   const { toast } = useToast();
 
@@ -345,6 +346,7 @@ export function PaymentsTab({
           paymentIds: Array.from(selectedIds),
           simulation: modoSimulacion,
           sendEmail: enviarPorEmail,
+          cancelaMismaMonedaExtranjera: cancelaUsd,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -395,8 +397,27 @@ export function PaymentsTab({
                 const t = await getToken();
                 if (!t) return;
                 for (const fn of filenames) {
-                  const r = await fetch(`/api/facturas/${fn}`, { headers: { Authorization: `Bearer ${t}` } });
+                  const r = await fetch(`/api/facturas/${encodeURIComponent(fn)}`, {
+                    headers: { Authorization: `Bearer ${t}` },
+                  });
+                  if (!r.ok) {
+                    const err = await r.json().catch(() => ({}));
+                    toast({
+                      variant: "destructive",
+                      title: `No se pudo descargar ${fn}`,
+                      description: (err as { error?: string }).error ?? r.statusText,
+                    });
+                    continue;
+                  }
                   const blob = await r.blob();
+                  if (!blob.type.includes("pdf") && blob.size < 500) {
+                    toast({
+                      variant: "destructive",
+                      title: `Archivo inválido: ${fn}`,
+                      description: "El servidor no devolvió un PDF válido.",
+                    });
+                    continue;
+                  }
                   const a = document.createElement("a");
                   a.href = URL.createObjectURL(blob);
                   a.download = fn;
@@ -693,12 +714,21 @@ export function PaymentsTab({
                 Emisor: {facturacionRazonSocial}
               </span>
             )}
-            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+            <label
+              className={`flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap rounded-md px-2 py-1 ${modoSimulacion ? "bg-amber-100 dark:bg-amber-900/30" : "bg-emerald-50 dark:bg-emerald-900/20"}`}
+              title={modoSimulacion ? "No se envía a ARCA" : "Emisión real contra ARCA"}
+            >
               <Checkbox
                 checked={modoSimulacion}
                 onCheckedChange={(c) => setModoSimulacion(c === true)}
               />
-              <span className="text-muted-foreground text-xs sm:text-sm">Simulación</span>
+              <span className={`text-xs sm:text-sm font-medium ${modoSimulacion ? "text-amber-800 dark:text-amber-300" : "text-emerald-800 dark:text-emerald-300"}`}>
+                {modoSimulacion ? "Simulación (sin CAE)" : "ARCA real"}
+              </span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap" title="USD cancelado en la misma moneda (CanMisMonExt)">
+              <Checkbox checked={cancelaUsd} onCheckedChange={(c) => setCancelaUsd(c === true)} />
+              <span className="text-muted-foreground text-xs sm:text-sm">USD pagado en USD</span>
             </label>
             <label
               className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap"

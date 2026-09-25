@@ -7,7 +7,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PDFDocument, rgb, StandardFonts, type PDFFont } from 'pdf-lib';
 import QRCode from 'qrcode';
-import type { FacturaPdfDatos } from '@/lib/factura-pdf';
+import type { AuthorizedInvoiceData } from '@/lib/fiscal/authorized-invoice';
+import { buildAfipQrUrl } from '@/lib/fiscal/qr';
+import { DOC_TIPO } from '@/lib/fiscal/constants';
 import type { SchoolFacturacion } from '@/lib/school-facturacion';
 import { formatCuitDisplay } from '@/lib/school-facturacion';
 import { getFacturasDir } from '@/lib/afip/credentials';
@@ -114,12 +116,12 @@ export async function loadTemplateAssets(
 }
 
 export async function generarFacturaConPlantilla(params: {
-  datos: FacturaPdfDatos;
+  authorized: AuthorizedInvoiceData;
   facturacion: SchoolFacturacion;
-  template: TemplateFactura;
+  template?: TemplateFactura;
   logoBytes?: Buffer;
 }): Promise<string> {
-  const { datos, facturacion, logoBytes } = params;
+  const { authorized: datos, facturacion, logoBytes } = params;
 
   const PW = 595, PH = 842; // A4 en puntos
   const ML = 15, MR = 15;
@@ -133,14 +135,14 @@ export async function generarFacturaConPlantilla(params: {
   // Fondo blanco
   page.drawRectangle({ x: 0, y: 0, width: PW, height: PH, color: rgb(1, 1, 1) });
 
-  const letra = facturaLetra(datos.tipoComprobante);
+  const letra = datos.voucherClass;
   const ptoStr = String(datos.puntoVenta).padStart(4, '0');
   const nroStr = String(datos.numero).padStart(8, '0');
   const fechaAr = formatFechaAr(datos.fecha);
-  const cuitEmisor = formatCuitDisplay(facturacion.cuit ?? datos.emisor.cuit);
-  const condIVA = (facturacion.condicionIVA ?? 'Resp.Inscripto')
+  const cuitEmisor = formatCuitDisplay(facturacion.cuit ?? datos.emisorCuit);
+  const condIVA = (facturacion.condicionIVA ?? datos.emisorCondicionIVA ?? 'Resp.Inscripto')
     .replace('Responsable Inscripto', 'Resp.Inscripto');
-  const tipoDoc = datos.tipoDocReceptor ?? 80;
+  const tipoDoc = datos.docTipoReceptor;
 
   // ── Helpers de coordenadas ──────────────────────────────────────────────
   // pdf-lib: y=0 en la BASE de la página, crece hacia arriba.
@@ -273,15 +275,15 @@ export async function generarFacturaConPlantilla(params: {
   vLine(E_VSEP, E_TOP, E_BOT);
 
   const maxEL = E_VSEP - ML - 6;
-  txt(fit(facturacion.razonSocial ?? datos.emisor.razonSocial, maxEL, 10, fontBold), ML + 3, E_TOP + 14, 10, fontBold);
-  txt(fit(facturacion.domicilio ?? datos.emisor.domicilio ?? '', maxEL, 8, font), ML + 3, E_TOP + 27, 8);
+  txt(fit(facturacion.razonSocial ?? datos.emisorRazonSocial, maxEL, 10, fontBold), ML + 3, E_TOP + 14, 10, fontBold);
+  txt(fit(facturacion.domicilio ?? datos.emisorDomicilio ?? '', maxEL, 8, font), ML + 3, E_TOP + 27, 8);
   txt(facturacion.telefono ?? '', ML + 3, E_TOP + 38, 8);
   txt(facturacion.email ?? '', ML + 3, E_TOP + 49, 8);
 
   txt(`Cuit:${cuitEmisor} - ${condIVA}`, E_VSEP + 5, E_TOP + 14, 8);
   txt(`Ing.Brutos: ${facturacion.ingBrutos ?? ''}`, E_VSEP + 5, E_TOP + 27, 8);
   txt(`Inicio Actividades: ${facturacion.inicioActividades ?? ''}`, E_VSEP + 5, E_TOP + 38, 8);
-  txt(`(FACTURA ELECTRONICA CAE: ${datos.CAE})`, E_VSEP + 5, E_TOP + 50, 7);
+  txt(`(FACTURA ELECTRONICA CAE: ${datos.cae})`, E_VSEP + 5, E_TOP + 50, 7);
 
   // ══════════════════════════════════════════════════════════════════════════
   // SECCIÓN 3: CLIENTE (y=200..282, recuadro)
@@ -292,20 +294,20 @@ export async function generarFacturaConPlantilla(params: {
   vLine(C_VSEP, C_TOP, C_BOT);
 
   let docStr: string;
-  if (tipoDoc === 80) {
-    docStr = `Resp.Inscripto - C.U.I.T.: ${formatCuitDisplay(datos.receptor.cuit)}`;
-  } else if (tipoDoc === 96) {
-    docStr = `Consumidor Final - D.N.I.: ${datos.receptor.cuit}`;
+  if (tipoDoc === DOC_TIPO.CUIT) {
+    docStr = `${datos.condicionIVAReceptorLabel} - C.U.I.T.: ${datos.docDisplayReceptor}`;
+  } else if (tipoDoc === DOC_TIPO.DNI) {
+    docStr = `${datos.condicionIVAReceptorLabel} - D.N.I.: ${datos.docDisplayReceptor}`;
   } else {
-    docStr = 'Consumidor Final';
+    docStr = datos.condicionIVAReceptorLabel;
   }
 
-  const clientName = datos.receptor.razonSocial.startsWith('-')
-    ? datos.receptor.razonSocial.slice(1)
-    : datos.receptor.razonSocial;
+  const clientName = datos.receptorRazonSocial.startsWith('-')
+    ? datos.receptorRazonSocial.slice(1)
+    : datos.receptorRazonSocial;
   const cliW = C_VSEP - ML - 8;
   txt(fit(clientName, cliW, 9, fontBold), ML + 5, C_TOP + 13, 9, fontBold);
-  const dom = datos.receptor.domicilio && datos.receptor.domicilio !== '-' ? datos.receptor.domicilio : '';
+  const dom = datos.receptorDomicilio && datos.receptorDomicilio !== '-' ? datos.receptorDomicilio : '';
   if (dom) txt(fit(dom, cliW, 8, font), ML + 5, C_TOP + 25, 8);
   txt(docStr, ML + 5, C_TOP + (dom ? 37 : 25), 8);
 
@@ -346,7 +348,15 @@ export async function generarFacturaConPlantilla(params: {
 
   // Filas de datos
   let rowY = TH_BOT;
-  for (const item of datos.items) {
+  const items = [
+    {
+      descripcion: datos.conceptoDescripcion,
+      cantidad: 1,
+      precioUnitario: datos.amounts.impNeto,
+      importe: datos.amounts.impNeto,
+    },
+  ];
+  for (const item of items) {
     const rowBot = rowY + ROW_H;
     hLine(rowBot, ML, PW - MR);
     [C2X, C3X, C4X, C5X].forEach(x => vLine(x, rowY, rowBot));
@@ -368,8 +378,12 @@ export async function generarFacturaConPlantilla(params: {
   const TOT_TOP = T_BOT, TOT_BOT = TOT_TOP + 22;
   box(ML, TOT_TOP, CW, TOT_BOT - TOT_TOP);
   // Baseline alineada: sz=9 usa TOT_TOP+7 → baseline en TOT_TOP+16; sz=14 usa TOT_TOP+2 → idem
-  txt('TOTAL $ (Pesos)', ML + 5, TOT_TOP + 7, 9, fontBold);
-  txtR(formatMoneyAr(datos.total), PW - MR - 3, TOT_TOP + 2, 14, fontBold);
+  const monedaLabel = datos.monedaAfip === 'DOL' ? 'USD' : 'Pesos';
+  txt(`TOTAL (${monedaLabel})`, ML + 5, TOT_TOP + 7, 9, fontBold);
+  txtR(formatMoneyAr(datos.amounts.impTotal), PW - MR - 3, TOT_TOP + 2, 14, fontBold);
+  if (datos.monedaAfip !== 'PES') {
+    txt(`Cotización: ${datos.cotizacionAfip}`, ML + 5, TOT_TOP + 18, 8);
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // SECCIÓN 6: PAGADO (y=732..746)
@@ -380,7 +394,7 @@ export async function generarFacturaConPlantilla(params: {
     // sz=8 en 14pt: usar PAG_TOP+2 → baseline en PAG_TOP+10 (texto de PAG_TOP+4 a PAG_TOP+12)
     txt('SIMULACIÓN – NO VÁLIDO COMO COMPROBANTE', ML + 5, PAG_TOP + 2, 8, fontBold, rgb(0.7, 0.2, 0));
   } else {
-    txt(`Pagado: Total $ ${formatMoneyAr(datos.total)}`, ML + 5, PAG_TOP + 2, 8);
+    txt(`Pagado: Total ${formatMoneyAr(datos.amounts.impTotal)}`, ML + 5, PAG_TOP + 2, 8);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -402,25 +416,7 @@ export async function generarFacturaConPlantilla(params: {
 
   // QR AFIP
   try {
-    const cuitENum = datos.emisor.cuit.replace(/\D/g, '');
-    const cuitRNum = datos.receptor.cuit.replace(/\D/g, '');
-    const tipoCmpMap: Record<'A' | 'B' | 'C', number> = { A: 1, B: 6, C: 11 };
-    const qrPayload = {
-      ver: 1,
-      fecha: datos.fecha,
-      cuit: parseInt(cuitENum, 10),
-      ptoVta: datos.puntoVenta,
-      tipoCmp: tipoCmpMap[letra],
-      nroCmp: datos.numero,
-      importe: datos.total,
-      moneda: 'PES',
-      ctz: 1,
-      tipoDocRec: tipoDoc,
-      nroDocRec: parseInt(cuitRNum, 10) || 0,
-      tipoCodAut: 'E',
-      codAut: /^\d+$/.test(datos.CAE) ? datos.CAE : '0',
-    };
-    const qrUrl = `https://www.afip.gob.ar/fe/qr/?p=${Buffer.from(JSON.stringify(qrPayload)).toString('base64')}`;
+    const qrUrl = buildAfipQrUrl(datos);
     const qrPng = await QRCode.toBuffer(qrUrl, { width: 120, margin: 0 });
     const qrImg = await pdfDoc.embedPng(qrPng);
     page.drawImage(qrImg, { x: QR_X, y: bY(QR_Y_TOP, QR_SIZE), width: QR_SIZE, height: QR_SIZE });
@@ -435,8 +431,8 @@ export async function generarFacturaConPlantilla(params: {
   txt(cmpL2, cmptCenterX - fontBold.widthOfTextAtSize(cmpL2, 7.5) / 2, FTR_TOP + 38, 7.5, fontBold);
 
   // CAE y Vto a la derecha
-  txtR(`AFIP CAE: ${datos.CAE}`, PW - MR - 5, FTR_TOP + 28, 7.5, fontBold);
-  txtR(`Vto CAE: ${formatFechaAr(datos.CAEFchVto)}`, PW - MR - 5, FTR_TOP + 40, 7.5);
+  txtR(`AFIP CAE: ${datos.cae}`, PW - MR - 5, FTR_TOP + 28, 7.5, fontBold);
+  txtR(`Vto CAE: ${formatFechaAr(datos.caeFchVto)}`, PW - MR - 5, FTR_TOP + 40, 7.5);
 
   // ── GUARDAR ──────────────────────────────────────────────────────────────
   const outDir = facturasDir();

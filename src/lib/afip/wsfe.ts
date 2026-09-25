@@ -1,17 +1,17 @@
 /**
- * WSFE - Web Service de Facturación Electrónica (AFIP)
- * Llamadas SOAP directas a AFIP, sin dependencias externas.
- * Usa getAfipToken() de wsaa.ts para autenticación.
+ * WSFE - Web Service de Facturación Electrónica (ARCA)
+ * Manual referencia: WSFEv1 RG 4291 FE v4.8 (Sep 2026)
+ * @see https://www.arca.gob.ar/fe/ayuda/documentos/wsfev1-RG-4291.pdf
  */
-import './tls-patch'; // primer import (parche DH para AFIP prod)
+import './tls-patch';
 
 import https from 'https';
 import { constants } from 'crypto';
 import axios from 'axios';
 import { getAfipToken } from './wsaa';
 import { getActiveAfipSession } from './session';
+import { sanitizeFiscalXml } from '@/lib/fiscal/sanitize';
 
-/** Agente HTTPS para AFIP producción (usa OPENSSL_CONF=./openssl.cnf con SECLEVEL=0) */
 const afipAgent = new https.Agent({
   minVersion: 'TLSv1',
   secureOptions: constants.SSL_OP_LEGACY_SERVER_CONNECT,
@@ -22,20 +22,10 @@ const WSFE_URL_PROD = 'https://servicios1.afip.gov.ar/wsfev1/service.asmx';
 const NS = 'http://ar.gov.afip.dif.FEV1/';
 
 function getWsfeUrl(): string {
-  const production = getActiveAfipSession().production;
-  return production ? WSFE_URL_PROD : WSFE_URL_HOMO;
+  return getActiveAfipSession().production ? WSFE_URL_PROD : WSFE_URL_HOMO;
 }
 
-/** Formato fecha AFIP: yyyymmdd */
-function toAfipDate(d: Date): number {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return parseInt(`${y}${m}${day}`, 10);
-}
-
-/** Formato fecha AFIP a yyyy-mm-dd */
-function formatDate(afipDate: string | number): string {
+export function formatAfipDateIso(afipDate: string | number): string {
   const s = String(afipDate);
   const m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
   return m ? `${m[1]}-${m[2]}-${m[3]}` : s;
@@ -50,9 +40,6 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
-/**
- * Construye el cuerpo SOAP 1.2 para una operación WSFE
- */
 function buildSoapBody(operation: string, content: string): string {
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
@@ -64,30 +51,38 @@ function buildSoapBody(operation: string, content: string): string {
 </soap12:Envelope>`;
 }
 
-/**
- * Extrae el resultado de la respuesta SOAP
- */
-function parseSoapResponse<T>(xml: string, resultTag: string): T {
+function parseSoapResponse(xml: string, resultTag: string): string {
   const data = typeof xml === 'string' ? xml : String(xml);
-
-  // SOAP Fault
   const faultMatch = data.match(/<faultstring[^>]*>([^<]*)<\/faultstring>/i);
   if (faultMatch) {
     throw new Error(`AFIP SOAP: ${faultMatch[1].trim()}`);
   }
-
-  // Resultado (soporta namespace en closing tag, ej: </ns1:FECAESolicitarResult>)
   const match = data.match(new RegExp(`<${resultTag}[^>]*>([\\s\\S]*?)</[^:>]*:?${resultTag}>`));
   if (!match) {
     throw new Error('AFIP SOAP: Respuesta inválida - no se encontró resultado');
   }
-  return match[1] as unknown as T;
+  return match[1];
 }
 
-/**
- * Ejecuta una operación SOAP en WSFE
- */
-async function executeSoap<T>(operation: string, content: string): Promise<string> {
+function parseErrObsBlocks(xml: string): {
+  errores: Array<{ code: number; msg: string }>;
+  observaciones: Array<{ code: number; msg: string }>;
+} {
+  const errores: Array<{ code: number; msg: string }> = [];
+  const observaciones: Array<{ code: number; msg: string }> = [];
+  const errRegex = /<Err>[\s\S]*?<Code>(\d+)<\/Code>[\s\S]*?<Msg>([^<]*)<\/Msg>[\s\S]*?<\/Err>/g;
+  const obsRegex = /<Obs>[\s\S]*?<Code>(\d+)<\/Code>[\s\S]*?<Msg>([^<]*)<\/Msg>[\s\S]*?<\/Obs>/g;
+  let m;
+  while ((m = errRegex.exec(xml)) !== null) {
+    errores.push({ code: parseInt(m[1], 10), msg: m[2].trim() });
+  }
+  while ((m = obsRegex.exec(xml)) !== null) {
+    observaciones.push({ code: parseInt(m[1], 10), msg: m[2].trim() });
+  }
+  return { errores, observaciones };
+}
+
+async function executeSoap(operation: string, content: string): Promise<string> {
   const { token, sign } = await getAfipToken();
   const cuit = getActiveAfipSession().cuit;
   if (!cuit) throw new Error('CUIT emisor AFIP no configurado');
@@ -99,77 +94,126 @@ async function executeSoap<T>(operation: string, content: string): Promise<strin
         <Cuit>${cuit}</Cuit>
       </Auth>`;
 
-  const fullContent = authBlock + '\n' + content;
-  const body = buildSoapBody(operation, fullContent);
-
-  const url = getWsfeUrl();
+  const body = buildSoapBody(operation, authBlock + '\n' + content);
   const isProduction = getActiveAfipSession().production;
-  const response = await axios.post(url, body, {
-    headers: {
-      'Content-Type': 'application/soap+xml; charset=utf-8',
-    },
+
+  const response = await axios.post(getWsfeUrl(), body, {
+    headers: { 'Content-Type': 'application/soap+xml; charset=utf-8' },
     timeout: 30000,
     httpsAgent: isProduction ? afipAgent : undefined,
   });
 
   const responseData = typeof response.data === 'string' ? response.data : String(response.data);
-  const resultTag = operation + 'Result';
-  return parseSoapResponse<string>(responseData, resultTag);
+  return parseSoapResponse(responseData, operation + 'Result');
 }
 
-/**
- * Obtiene las condiciones IVA del receptor (para Factura B)
- */
-export async function getCondicionIvaReceptor(claseCmp?: string): Promise<Array<{ Id: number; Desc: string }>> {
+export interface CondicionIvaReceptorRow {
+  Id: number;
+  Desc: string;
+  Cmp_Clase?: string;
+}
+
+export async function getCondicionIvaReceptor(claseCmp?: string): Promise<CondicionIvaReceptorRow[]> {
   const content = claseCmp ? `<ClaseCmp>${escapeXml(claseCmp)}</ClaseCmp>` : '';
   const resultXml = await executeSoap('FEParamGetCondicionIvaReceptor', content);
-  const items: Array<{ Id: number; Desc: string }> = [];
-  const regex = /<CondicionIvaReceptor>[\s\S]*?<Id>(\d+)<\/Id>[\s\S]*?<Desc>([^<]*)<\/Desc>/g;
+  const items: CondicionIvaReceptorRow[] = [];
+  const regex =
+    /<CondicionIvaReceptor>[\s\S]*?<Id>(\d+)<\/Id>[\s\S]*?<Desc>([^<]*)<\/Desc>(?:[\s\S]*?<Cmp_Clase>([^<]*)<\/Cmp_Clase>)?/g;
   let m;
   while ((m = regex.exec(resultXml)) !== null) {
-    items.push({ Id: parseInt(m[1], 10), Desc: m[2] });
+    items.push({ Id: parseInt(m[1], 10), Desc: m[2], Cmp_Clase: m[3] });
   }
   return items;
 }
 
-/**
- * Obtiene el último comprobante autorizado
- */
+export async function getCotizacion(monId: string, monFecha?: string): Promise<number> {
+  const fechaBlock = monFecha ? `<FchCotiz>${escapeXml(monFecha)}</FchCotiz>` : '';
+  const content = `<MonId>${escapeXml(monId)}</MonId>${fechaBlock}`;
+  const resultXml = await executeSoap('FEParamGetCotizacion', content);
+  const errMatch = resultXml.match(/<Errors>[\s\S]*?<Err><Code>(\d+)<\/Code><Msg>([^<]*)<\/Msg><\/Err>/);
+  if (errMatch) {
+    throw new Error(`AFIP cotización (${errMatch[1]}): ${errMatch[2]}`);
+  }
+  const cotMatch = resultXml.match(/<MonCotiz>([\d.]+)<\/MonCotiz>/);
+  if (!cotMatch) {
+    throw new Error(`AFIP: No se obtuvo cotización para ${monId}`);
+  }
+  return parseFloat(cotMatch[1]);
+}
+
 export async function getLastVoucher(ptoVta: number, cbteTipo: number): Promise<number> {
   const content = `
       <PtoVta>${ptoVta}</PtoVta>
       <CbteTipo>${cbteTipo}</CbteTipo>`;
-
   const resultXml = await executeSoap('FECompUltimoAutorizado', content);
-
   const cbteNroMatch = resultXml.match(/<CbteNro>(\d+)<\/CbteNro>/);
   if (!cbteNroMatch) {
-    const errMatch = resultXml.match(/<Err><Code>(\d+)<\/Code><Msg>([^<]*)<\/Msg><\/Err>/);
-    if (errMatch) {
-      throw new Error(`AFIP (${errMatch[1]}): ${errMatch[2]}`);
-    }
+    const { errores } = parseErrObsBlocks(resultXml);
+    if (errores[0]) throw new Error(`AFIP (${errores[0].code}): ${errores[0].msg}`);
     throw new Error('AFIP: No se obtuvo CbteNro en FECompUltimoAutorizado');
   }
-
   return parseInt(cbteNroMatch[1], 10);
 }
 
-/** Alicuota IVA: Id 5 = 21%, Id 4 = 10.5%, Id 6 = 27% */
+export interface ConsultVoucherResult {
+  resultado: string;
+  cae: string;
+  caeFchVto: string;
+  observaciones: Array<{ code: number; msg: string }>;
+  errores: Array<{ code: number; msg: string }>;
+}
+
+/** FECompConsultar — idempotencia post-timeout. */
+export async function consultVoucher(
+  ptoVta: number,
+  cbteTipo: number,
+  cbteNro: number
+): Promise<ConsultVoucherResult | null> {
+  const content = `
+      <FeCompConsReq>
+        <CbteTipo>${cbteTipo}</CbteTipo>
+        <CbteNro>${cbteNro}</CbteNro>
+        <PtoVta>${ptoVta}</PtoVta>
+      </FeCompConsReq>`;
+
+  try {
+    const resultXml = await executeSoap('FECompConsultar', content);
+    const resultado = resultXml.match(/<Resultado>([^<]*)<\/Resultado>/)?.[1]?.trim() ?? '';
+    const cae = resultXml.match(/<CodAutorizacion>([^<]+)<\/CodAutorizacion>/)?.[1]?.trim()
+      ?? resultXml.match(/<CAE>([^<]+)<\/CAE>/)?.[1]?.trim()
+      ?? '';
+    const caeVtoRaw = resultXml.match(/<FchVto>([^<]+)<\/FchVto>/)?.[1]?.trim()
+      ?? resultXml.match(/<CAEFchVto>([^<]+)<\/CAEFchVto>/)?.[1]?.trim()
+      ?? '';
+    const { errores, observaciones } = parseErrObsBlocks(resultXml);
+
+    if (!resultado && !cae && errores.length === 0) return null;
+
+    return {
+      resultado,
+      cae,
+      caeFchVto: formatAfipDateIso(caeVtoRaw),
+      observaciones,
+      errores,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface AlicIva {
   Id: number;
   BaseImp: number;
   Importe: number;
 }
 
-/** Condición IVA receptor: 5=Consumidor Final, 1=Responsable Inscripto, 6=Monotributista, etc. */
 export interface CreateVoucherParams {
   PtoVta: number;
   CbteTipo: number;
   Concepto: number;
   DocTipo: number;
   DocNro: number;
-  /** Condición frente al IVA del receptor (RG 5616). 5=Consumidor Final, 1=RI, 6=Monotributo */
-  CondIVAReceptor?: number;
+  CondIVAReceptor: number;
   CbteDesde: number;
   CbteHasta: number;
   CbteFch: number;
@@ -181,20 +225,24 @@ export interface CreateVoucherParams {
   ImpTrib: number;
   MonId: string;
   MonCotiz: number;
+  CanMisMonExt?: 'S' | 'N';
   FchServDesde?: number;
   FchServHasta?: number;
   FchVtoPago?: number;
-  /** Para Factura B/C con IVA: alícuotas (ej. Id 5 = 21%) */
   Iva?: AlicIva[];
 }
 
-/**
- * Solicita CAE para un comprobante (FECAESolicitar)
- */
-export async function createVoucher(params: CreateVoucherParams): Promise<{ CAE: string; CAEFchVto: string }> {
-  const cantReg = params.CbteHasta - params.CbteDesde + 1;
+export interface VoucherEmitResult {
+  resultado: string;
+  cae: string;
+  caeFchVto: string;
+  observaciones: Array<{ code: number; msg: string }>;
+  errores: Array<{ code: number; msg: string }>;
+  requestSanitized?: string;
+  responseSanitized?: string;
+}
 
-  // Para Concepto 2 (Servicios) y 3, AFIP requiere FchServDesde y FchServHasta
+export function buildFecaDetRequestXml(params: CreateVoucherParams): string {
   const fecha = params.CbteFch;
   const fchServDesde = params.FchServDesde ?? fecha;
   const fchServHasta = params.FchServHasta ?? fecha;
@@ -208,8 +256,11 @@ export async function createVoucher(params: CreateVoucherParams): Promise<{ CAE:
           </Iva>`
       : '';
 
-  const condIvaReceptor = params.CondIVAReceptor ?? 5; // 5 = Consumidor Final (RG 5616)
-  const det = `
+  const canMisMonExtBlock = params.CanMisMonExt
+    ? `\n          <CanMisMonExt>${params.CanMisMonExt}</CanMisMonExt>`
+    : '';
+
+  return `
         <FECAEDetRequest>
           <Concepto>${params.Concepto}</Concepto>
           <DocTipo>${params.DocTipo}</DocTipo>
@@ -224,12 +275,58 @@ export async function createVoucher(params: CreateVoucherParams): Promise<{ CAE:
           <ImpIVA>${params.ImpIVA}</ImpIVA>
           <ImpTrib>${params.ImpTrib}</ImpTrib>
           <MonId>${params.MonId}</MonId>
-          <MonCotiz>${params.MonCotiz}</MonCotiz>
+          <MonCotiz>${params.MonCotiz}</MonCotiz>${canMisMonExtBlock}
+          <CondicionIVAReceptorId>${params.CondIVAReceptor}</CondicionIVAReceptorId>
           <FchServDesde>${fchServDesde}</FchServDesde>
           <FchServHasta>${fchServHasta}</FchServHasta>
-          <FchVtoPago>${fchVtoPago}</FchVtoPago>
-          <CondicionIVAReceptorId>${condIvaReceptor}</CondicionIVAReceptorId>${ivaBlock}
+          <FchVtoPago>${fchVtoPago}</FchVtoPago>${ivaBlock}
         </FECAEDetRequest>`;
+}
+
+/** Parsea respuesta FECAESolicitar — usable en tests sin llamar a ARCA. */
+export function parseFecaSolicitarResponse(
+  resultXml: string,
+  requestSanitized?: string
+): VoucherEmitResult {
+  const responseSanitized = sanitizeFiscalXml(resultXml);
+  const { errores, observaciones } = parseErrObsBlocks(resultXml);
+
+  const cabResultado = resultXml.match(/<FeCabResp>[\s\S]*?<Resultado>([^<]*)<\/Resultado>/)?.[1]?.trim();
+  const detResultado = resultXml.match(/<FECAEDetResponse>[\s\S]*?<Resultado>([^<]*)<\/Resultado>/)?.[1]?.trim()
+    ?? resultXml.match(/<Resultado>([^<]*)<\/Resultado>/)?.[1]?.trim()
+    ?? '';
+  const resultado = detResultado || cabResultado || '';
+
+  const cae = resultXml.match(/<CAE>([^<]+)<\/CAE>/)?.[1]?.trim() ?? '';
+  const caeVto = resultXml.match(/<CAEFchVto>([^<]+)<\/CAEFchVto>/)?.[1]?.trim() ?? '';
+
+  if (errores.length > 0 && !cae) {
+    throw new Error(`AFIP (${errores[0]!.code}): ${errores[0]!.msg}`);
+  }
+
+  if (!cae && resultado.toUpperCase() !== 'A') {
+    const obsMsg = observaciones.map((o) => `${o.code}: ${o.msg}`).join('; ');
+    throw new Error(
+      obsMsg
+        ? `AFIP rechazó (${resultado}): ${obsMsg}`
+        : `AFIP: No se obtuvo CAE (Resultado=${resultado || '?'})`
+    );
+  }
+
+  return {
+    resultado: resultado || (cae ? 'A' : 'R'),
+    cae,
+    caeFchVto: formatAfipDateIso(caeVto),
+    observaciones,
+    errores,
+    requestSanitized,
+    responseSanitized,
+  };
+}
+
+export async function createVoucher(params: CreateVoucherParams): Promise<VoucherEmitResult> {
+  const cantReg = params.CbteHasta - params.CbteDesde + 1;
+  const det = buildFecaDetRequestXml(params);
 
   const content = `
       <FeCAEReq>
@@ -243,55 +340,17 @@ export async function createVoucher(params: CreateVoucherParams): Promise<{ CAE:
         </FeDetReq>
       </FeCAEReq>`;
 
+  const requestSanitized = sanitizeFiscalXml(content);
   const resultXml = await executeSoap('FECAESolicitar', content);
-
-  // Verificar errores en Errors
-  const errMatch = resultXml.match(/<Errors>[\s\S]*?<Err><Code>(\d+)<\/Code><Msg>([^<]*)<\/Msg><\/Err>/);
-  if (errMatch) {
-    throw new Error(`AFIP (${errMatch[1]}): ${errMatch[2]}`);
-  }
-
-  // Verificar Observaciones (cuando Resultado=R, el CAE no viene)
-  const obsMatch = resultXml.match(/<Observaciones>[\s\S]*?<Obs><Code>(\d+)<\/Code><Msg>([^<]*)<\/Msg><\/Obs>/);
-  if (obsMatch) {
-    throw new Error(`AFIP (${obsMatch[1]}): ${obsMatch[2]}`);
-  }
-
-  const caeMatch = resultXml.match(/<CAE>([^<]+)<\/CAE>/);
-  const caeVtoMatch = resultXml.match(/<CAEFchVto>([^<]+)<\/CAEFchVto>/);
-
-  if (!caeMatch || !caeVtoMatch) {
-    const errDetail = resultXml.match(/<Err><Code>(\d+)<\/Code><Msg>([^<]*)<\/Msg><\/Err>/);
-    const msg = errDetail ? `AFIP (${errDetail[1]}): ${errDetail[2]}` : `AFIP: No se obtuvo CAE en FECAESolicitar. Respuesta: ${resultXml.slice(0, 500)}`;
-    throw new Error(msg);
-  }
-
-  return {
-    CAE: caeMatch[1].trim(),
-    CAEFchVto: formatDate(caeVtoMatch[1].trim()),
-  };
+  return parseFecaSolicitarResponse(resultXml, requestSanitized);
 }
 
-/**
- * Crea el siguiente comprobante (getLastVoucher + 1, luego createVoucher)
- */
-export async function createNextVoucher(params: Omit<CreateVoucherParams, 'CbteDesde' | 'CbteHasta'>): Promise<{
-  voucherNumber: number;
-  CAE: string;
-  CAEFchVto: string;
-}> {
+/** @deprecated Preferir emitVoucherFiscal — mantiene compatibilidad scripts. */
+export async function createNextVoucher(
+  params: Omit<CreateVoucherParams, 'CbteDesde' | 'CbteHasta'>
+): Promise<{ voucherNumber: number; CAE: string; CAEFchVto: string }> {
   const lastVoucher = await getLastVoucher(params.PtoVta, params.CbteTipo);
   const voucherNumber = lastVoucher + 1;
-
-  const result = await createVoucher({
-    ...params,
-    CbteDesde: voucherNumber,
-    CbteHasta: voucherNumber,
-  });
-
-  return {
-    voucherNumber,
-    CAE: result.CAE,
-    CAEFchVto: result.CAEFchVto,
-  };
+  const result = await createVoucher({ ...params, CbteDesde: voucherNumber, CbteHasta: voucherNumber });
+  return { voucherNumber, CAE: result.cae, CAEFchVto: result.caeFchVto };
 }

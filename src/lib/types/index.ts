@@ -191,7 +191,9 @@ export interface Player {
   usuarioId?: string;
   /** CUIT del cliente (para facturación electrónica) */
   cuit?: string;
-  /** Condición frente al IVA (Responsable Inscripto, Consumidor Final, Monotributista) */
+  /** Condición frente al IVA — id ARCA (FEParamGetCondicionIvaReceptor). Preferido. */
+  condicionIVAId?: number;
+  /** @deprecated Usar condicionIVAId. Etiqueta legible legacy. */
   condicionIVA?: string;
   /** Si requiere factura (default true). Si false, no se factura. */
   requiereFactura?: boolean;

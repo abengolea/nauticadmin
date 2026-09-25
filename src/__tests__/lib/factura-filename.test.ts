@@ -12,6 +12,16 @@ describe('buildFacturaPdfFilename', () => {
     ).toBe('factura-B-0006-00018716.pdf');
   });
 
+  it('arma el nombre AFIP de Factura A', () => {
+    expect(
+      buildFacturaPdfFilename({
+        facturaTipo: 'FACTURA A',
+        facturaPtoVta: 6,
+        facturaNumero: 5327,
+      })
+    ).toBe('factura-A-0006-00005327.pdf');
+  });
+
   it('retorna null si falta el número', () => {
     expect(buildFacturaPdfFilename({ facturaPtoVta: 6 })).toBeNull();
   });

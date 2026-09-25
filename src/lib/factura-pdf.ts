@@ -1,6 +1,6 @@
 /**
- * Generación de PDF de factura electrónica (AFIP).
- * Diseño estándar argentino con CAE y QR obligatorio.
+ * Generación de PDF de factura electrónica (ARCA).
+ * Consume exclusivamente AuthorizedInvoiceData.
  */
 
 import * as fs from 'fs';
@@ -8,7 +8,11 @@ import * as path from 'path';
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { getFacturasDir } from '@/lib/afip/credentials';
+import type { AuthorizedInvoiceData } from '@/lib/fiscal/authorized-invoice';
+import { buildAfipQrUrl } from '@/lib/fiscal/qr';
+import { CBTE_TIPO } from '@/lib/fiscal/constants';
 
+/** @deprecated Usar AuthorizedInvoiceData */
 export interface FacturaPdfEmisor {
   razonSocial: string;
   cuit: string;
@@ -16,6 +20,7 @@ export interface FacturaPdfEmisor {
   condicionIVA: string;
 }
 
+/** @deprecated Usar AuthorizedInvoiceData */
 export interface FacturaPdfReceptor {
   razonSocial: string;
   cuit: string;
@@ -23,6 +28,7 @@ export interface FacturaPdfReceptor {
   condicionIVA: string;
 }
 
+/** @deprecated Usar AuthorizedInvoiceData */
 export interface FacturaPdfItem {
   descripcion: string;
   cantidad: number;
@@ -30,6 +36,7 @@ export interface FacturaPdfItem {
   importe: number;
 }
 
+/** @deprecated Usar AuthorizedInvoiceData */
 export interface FacturaPdfDatos {
   emisor: FacturaPdfEmisor;
   tipoComprobante: string;
@@ -43,59 +50,127 @@ export interface FacturaPdfDatos {
   total: number;
   CAE: string;
   CAEFchVto: string;
-  /** Tipo documento receptor: 80=CUIT, 96=DNI */
   tipoDocReceptor?: number;
-  /** Si true, agrega marca "SIMULACIÓN - NO VÁLIDO" al PDF */
   simulacion?: boolean;
+}
+
+function facturaLetra(data: AuthorizedInvoiceData): 'A' | 'B' | 'C' {
+  if (data.voucherClass === 'M') return 'C';
+  return data.voucherClass;
+}
+
+function currencyLabel(monedaAfip: string): string {
+  return monedaAfip === 'DOL' ? 'USD' : 'ARS';
+}
+
+function formatMoney(amount: number, monedaAfip: string): string {
+  const curr = currencyLabel(monedaAfip);
+  try {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: curr === 'USD' ? 'USD' : 'ARS',
+    }).format(amount);
+  } catch {
+    return `${curr} ${amount}`;
+  }
 }
 
 function facturasDir(): string {
   return getFacturasDir();
 }
 
-/**
- * Construye la URL del QR AFIP según especificación.
- * https://www.afip.gob.ar/fe/qr/?p= + base64(JSON)
- */
-function buildAfipQrUrl(datos: FacturaPdfDatos): string {
-  const cuitEmisor = datos.emisor.cuit.replace(/\D/g, '');
-  const cuitReceptor = datos.receptor.cuit.replace(/\D/g, '');
-  const tipoDocRec = datos.tipoDocReceptor ?? 80;
-
-  const qrData = {
-    ver: 1,
+function authorizedFromLegacyPdfDatos(datos: FacturaPdfDatos): AuthorizedInvoiceData {
+  const letra = datos.tipoComprobante.includes('A')
+    ? 'A'
+    : datos.tipoComprobante.includes('C')
+      ? 'C'
+      : 'B';
+  const cbteTipo =
+    letra === 'A' ? CBTE_TIPO.FACTURA_A : letra === 'C' ? CBTE_TIPO.FACTURA_C : CBTE_TIPO.FACTURA_B;
+  return {
+    emisorRazonSocial: datos.emisor.razonSocial,
+    emisorCuit: datos.emisor.cuit,
+    emisorDomicilio: datos.emisor.domicilio,
+    emisorCondicionIVA: datos.emisor.condicionIVA,
+    cbteTipo,
+    tipoComprobanteLabel: datos.tipoComprobante,
+    voucherClass: letra,
+    puntoVenta: datos.puntoVenta,
+    numero: datos.numero,
     fecha: datos.fecha,
-    cuit: parseInt(cuitEmisor, 10),
-    ptoVta: datos.puntoVenta,
-    tipoCmp: datos.tipoComprobante.includes('B') ? 6 : datos.tipoComprobante.includes('C') ? 11 : 6,
-    nroCmp: datos.numero,
-    importe: datos.total,
-    moneda: 'PES',
-    ctz: 1,
-    tipoDocRec,
-    nroDocRec: parseInt(cuitReceptor, 10),
-    tipoCodAut: 'E',
-    codAut: datos.CAE,
+    conceptoDescripcion: datos.items[0]?.descripcion ?? 'Servicios',
+    receptorRazonSocial: datos.receptor.razonSocial,
+    receptorDomicilio: datos.receptor.domicilio,
+    condicionIVAReceptorId: 5,
+    condicionIVAReceptorLabel: datos.receptor.condicionIVA,
+    docTipoReceptor: datos.tipoDocReceptor ?? 80,
+    docNroReceptor: parseInt(String(datos.receptor.cuit).replace(/\D/g, ''), 10) || 0,
+    docDisplayReceptor: datos.receptor.cuit,
+    amounts: {
+      impTotal: datos.total,
+      impTotConc: 0,
+      impNeto: datos.subtotal,
+      impOpEx: 0,
+      impIva: datos.iva21 ?? 0,
+      impTrib: 0,
+    },
+    monedaAfip: 'PES',
+    cotizacionAfip: 1,
+    cancelaMismaMonedaExtranjera: false,
+    cae: datos.CAE,
+    caeFchVto: datos.CAEFchVto,
+    afipResultado: datos.simulacion ? 'SIM' : 'A',
+    afipObservaciones: [],
+    facturacionModo: datos.simulacion ? 'simulacion' : 'real',
+    simulacion: !!datos.simulacion,
   };
-
-  const jsonStr = JSON.stringify(qrData);
-  const base64 = Buffer.from(jsonStr, 'utf-8').toString('base64');
-  return `https://www.afip.gob.ar/fe/qr/?p=${base64}`;
 }
 
-/**
- * Genera el PDF de la factura y lo guarda en ./facturas/
- * Retorna la ruta absoluta del archivo.
- */
-export async function generarFacturaPDF(datos: FacturaPdfDatos): Promise<string> {
-  const outDir = facturasDir();
-  if (!fs.existsSync(outDir)) {
-    fs.mkdirSync(outDir, { recursive: true });
-  }
+export function authorizedToLegacyPdfDatos(data: AuthorizedInvoiceData): FacturaPdfDatos {
+  return {
+    emisor: {
+      razonSocial: data.emisorRazonSocial,
+      cuit: data.emisorCuit,
+      domicilio: data.emisorDomicilio,
+      condicionIVA: data.emisorCondicionIVA,
+    },
+    tipoComprobante: data.tipoComprobanteLabel,
+    puntoVenta: data.puntoVenta,
+    numero: data.numero,
+    fecha: data.fecha,
+    receptor: {
+      razonSocial: data.receptorRazonSocial,
+      cuit: data.docDisplayReceptor,
+      domicilio: data.receptorDomicilio,
+      condicionIVA: data.condicionIVAReceptorLabel,
+    },
+    items: [
+      {
+        descripcion: data.conceptoDescripcion,
+        cantidad: 1,
+        precioUnitario: data.amounts.impNeto,
+        importe: data.amounts.impNeto,
+      },
+    ],
+    subtotal: data.amounts.impNeto,
+    iva21: data.amounts.impIva > 0 ? data.amounts.impIva : undefined,
+    total: data.amounts.impTotal,
+    CAE: data.cae,
+    CAEFchVto: data.caeFchVto,
+    tipoDocReceptor: data.docTipoReceptor,
+    simulacion: data.simulacion,
+  };
+}
 
-  const letra = facturaLetra(datos.tipoComprobante);
-  const ptoVtaStr = String(datos.puntoVenta).padStart(4, '0');
-  const nroStr = String(datos.numero).padStart(8, '0');
+export async function generarFacturaPDFFromAuthorized(
+  data: AuthorizedInvoiceData
+): Promise<string> {
+  const outDir = facturasDir();
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+  const letra = facturaLetra(data);
+  const ptoVtaStr = String(data.puntoVenta).padStart(4, '0');
+  const nroStr = String(data.numero).padStart(8, '0');
   const filename = `factura-${letra}-${ptoVtaStr}-${nroStr}.pdf`;
   const filepath = path.join(outDir, filename);
 
@@ -105,7 +180,7 @@ export async function generarFacturaPDF(datos: FacturaPdfDatos): Promise<string>
   const margin = 15;
   let y = 15;
 
-  if (datos.simulacion) {
+  if (data.simulacion) {
     doc.setFillColor(255, 240, 200);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
     doc.setFontSize(14);
@@ -115,139 +190,137 @@ export async function generarFacturaPDF(datos: FacturaPdfDatos): Promise<string>
     doc.setTextColor(0, 0, 0);
   }
 
-  // --- EMISOR ---
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text(datos.emisor.razonSocial, margin, y);
+  doc.text(data.emisorRazonSocial, margin, y);
   y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(`CUIT: ${datos.emisor.cuit}`, margin, y);
+  doc.text(`CUIT: ${data.emisorCuit}`, margin, y);
   y += 5;
-  doc.text(`Domicilio: ${datos.emisor.domicilio}`, margin, y);
+  doc.text(`Domicilio: ${data.emisorDomicilio}`, margin, y);
   y += 5;
-  doc.text(`Cond. IVA: ${datos.emisor.condicionIVA}`, margin, y);
+  doc.text(`Cond. IVA: ${data.emisorCondicionIVA}`, margin, y);
   y += 12;
 
-  // --- TIPO Y NÚMERO (recuadro con letra B grande) ---
   const letraBoxX = pageWidth - margin - 25;
-  doc.setDrawColor(0, 0, 0);
   doc.rect(letraBoxX, y - 8, 25, 25);
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
   doc.text(letra, letraBoxX + 8, y + 6);
 
   doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${datos.tipoComprobante}  ${ptoVtaStr}-${nroStr}`, margin, y);
+  doc.text(`${data.tipoComprobanteLabel}  ${ptoVtaStr}-${nroStr}`, margin, y);
   y += 8;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text(`Fecha de emisión: ${datos.fecha}`, margin, y);
+  doc.text(`Fecha de emisión: ${data.fecha}`, margin, y);
   y += 15;
 
-  // --- RECEPTOR ---
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text('Datos del receptor', margin, y);
   y += 6;
   doc.setFont('helvetica', 'normal');
-  doc.text(`Razón social: ${datos.receptor.razonSocial}`, margin, y);
+  doc.text(`Razón social: ${data.receptorRazonSocial}`, margin, y);
   y += 5;
-  doc.text(`CUIT: ${datos.receptor.cuit}`, margin, y);
+  doc.text(`Documento: ${data.docDisplayReceptor}`, margin, y);
   y += 5;
-  doc.text(`Domicilio: ${datos.receptor.domicilio}`, margin, y);
+  doc.text(`Domicilio: ${data.receptorDomicilio}`, margin, y);
   y += 5;
-  doc.text(`Cond. IVA: ${datos.receptor.condicionIVA}`, margin, y);
+  doc.text(`Cond. IVA: ${data.condicionIVAReceptorLabel}`, margin, y);
   y += 12;
 
-  // --- DETALLE DE ÍTEMS ---
   doc.setFont('helvetica', 'bold');
   doc.text('Detalle', margin, y);
   y += 6;
 
-  const colCant = margin;
   const colDesc = margin + 18;
   const colPrecio = pageWidth - margin - 50;
   const colImporte = pageWidth - margin - 25;
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text('Cant.', colCant, y);
+  doc.text('Cant.', margin, y);
   doc.text('Descripción', colDesc, y);
   doc.text('P. Unit.', colPrecio, y);
   doc.text('Importe', colImporte, y);
   y += 6;
 
   doc.setFont('helvetica', 'normal');
-  for (const item of datos.items) {
-    doc.text(String(item.cantidad), colCant, y);
-    doc.text(item.descripcion.slice(0, 45) + (item.descripcion.length > 45 ? '...' : ''), colDesc, y);
-    doc.text(`$ ${item.precioUnitario.toLocaleString('es-AR')}`, colPrecio, y);
-    doc.text(`$ ${item.importe.toLocaleString('es-AR')}`, colImporte, y);
-    y += 5;
-  }
-  y += 5;
+  doc.text('1', margin, y);
+  doc.text(data.conceptoDescripcion.slice(0, 45), colDesc, y);
+  doc.text(formatMoney(data.amounts.impNeto, data.monedaAfip), colPrecio, y);
+  doc.text(formatMoney(data.amounts.impNeto, data.monedaAfip), colImporte, y);
+  y += 10;
 
-  // --- TOTALES ---
   const totalX = pageWidth - margin - 50;
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Subtotal:`, totalX - 30, y);
-  doc.text(`$ ${datos.subtotal.toLocaleString('es-AR')}`, totalX, y);
+  doc.text('Subtotal:', totalX - 30, y);
+  doc.text(formatMoney(data.amounts.impNeto, data.monedaAfip), totalX, y);
   y += 6;
-  if (datos.iva21 != null && datos.iva21 > 0) {
-    doc.text(`IVA 21%:`, totalX - 30, y);
-    doc.text(`$ ${datos.iva21.toLocaleString('es-AR')}`, totalX, y);
+
+  if (data.amounts.impIva > 0) {
+    doc.text('IVA 21%:', totalX - 30, y);
+    doc.text(formatMoney(data.amounts.impIva, data.monedaAfip), totalX, y);
     y += 6;
   }
+
+  if (data.monedaAfip !== 'PES') {
+    doc.text(`Moneda: ${data.monedaAfip}`, margin, y);
+    y += 5;
+    doc.text(`Cotización: ${data.cotizacionAfip}`, margin, y);
+    y += 5;
+  }
+
   doc.setFont('helvetica', 'bold');
-  doc.text(`Total:`, totalX - 30, y);
-  doc.text(`$ ${datos.total.toLocaleString('es-AR')}`, totalX, y);
+  doc.text('Total:', totalX - 30, y);
+  doc.text(formatMoney(data.amounts.impTotal, data.monedaAfip), totalX, y);
   y += 12;
 
-  // --- CAE ---
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.text(`CAE: ${datos.CAE}`, margin, y);
-  y += 5;
-  doc.text(`Vencimiento CAE: ${datos.CAEFchVto}`, margin, y);
-  y += 15;
+  if (!data.simulacion) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`CAE: ${data.cae}`, margin, y);
+    y += 5;
+    doc.text(`Vencimiento CAE: ${data.caeFchVto}`, margin, y);
+    y += 15;
 
-  // --- QR AFIP ---
-  const qrUrl = buildAfipQrUrl(datos);
-  const qrDataUrl = await QRCode.toDataURL(qrUrl, {
-    width: 80,
-    margin: 1,
-    color: { dark: '#000000', light: '#ffffff' },
-  });
-
-  doc.addImage(qrDataUrl, 'PNG', margin, y, 25, 25);
-  doc.setFontSize(7);
-  doc.text('Código QR para verificación AFIP', margin, y + 30);
-
-  const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
-  const absolutePath = path.resolve(filepath);
-  fs.writeFileSync(absolutePath, pdfBuffer);
-
-  if (!fs.existsSync(absolutePath)) {
-    throw new Error(`No se pudo guardar el PDF en ${absolutePath}`);
+    const qrUrl = buildAfipQrUrl(data);
+    const qrDataUrl = await QRCode.toDataURL(qrUrl, {
+      width: 80,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+    doc.addImage(qrDataUrl, 'PNG', margin, y, 25, 25);
+    doc.setFontSize(7);
+    doc.text('Código QR para verificación ARCA', margin, y + 30);
   }
-  console.log('[factura-pdf] PDF guardado:', absolutePath);
-  return absolutePath;
+
+  fs.writeFileSync(path.resolve(filepath), Buffer.from(doc.output('arraybuffer')));
+  return path.resolve(filepath);
+}
+
+/** Compatibilidad legacy */
+export async function generarFacturaPDF(datos: FacturaPdfDatos): Promise<string> {
+  return generarFacturaPDFFromAuthorized(authorizedFromLegacyPdfDatos(datos));
 }
 
 export interface GenerarFacturaOptions {
-  datos: FacturaPdfDatos;
+  authorized?: AuthorizedInvoiceData;
+  /** @deprecated Usar authorized */
+  datos?: FacturaPdfDatos;
   schoolId?: string;
   facturacion?: import('@/lib/school-facturacion').SchoolFacturacion;
 }
 
-/**
- * Genera factura PDF: usa plantilla Marinas (logo, fondo blanco) si hay templateFactura,
- * sino el PDF genérico jsPDF.
- */
 export async function generarFactura(opts: GenerarFacturaOptions): Promise<string> {
-  const { datos, schoolId, facturacion } = opts;
+  const authorized =
+    opts.authorized ??
+    (opts.datos ? authorizedFromLegacyPdfDatos(opts.datos) : undefined);
+  if (!authorized) {
+    throw new Error('generarFactura requiere authorized o datos');
+  }
+  const { schoolId, facturacion } = opts;
   if (facturacion?.templateFactura && schoolId) {
     const { generarFacturaConPlantilla, loadTemplateAssets } = await import(
       '@/lib/factura-pdf-template'
@@ -264,11 +337,10 @@ export async function generarFactura(opts: GenerarFacturaOptions): Promise<strin
       }
     }
     return generarFacturaConPlantilla({
-      datos,
+      authorized,
       facturacion,
-      template: facturacion.templateFactura,
       logoBytes,
     });
   }
-  return generarFacturaPDF(datos);
+  return generarFacturaPDFFromAuthorized(authorized);
 }

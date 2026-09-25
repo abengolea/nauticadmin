@@ -66,12 +66,22 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                                     <TableCell className="text-right">{player.dni}</TableCell>
                                 </TableRow>
                             )}
-                            {player.cuit && (
+                            {(player as { condicionIVA?: string; condicionIVAId?: number }).condicionIVA && (
                                 <TableRow>
-                                    <TableCell className="font-medium text-muted-foreground">CUIT</TableCell>
-                                    <TableCell className="text-right">{player.cuit}</TableCell>
+                                    <TableCell className="font-medium text-muted-foreground">Condición IVA</TableCell>
+                                    <TableCell className="text-right">
+                                      {(player as { condicionIVA: string }).condicionIVA}
+                                    </TableCell>
                                 </TableRow>
                             )}
+                            <TableRow>
+                                <TableCell className="font-medium text-muted-foreground">CUIT</TableCell>
+                                <TableCell className="text-right">
+                                  {player.cuit?.trim() ? player.cuit : (
+                                    <span className="text-amber-600 text-sm">Sin cargar — requerido para RI</span>
+                                  )}
+                                </TableCell>
+                            </TableRow>
                             {player.email && (
                                 <TableRow>
                                     <TableCell className="font-medium text-muted-foreground">Email (acceso al panel)</TableCell>
@@ -187,12 +197,6 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                                 <TableRow>
                                     <TableCell className="font-medium text-muted-foreground">Crédito activo</TableCell>
                                     <TableCell className="text-right">{player.creditoActivo ? "Sí" : "No"}</TableCell>
-                                </TableRow>
-                            )}
-                            {(player as { condicionIVA?: string }).condicionIVA && (
-                                <TableRow>
-                                    <TableCell className="font-medium text-muted-foreground">Condición IVA</TableCell>
-                                    <TableCell className="text-right">{(player as { condicionIVA: string }).condicionIVA}</TableCell>
                                 </TableRow>
                             )}
                             {serviciosAdicionales.length > 0 && (

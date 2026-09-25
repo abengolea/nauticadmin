@@ -37,7 +37,7 @@ export async function processInvoiceOrder(db: Firestore, order: InvoiceOrder): P
     // 1) Emitir en AFIP
     const afipResult = await emitAfipComprobante({
       ptoVta: 1, // TODO: config por náutica
-      cbteTipo: 1, // Factura B
+      cbteTipo: 6, // Factura B
       concept: order.concept,
       amount: order.amount,
       currency: order.currency,
@@ -47,7 +47,7 @@ export async function processInvoiceOrder(db: Firestore, order: InvoiceOrder): P
     await orderRef.update({
       afip: {
         ptoVta: 1,
-        cbteTipo: 1,
+        cbteTipo: 6,
         cbteNro: afipResult.cbteNro,
         cae: afipResult.cae,
         caeVto: afipResult.caeVto,
@@ -58,8 +58,8 @@ export async function processInvoiceOrder(db: Firestore, order: InvoiceOrder): P
 
     // 2) Generar PDF
     const pdfBuffer = await generateInvoicePdf({
-      order: { ...order, afip: { ptoVta: 1, cbteTipo: 1, cbteNro: afipResult.cbteNro, cae: afipResult.cae, caeVto: afipResult.caeVto } },
-      afip: { ptoVta: 1, cbteTipo: 1, cbteNro: afipResult.cbteNro, cae: afipResult.cae, caeVto: afipResult.caeVto },
+      order: { ...order, afip: { ptoVta: 1, cbteTipo: 6, cbteNro: afipResult.cbteNro, cae: afipResult.cae, caeVto: afipResult.caeVto } },
+      afip: { ptoVta: 1, cbteTipo: 6, cbteNro: afipResult.cbteNro, cae: afipResult.cae, caeVto: afipResult.caeVto },
       concept: order.concept,
     });
 

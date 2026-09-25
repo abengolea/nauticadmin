@@ -39,6 +39,10 @@ import { uploadPlayerPhoto } from "@/lib/player-photo";
 import { updateDoc } from "firebase/firestore";
 import { useDoc } from "@/firebase";
 import type { BoatPricingConfig } from "@/lib/types/boat-pricing";
+import { FiscalProfileFields } from "./FiscalProfileFields";
+import { CONDICION_IVA_RECEPTOR } from "@/lib/fiscal/constants";
+import { getCondicionIvaLabel } from "@/lib/fiscal/iva-receptor";
+import { refinePlayerFiscalFields } from "@/lib/fiscal/player-fiscal-form";
 import { getDefaultBoatPricingItems, splitPricingItems } from "@/lib/types/boat-pricing";
 
 function generateRandomPassword(length = 16): string {
@@ -89,9 +93,9 @@ const playerSchema = z.object({
   personasAutorizadas: z.string().optional(),
   usuarioId: z.string().optional(),
   cuit: z.string().optional(),
-  condicionIVA: z.string().optional(),
+  condicionIVAId: z.coerce.number().optional(),
   documentacion: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
-});
+}).superRefine(refinePlayerFiscalFields);
 
 export function AddPlayerForm() {
     const firestore = useFirestore();
@@ -122,7 +126,7 @@ export function AddPlayerForm() {
             personasAutorizadas: "",
             usuarioId: "",
             cuit: "",
-            condicionIVA: "Consumidor Final",
+            condicionIVAId: CONDICION_IVA_RECEPTOR.CONSUMIDOR_FINAL,
             documentacion: "",
         },
     });
@@ -222,7 +226,10 @@ export function AddPlayerForm() {
                 ...(personasArr && personasArr.length > 0 && { personasAutorizadas: personasArr }),
                 ...(values.usuarioId?.trim() && { usuarioId: values.usuarioId.trim() }),
                 ...(values.cuit?.trim() && { cuit: values.cuit.trim() }),
-                ...(values.condicionIVA?.trim() && { condicionIVA: values.condicionIVA.trim() }),
+                condicionIVAId: values.condicionIVAId ?? CONDICION_IVA_RECEPTOR.CONSUMIDOR_FINAL,
+                condicionIVA: getCondicionIvaLabel(
+                  (values.condicionIVAId ?? CONDICION_IVA_RECEPTOR.CONSUMIDOR_FINAL) as import('@/lib/fiscal/constants').CondicionIvaReceptorId
+                ),
                 ...(values.documentacion?.trim() && { documentacion: values.documentacion.trim() }),
             };
 
@@ -402,14 +409,16 @@ export function AddPlayerForm() {
                     name="dni"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>DNI (Opcional)</FormLabel>
+                        <FormLabel>DNI</FormLabel>
                         <FormControl>
-                        <Input placeholder="40.123.456" {...field} />
+                        <Input placeholder="Ej: 25715970" {...field} />
                         </FormControl>
+                        <FormDescription>Para consumidor final. Si es RI, usá CUIT abajo.</FormDescription>
                         <FormMessage />
                     </FormItem>
                     )}
                 />
+                <FiscalProfileFields control={form.control} />
                  <FormField
                     control={form.control}
                     name="tutorPhone"
@@ -698,65 +707,6 @@ export function AddPlayerForm() {
                                 </FormControl>
                                 <FormDescription>ID del cliente en la app de pagos (para importar Excel).</FormDescription>
                                 <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="cuit"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>CUIT (facturación electrónica)</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Ej: 30-71460552-2" {...field} />
-                                </FormControl>
-                                <FormDescription>
-                                    Opcional para consumidor final con DNI. Obligatorio si es responsable inscripto o monotributista.
-                                </FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="condicionIVA"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Condición frente al IVA</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value ?? "Consumidor Final"}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar..." />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="Responsable Inscripto">Responsable Inscripto</SelectItem>
-                                        <SelectItem value="Consumidor Final">Consumidor Final</SelectItem>
-                                        <SelectItem value="Monotributista">Monotributista</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormDescription>Define el tipo de factura a emitir (AFIP).</FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="requiereFactura"
-                        render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 md:col-span-2">
-                                <div className="space-y-0.5">
-                                    <FormLabel>Requiere factura</FormLabel>
-                                    <FormDescription>
-                                        Si está activo, se facturarán los pagos de este cliente. Desactivar si no necesita factura.
-                                    </FormDescription>
-                                </div>
-                                <FormControl>
-                                    <Switch
-                                        checked={field.value ?? true}
-                                        onCheckedChange={field.onChange}
-                                    />
-                                </FormControl>
                             </FormItem>
                         )}
                     />

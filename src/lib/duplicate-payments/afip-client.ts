@@ -36,27 +36,28 @@ export async function emitAfipComprobante(params: AfipEmitParams): Promise<AfipE
       : 0;
 
     // Si ImpNeto > 0, AFIP exige el bloque Iva (error 10070)
-    const impNeto = params.amount;
-    const impIva = Math.round(params.amount * 0.21 * 100) / 100;
-    const impTotal = impNeto + impIva;
+    const cbteTipo = params.cbteTipo ?? config.cbteTipo;
+    const { calculateFiscalAmounts } = await import('@/lib/fiscal/amounts');
+    const { CONDICION_IVA_RECEPTOR } = await import('@/lib/fiscal/constants');
+    const amounts = calculateFiscalAmounts(params.amount, cbteTipo as 1 | 6 | 11);
 
     const voucherParams: Parameters<typeof createNextVoucher>[0] = {
       PtoVta: params.ptoVta ?? config.ptoVta,
-      CbteTipo: params.cbteTipo ?? config.cbteTipo,
+      CbteTipo: cbteTipo,
       Concepto: 2,
       DocTipo: docTipo,
       DocNro: docNro,
       CbteFch: date,
-      ImpTotal: impTotal,
-      ImpTotConc: 0,
-      ImpNeto: impNeto,
-      ImpOpEx: 0,
-      ImpIVA: impIva,
-      ImpTrib: 0,
+      ImpTotal: amounts.impTotal,
+      ImpTotConc: amounts.impTotConc,
+      ImpNeto: amounts.impNeto,
+      ImpOpEx: amounts.impOpEx,
+      ImpIVA: amounts.impIva,
+      ImpTrib: amounts.impTrib,
       MonId: params.currency === 'USD' ? 'DOL' : 'PES',
-      MonCotiz: params.currency === 'USD' ? 1 : 1,
-      CondIVAReceptor: 5, // Consumidor Final
-      Iva: [{ Id: 5, BaseImp: impNeto, Importe: impIva }], // Id 5 = 21%
+      MonCotiz: 1,
+      CondIVAReceptor: CONDICION_IVA_RECEPTOR.CONSUMIDOR_FINAL,
+      Iva: amounts.iva,
     };
 
     const res = await createNextVoucher(voucherParams);

@@ -48,10 +48,18 @@ export interface Payment {
   /** ID del caso de duplicado si está suspected/confirmed. */
   duplicateCaseId?: string | null;
   updatedAt?: Date;
-  /** true si se emitió factura para este pago (emit-batch). */
+  /** true si se emitió factura fiscal real o manual para este pago. */
   facturado?: boolean;
-  /** Fecha en que se facturó (si facturado). */
+  /** real | simulacion | manual */
+  facturacionModo?: 'real' | 'simulacion' | 'manual';
+  /** Fecha en que se facturó (si facturado real/manual). */
   facturadoAt?: Date;
+  /** Preview simulación (no válido fiscalmente). */
+  facturacionSimulacionAt?: Date;
+  facturaSimulacionStoragePath?: string;
+  facturaSimulacionNumero?: number;
+  facturaSimulacionPtoVta?: number;
+  facturaSimulacionTipo?: string;
   /** PDF opcional adjunto al cobro (remito, nota, etc.), distinto de la factura. */
   documentoAdjuntoStoragePath?: string;
   documentoAdjuntoNombre?: string;
@@ -64,6 +72,24 @@ export interface Payment {
   facturaStoragePath?: string;
   facturaManual?: boolean;
   CAE?: string;
+  CAEFchVto?: string;
+  condicionIVAReceptorId?: number;
+  docTipoReceptor?: number;
+  docNroReceptor?: number;
+  monedaAfip?: string;
+  cotizacionAfip?: number;
+  cotizacionFecha?: string;
+  cancelaMismaMonedaExtranjera?: boolean;
+  afipResultado?: string;
+  afipObservaciones?: Array<{ code: number; msg: string }>;
+  afipErrores?: Array<{ code: number; msg: string }>;
+  emitidoAt?: Date;
+  emitidoPorUid?: string;
+  afipProduction?: boolean;
+  cbteTipo?: number;
+  afipRequestSanitized?: string;
+  afipResponseSanitized?: string;
+  fiscalPendingVoucherNumber?: number | null;
 }
 
 export interface PaymentIntent {

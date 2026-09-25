@@ -42,6 +42,10 @@ import type { Player } from "@/lib/types";
 import { getPlayerEmbarcaciones } from "@/lib/utils";
 import { useDoc } from "@/firebase";
 import type { BoatPricingConfig } from "@/lib/types/boat-pricing";
+import { FiscalProfileFields } from "./FiscalProfileFields";
+import { CONDICION_IVA_RECEPTOR } from "@/lib/fiscal/constants";
+import { parseCondicionIvaReceptorId, getCondicionIvaLabel } from "@/lib/fiscal/iva-receptor";
+import { refinePlayerFiscalFields } from "@/lib/fiscal/player-fiscal-form";
 import { getDefaultBoatPricingItems, splitPricingItems } from "@/lib/types/boat-pricing";
 
 const embarcacionSchema = z.object({
@@ -79,9 +83,9 @@ const playerSchema = z.object({
   personasAutorizadas: z.string().optional(),
   usuarioId: z.string().optional(),
   cuit: z.string().optional(),
-  condicionIVA: z.string().optional(),
+  condicionIVAId: z.coerce.number().optional(),
   documentacion: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
-});
+}).superRefine(refinePlayerFiscalFields);
 
 interface EditPlayerDialogProps {
   player: Player;
@@ -132,7 +136,10 @@ export function EditPlayerDialog({
       personasAutorizadas: Array.isArray(player.personasAutorizadas) ? player.personasAutorizadas.join(", ") : (player.personasAutorizadas as string) ?? "",
       usuarioId: player.usuarioId ?? "",
       cuit: player.cuit ?? "",
-      condicionIVA: (player as { condicionIVA?: string }).condicionIVA ?? "Consumidor Final",
+      condicionIVAId:
+        (player as { condicionIVAId?: number }).condicionIVAId ??
+        parseCondicionIvaReceptorId(undefined, (player as { condicionIVA?: string }).condicionIVA ?? undefined) ??
+        CONDICION_IVA_RECEPTOR.CONSUMIDOR_FINAL,
       documentacion: (player as { documentacion?: string }).documentacion ?? "",
     },
   });
@@ -188,7 +195,10 @@ export function EditPlayerDialog({
         personasAutorizadas: Array.isArray(player.personasAutorizadas) ? player.personasAutorizadas.join(", ") : (player.personasAutorizadas as string) ?? "",
         usuarioId: player.usuarioId ?? "",
         cuit: player.cuit ?? "",
-        condicionIVA: (player as { condicionIVA?: string }).condicionIVA ?? "Consumidor Final",
+        condicionIVAId:
+        (player as { condicionIVAId?: number }).condicionIVAId ??
+        parseCondicionIvaReceptorId(undefined, (player as { condicionIVA?: string }).condicionIVA ?? undefined) ??
+        CONDICION_IVA_RECEPTOR.CONSUMIDOR_FINAL,
         documentacion: (player as { documentacion?: string }).documentacion ?? "",
       });
     }
@@ -236,7 +246,10 @@ export function EditPlayerDialog({
       personasAutorizadas: personasArr ?? null,
       usuarioId: values.usuarioId?.trim() || null,
       cuit: values.cuit?.trim() || null,
-      condicionIVA: values.condicionIVA?.trim() || null,
+      condicionIVAId: values.condicionIVAId ?? CONDICION_IVA_RECEPTOR.CONSUMIDOR_FINAL,
+      condicionIVA: getCondicionIvaLabel(
+        (values.condicionIVAId ?? CONDICION_IVA_RECEPTOR.CONSUMIDOR_FINAL) as import('@/lib/fiscal/constants').CondicionIvaReceptorId
+      ),
       documentacion: values.documentacion?.trim() || null,
     };
     if (embarcaciones.length > 0) {
@@ -387,12 +400,13 @@ export function EditPlayerDialog({
                           <Input placeholder="Ej: 18350968" {...field} />
                         </FormControl>
                         <FormDescription>
-                          Para consumidor final alcanza con el DNI. Completá CUIT solo si el cliente es responsable inscripto o monotributista.
+                          Para consumidor final. Si es Responsable Inscripto, completá el CUIT abajo.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  <FiscalProfileFields control={form.control} showRequiereFactura={!isPlayerEditing} />
                   <FormField
                     control={form.control}
                     name="tutorPhone"
@@ -725,65 +739,6 @@ export function EditPlayerDialog({
                       )}
                     />
                   )}
-                  <FormField
-                    control={form.control}
-                    name="cuit"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CUIT (facturación electrónica)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ej: 30-71460552-2" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Opcional para consumidor final con DNI. Obligatorio si es responsable inscripto o monotributista.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="condicionIVA"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Condición frente al IVA</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? "Consumidor Final"}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Responsable Inscripto">Responsable Inscripto</SelectItem>
-                            <SelectItem value="Consumidor Final">Consumidor Final</SelectItem>
-                            <SelectItem value="Monotributista">Monotributista</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>Define el tipo de factura a emitir (AFIP).</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="requiereFactura"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel>Requiere factura</FormLabel>
-                          <FormDescription>
-                            Si está activo, se facturarán los pagos de este cliente. Desactivar si no necesita factura.
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value ?? true}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="creditoActivo"

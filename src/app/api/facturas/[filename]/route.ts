@@ -1,7 +1,7 @@
 /**
  * GET /api/facturas/[filename]
  * Sirve un PDF de la carpeta facturas/ para descargar.
- * Solo permite nombres seguros (factura-B-0001-00000001.pdf).
+ * Solo permite nombres seguros (factura-A|B|C-0001-00000001.pdf).
  */
 
 import { NextResponse } from 'next/server';
@@ -21,7 +21,7 @@ export async function GET(
     }
 
     const { filename } = await params;
-    if (!filename || !/^factura-[BC]-\d{4}-\d{8}\.pdf$/.test(filename)) {
+    if (!filename || !/^factura-[ABC]-\d{4}-\d{8}\.pdf$/.test(filename)) {
       return NextResponse.json({ error: 'Nombre de archivo inválido' }, { status: 400 });
     }
 

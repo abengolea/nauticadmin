@@ -184,6 +184,7 @@ export async function POST(
       facturado: true,
       facturadoAt: now,
       facturaManual: true,
+      facturacionModo: 'manual',
       updatedAt: now,
     };
     if (finalNumero != null && finalNumero > 0) updateData.facturaNumero = finalNumero;
