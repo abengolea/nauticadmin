@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Table,
   TableBody,
@@ -44,6 +44,13 @@ import {
   PAYMENT_METHOD_LABELS,
   REGISTER_PAYMENT_METHODS,
 } from "@/lib/payments/payment-method";
+import {
+  MANUAL_CHARGE_TYPE_MONTHLY,
+  MANUAL_CHARGE_TYPE_OPTIONS,
+  MANUAL_CHARGE_TYPE_OTHER,
+  MANUAL_CHARGE_TYPE_REGISTRATION,
+  resolveManualCharge,
+} from "@/lib/payments/charge-concepts";
 
 /** Pago con nombre de jugador enriquecido por la API */
 type PaymentWithPlayerName = Payment & {
@@ -150,12 +157,51 @@ export function PaymentsTab({
   const manualOpen = manualOpenProp ?? manualOpenLocal;
   const setManualOpen = onManualOpenChange ?? setManualOpenLocal;
   const [manualPlayerId, setManualPlayerId] = useState("");
+  const [manualChargeType, setManualChargeType] = useState(MANUAL_CHARGE_TYPE_MONTHLY);
+  const [manualConceptCustom, setManualConceptCustom] = useState("");
   const [manualPeriod, setManualPeriod] = useState(currentPeriod());
   const [manualAmount, setManualAmount] = useState("15000");
   const [manualMethod, setManualMethod] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [unpaidPeriods, setUnpaidPeriods] = useState<{ period: string; amount: number; currency: string; label: string }[]>([]);
   const [unpaidLoading, setUnpaidLoading] = useState(false);
+  const manualChargeTypeRef = useRef(manualChargeType);
+  manualChargeTypeRef.current = manualChargeType;
+
+  const monthlyUnpaid = useMemo(
+    () => unpaidPeriods.filter((u) => /^\d{4}-(0[1-9]|1[0-2])$/.test(u.period)),
+    [unpaidPeriods]
+  );
+  const registrationUnpaid = useMemo(
+    () => unpaidPeriods.find((u) => u.period === REGISTRATION_PERIOD),
+    [unpaidPeriods]
+  );
+
+  const applyChargeTypeDefaults = useCallback(
+    (
+      chargeType: string,
+      unpaid: { period: string; amount: number; currency: string; label: string }[]
+    ) => {
+      if (chargeType === MANUAL_CHARGE_TYPE_MONTHLY) {
+        const firstMonthly = unpaid.find((u) => /^\d{4}-(0[1-9]|1[0-2])$/.test(u.period));
+        if (firstMonthly) {
+          setManualPeriod(firstMonthly.period);
+          setManualAmount(String(firstMonthly.amount));
+        } else {
+          setManualPeriod(currentPeriod());
+        }
+        return;
+      }
+      if (chargeType === MANUAL_CHARGE_TYPE_REGISTRATION) {
+        const inscription = unpaid.find((u) => u.period === REGISTRATION_PERIOD);
+        setManualPeriod(REGISTRATION_PERIOD);
+        if (inscription) setManualAmount(String(inscription.amount));
+        return;
+      }
+      setManualPeriod(currentPeriod());
+    },
+    []
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [facturando, setFacturando] = useState(false);
   const [modoSimulacion, setModoSimulacion] = useState(true);
@@ -236,11 +282,13 @@ export function PaymentsTab({
       );
       if (res.ok) {
         const data = await res.json();
-        setUnpaidPeriods(data.unpaid ?? []);
-        const first = data.unpaid?.[0];
-        if (first) {
-          setManualPeriod(first.period);
-          setManualAmount(String(first.amount));
+        const unpaid = data.unpaid ?? [];
+        setUnpaidPeriods(unpaid);
+        if (
+          manualChargeTypeRef.current === MANUAL_CHARGE_TYPE_MONTHLY ||
+          manualChargeTypeRef.current === MANUAL_CHARGE_TYPE_REGISTRATION
+        ) {
+          applyChargeTypeDefaults(manualChargeTypeRef.current, unpaid);
         }
       } else {
         setUnpaidPeriods([]);
@@ -250,7 +298,7 @@ export function PaymentsTab({
     } finally {
       setUnpaidLoading(false);
     }
-  }, [manualPlayerId, schoolId, getToken]);
+  }, [manualPlayerId, schoolId, getToken, applyChargeTypeDefaults]);
 
   useEffect(() => {
     fetchUnpaidForPlayer();
@@ -399,14 +447,33 @@ export function PaymentsTab({
     }
   };
 
+  const resetManualForm = () => {
+    setManualPlayerId("");
+    setManualChargeType(MANUAL_CHARGE_TYPE_MONTHLY);
+    setManualConceptCustom("");
+    setManualPeriod(currentPeriod());
+    setManualAmount("15000");
+    setManualMethod("");
+    setUnpaidPeriods([]);
+  };
+
+  const handleChargeTypeChange = (value: string) => {
+    setManualChargeType(value);
+    applyChargeTypeDefaults(value, unpaidPeriods);
+  };
+
   const handleManualPayment = async () => {
     const amount = parseFloat(manualAmount);
-    const period = manualPeriod;
+    const resolved = resolveManualCharge(manualChargeType, manualConceptCustom);
     if (!manualPlayerId || Number.isNaN(amount) || amount <= 0) {
       toast({ variant: "destructive", title: "Completá cliente y monto válido." });
       return;
     }
-    if (!manualPeriod) {
+    if ("error" in resolved) {
+      toast({ variant: "destructive", title: resolved.error });
+      return;
+    }
+    if (resolved.kind === "monthly" && !manualPeriod) {
       toast({ variant: "destructive", title: "Completá el período para la cuota mensual." });
       return;
     }
@@ -422,31 +489,54 @@ export function PaymentsTab({
       return;
     }
     try {
-      const res = await fetch("/api/payments/manual", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          playerId: manualPlayerId,
-          schoolId,
-          period,
-          amount,
-          currency: "ARS",
-          method: manualMethod,
-        }),
-      });
+      const res =
+        resolved.kind === "service"
+          ? await fetch("/api/payments/service-charge", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                playerId: manualPlayerId,
+                schoolId,
+                concept: resolved.concept,
+                amount,
+                currency: "ARS",
+                period: manualPeriod || currentPeriod(),
+                method: manualMethod,
+              }),
+            })
+          : await fetch("/api/payments/manual", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                playerId: manualPlayerId,
+                schoolId,
+                period: resolved.kind === "registration" ? REGISTRATION_PERIOD : manualPeriod,
+                amount,
+                currency: "ARS",
+                method: manualMethod,
+              }),
+            });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error ?? "Error al registrar pago");
       }
-      toast({ title: "Pago registrado correctamente." });
+      toast({
+        title: "Cobro registrado correctamente.",
+        description:
+          resolved.kind === "service"
+            ? `Concepto: ${resolved.concept}`
+            : resolved.kind === "registration"
+              ? "Imputado a inscripción"
+              : undefined,
+      });
       setManualOpen(false);
-      setManualPlayerId("");
-      setManualPeriod(currentPeriod());
-      setManualAmount("15000");
-      setManualMethod("");
+      resetManualForm();
       fetchPayments();
     } catch (e) {
       toast({
@@ -762,12 +852,18 @@ export function PaymentsTab({
         </div>
       )}
 
-      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
-        <DialogContent className="overflow-visible sm:max-w-md">
+      <Dialog
+        open={manualOpen}
+        onOpenChange={(open) => {
+          if (!open) resetManualForm();
+          setManualOpen(open);
+        }}
+      >
+        <DialogContent className="overflow-visible sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Registrar pago manual</DialogTitle>
+            <DialogTitle>Registrar cobro manual</DialogTitle>
             <DialogDescription>
-              Simulá o registrá un pago realizado fuera del sistema (efectivo, transferencia, etc.).
+              Elegí qué se cobra: cuota mensual, inscripción, amarra, un servicio u otro concepto.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4 overflow-visible">
@@ -784,7 +880,35 @@ export function PaymentsTab({
                 />
               </div>
             </div>
-            {manualPlayerId && (
+            <div>
+              <Label htmlFor="manual-charge-type">Qué se cobra</Label>
+              <Select value={manualChargeType} onValueChange={handleChargeTypeChange}>
+                <SelectTrigger id="manual-charge-type" className="mt-1">
+                  <SelectValue placeholder="Elegí el concepto de cobro" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MANUAL_CHARGE_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {manualChargeType === MANUAL_CHARGE_TYPE_OTHER && (
+              <div>
+                <Label htmlFor="manual-concept-custom">Concepto</Label>
+                <Input
+                  id="manual-concept-custom"
+                  value={manualConceptCustom}
+                  onChange={(e) => setManualConceptCustom(e.target.value)}
+                  placeholder="Ej: Alquiler de kayak"
+                  maxLength={200}
+                  className="mt-1"
+                />
+              </div>
+            )}
+            {manualChargeType === MANUAL_CHARGE_TYPE_MONTHLY && manualPlayerId && (
               <div>
                 <Label>Imputar a la cuota</Label>
                 {unpaidLoading ? (
@@ -792,13 +916,13 @@ export function PaymentsTab({
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Cargando cuotas adeudadas…
                   </p>
-                ) : unpaidPeriods.length === 0 ? (
+                ) : monthlyUnpaid.length === 0 ? (
                   <p className="text-sm text-muted-foreground mt-1">
                     Este cliente no tiene cuotas adeudadas. Podés registrar un pago adelantado con período manual.
                   </p>
                 ) : (
                   <div className="mt-2 space-y-2 max-h-48 overflow-y-auto rounded-md border p-2">
-                    {unpaidPeriods.map((u) => (
+                    {monthlyUnpaid.map((u) => (
                       <label
                         key={u.period}
                         className={`flex items-center justify-between gap-2 p-2 rounded cursor-pointer hover:bg-muted/50 ${
@@ -825,18 +949,74 @@ export function PaymentsTab({
                 )}
               </div>
             )}
-            {(!manualPlayerId || unpaidPeriods.length === 0) && (
-              <div>
-                <Label htmlFor="manual-period">Período (YYYY-MM) — pago adelantado</Label>
-                <Input
-                  id="manual-period"
-                  value={manualPeriod}
-                  onChange={(e) => setManualPeriod(e.target.value)}
-                  placeholder="2026-02"
-                  className="mt-1"
-                />
-              </div>
+            {manualChargeType === MANUAL_CHARGE_TYPE_MONTHLY &&
+              (!manualPlayerId || monthlyUnpaid.length === 0) && (
+                <div>
+                  <Label htmlFor="manual-period">Período (YYYY-MM) — pago adelantado</Label>
+                  <Input
+                    id="manual-period"
+                    value={manualPeriod}
+                    onChange={(e) => setManualPeriod(e.target.value)}
+                    placeholder="2026-02"
+                    className="mt-1"
+                  />
+                </div>
+              )}
+            {manualChargeType === MANUAL_CHARGE_TYPE_REGISTRATION && (
+              <p className="text-sm text-muted-foreground">
+                {registrationUnpaid
+                  ? `Inscripción pendiente: ${registrationUnpaid.currency} ${registrationUnpaid.amount.toLocaleString("es-AR")}`
+                  : "Este cliente no tiene inscripción pendiente. Podés registrarla igual si corresponde."}
+              </p>
             )}
+            {manualChargeType !== MANUAL_CHARGE_TYPE_MONTHLY &&
+              manualChargeType !== MANUAL_CHARGE_TYPE_REGISTRATION && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Mes</Label>
+                    <Select
+                      value={manualPeriod.slice(5, 7) || String(new Date().getMonth() + 1).padStart(2, "0")}
+                      onValueChange={(month) => {
+                        const year = manualPeriod.slice(0, 4) || String(new Date().getFullYear());
+                        setManualPeriod(`${year}-${month}`);
+                      }}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MONTHS.map((m) => (
+                          <SelectItem key={m.value} value={m.value}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Año</Label>
+                    <Select
+                      value={manualPeriod.slice(0, 4) || String(new Date().getFullYear())}
+                      onValueChange={(year) => {
+                        const month =
+                          manualPeriod.slice(5, 7) || String(new Date().getMonth() + 1).padStart(2, "0");
+                        setManualPeriod(`${year}-${month}`);
+                      }}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getYears().map((y) => (
+                          <SelectItem key={y} value={String(y)}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             <div>
               <Label htmlFor="manual-amount">Monto (ARS)</Label>
               <Input
@@ -865,14 +1045,20 @@ export function PaymentsTab({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setManualOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetManualForm();
+                setManualOpen(false);
+              }}
+            >
               Cancelar
             </Button>
             <Button
               onClick={handleManualPayment}
               disabled={manualSubmitting}
             >
-              {manualSubmitting ? "Guardando…" : "Registrar pago"}
+              {manualSubmitting ? "Guardando…" : "Registrar cobro"}
             </Button>
           </DialogFooter>
         </DialogContent>

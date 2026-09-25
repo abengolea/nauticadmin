@@ -25,15 +25,7 @@ import {
   PAYMENT_METHOD_LABELS,
   REGISTER_PAYMENT_METHODS,
 } from "@/lib/payments/payment-method";
-
-const CONCEPTOS_PREDEFINIDOS = [
-  "Lavado de lancha",
-  "Venta de insumos",
-  "Mantenimiento embarcación",
-  "Guardería adicional",
-  "Uso de grúa",
-  "Otro",
-] as const;
+import { SERVICE_CHARGE_CONCEPTS } from "@/lib/payments/charge-concepts";
 
 const MONTHS: { value: string; label: string }[] = [
   { value: "01", label: "Enero" },
@@ -211,7 +203,7 @@ export function AddServiceChargeDialog({
                 <SelectValue placeholder="Seleccionar o escribir otro" />
               </SelectTrigger>
               <SelectContent>
-                {CONCEPTOS_PREDEFINIDOS.filter((c) => c !== "Otro").map((c) => (
+                {SERVICE_CHARGE_CONCEPTS.map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
                   </SelectItem>
