@@ -375,6 +375,57 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // --- Marina: amarras, embarcaciones, bitácora ---
+
+    match /schools/{schoolId}/berths/{berthId} {
+      allow read: if isStaffOfSchool(schoolId);
+      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
+      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+    }
+
+    match /schools/{schoolId}/berthContracts/{contractId} {
+      allow read: if isStaffOfSchool(schoolId);
+      allow create, update: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId);
+      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+    }
+
+    match /schools/{schoolId}/vessels/{vesselId} {
+      // Reglas separadas (sin ||): Firestore rechaza list queries con OR que mezcla staff + resource.data.
+      allow read: if isStaffOfSchool(schoolId);
+      allow read: if isOwnPlayer(schoolId, resource.data.playerId)
+          || hasPlayerLoginFor(schoolId, resource.data.playerId);
+      allow create: if isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || isOperador(schoolId)
+          || (isSignedIn()
+              && request.resource.data.playerId != null
+              && (isOwnPlayer(schoolId, request.resource.data.playerId)
+                  || hasPlayerLoginFor(schoolId, request.resource.data.playerId)));
+      allow update: if isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || isOperador(schoolId)
+          || ((isOwnPlayer(schoolId, resource.data.playerId)
+                  || hasPlayerLoginFor(schoolId, resource.data.playerId))
+              && request.resource.data.playerId == resource.data.playerId);
+      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+    }
+
+    match /schools/{schoolId}/logbook/{entryId} {
+      allow read: if isStaffOfSchool(schoolId);
+      allow read: if isOwnPlayer(schoolId, resource.data.playerId)
+          || hasPlayerLoginFor(schoolId, resource.data.playerId);
+      allow create: if isStaffOfSchool(schoolId)
+          || (isSignedIn()
+              && request.resource.data.playerId != null
+              && (isOwnPlayer(schoolId, request.resource.data.playerId)
+                  || hasPlayerLoginFor(schoolId, request.resource.data.playerId)));
+      allow update: if isStaffOfSchool(schoolId)
+          || ((isOwnPlayer(schoolId, resource.data.playerId)
+                  || hasPlayerLoginFor(schoolId, resource.data.playerId))
+              && request.resource.data.playerId == resource.data.playerId);
+      allow delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+    }
+
     // Configuración de turnos por náutica (admin configura; clientes leen si está habilitado)
     match /schools/{schoolId}/appointmentConfig/{configId} {
       allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isOperador(schoolId)
