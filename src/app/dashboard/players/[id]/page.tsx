@@ -30,6 +30,7 @@ import {
 import { AlertCircle, Archive, ArchiveRestore } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PlayerPaymentStatusCard } from "@/components/players/PlayerPaymentStatusCard";
+import { PlayerVesselsSection } from "@/components/players/PlayerVesselsSection";
 
 export default function PlayerProfilePage() {
   const params = useParams();
@@ -345,6 +346,17 @@ export default function PlayerProfilePage() {
           playerId={id}
           onEditEmbarcacion={() => { setEditInitialTab("nautica"); setEditPlayerOpen(true); }}
         />
+        {schoolId && (
+          <div className="mt-4">
+            <PlayerVesselsSection
+              playerId={id}
+              playerName={player ? `${player.firstName} ${player.lastName}` : ''}
+              schoolId={schoolId}
+              isAdmin={!isViewingAsPlayer && (profile?.role === 'school_admin' || profile?.role === 'operador' || !!isSuperAdmin)}
+              isOwnProfile={isViewingAsPlayer}
+            />
+          </div>
+        )}
         <div className="mt-4">
           <PlayerPaymentStatusCard
             getToken={getToken}

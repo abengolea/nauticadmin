@@ -25,6 +25,8 @@ import {
   BarChart3,
   Calculator,
   Truck,
+  Anchor,
+  BookOpen,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -158,6 +160,7 @@ export function SidebarNav() {
         { href: "/dashboard", label: "Panel Principal", icon: Home },
         { href: profileHref, label: "Mi perfil", icon: Users },
         { href: "/dashboard/reservar-lancha", label: "Pedir lancha", icon: Ship },
+        { href: "/dashboard/bitacora", label: "Bitácora", icon: BookOpen },
         { href: "/dashboard/appointments", label: "Sacar turno", icon: CalendarClock },
         { href: tab("videoteca"), label: "Galería", icon: Video },
         { href: "/dashboard/payments", label: "Mis pagos", icon: Banknote, badgeOverdue: true },
@@ -170,6 +173,9 @@ export function SidebarNav() {
     menuItems = [
       { href: "/dashboard", label: "Panel Principal", icon: Home },
       { href: "/dashboard/players", label: "Clientes", icon: Users },
+      { href: "/dashboard/amarras", label: "Amarras", icon: Anchor },
+      { href: "/dashboard/embarcaciones", label: "Embarcaciones", icon: Ship },
+      { href: "/dashboard/bitacora", label: "Bitácora", icon: BookOpen },
       { href: "/dashboard/solicitudes", label: "Solicitudes embarcaciones", icon: Ship },
       { href: "/dashboard/payments", label: "Ventas y pagos", icon: Banknote },
       { href: "/dashboard/reconciliation", label: "Conciliación", icon: FileSpreadsheet },

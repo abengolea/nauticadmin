@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -14,12 +13,14 @@ import { useCollection, useUserProfile, useDoc, useFirebase } from "@/firebase";
 import { getAuth } from "firebase/auth";
 import type { Player, School as SchoolType } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import React, { useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { DashboardStats } from "./DashboardStats";
+import { MarinaDashboardSection } from "./MarinaDashboardSection";
 
 export function SchoolAdminDashboard() {
   const { profile, isReady, activeSchoolId } = useUserProfile();
   const { app } = useFirebase();
+  const [marinaTotals, setMarinaTotals] = useState<{ current: number; prevYear: number; currency: string } | null>(null);
 
   const getToken = useCallback(async () => {
     if (!app) return null;
@@ -124,10 +125,24 @@ export function SchoolAdminDashboard() {
       </div>
 
       {activeSchoolId && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Resumen del mes</h2>
-          <DashboardStats schoolId={activeSchoolId} getToken={getToken} />
-        </div>
+        <>
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold">Resumen del mes</h2>
+            <DashboardStats
+              schoolId={activeSchoolId}
+              getToken={getToken}
+              onTotals={(current, prevYear, currency) =>
+                setMarinaTotals({ current, prevYear, currency })
+              }
+            />
+          </div>
+          <MarinaDashboardSection
+            schoolId={activeSchoolId}
+            currentMonthTotal={marinaTotals?.current ?? 0}
+            prevYearTotal={marinaTotals?.prevYear ?? 0}
+            currency={marinaTotals?.currency ?? "ARS"}
+          />
+        </>
       )}
     </div>
   );

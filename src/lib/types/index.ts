@@ -491,3 +491,5 @@ export * from './payments';
 export * from './platform-fee';
 // Re-export appointments types
 export * from './appointments';
+// Re-export marina types
+export * from './marina';

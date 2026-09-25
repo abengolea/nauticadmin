@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { getAuth } from "firebase/auth";
 import {
   Card,
@@ -66,6 +66,7 @@ type SolicitudItem = {
 interface DashboardStatsProps {
   schoolId: string;
   getToken: () => Promise<string | null>;
+  onTotals?: (currentMonth: number, prevYear: number, currency: string) => void;
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -78,10 +79,11 @@ function formatCurrency(amount: number, currency = "ARS"): string {
   return `${currency} ${amount.toLocaleString("es-AR")}`;
 }
 
-export function DashboardStats({ schoolId, getToken }: DashboardStatsProps) {
+export function DashboardStats({ schoolId, getToken, onTotals }: DashboardStatsProps) {
   const [loading, setLoading] = useState(true);
   const [delinquents, setDelinquents] = useState<DelinquentInfo[]>([]);
   const [paymentsMonth, setPaymentsMonth] = useState<PaymentItem[]>([]);
+  const [paymentsPrevYear, setPaymentsPrevYear] = useState<PaymentItem[]>([]);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [registro, setRegistro] = useState<RegistroItem[]>([]);
   const [pendientes, setPendientes] = useState<SolicitudItem[]>([]);
@@ -97,14 +99,20 @@ export function DashboardStats({ schoolId, getToken }: DashboardStatsProps) {
     const now = new Date();
     const dateFrom = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
     const dateTo = format(now, "yyyy-MM-dd");
+    const prevYearFrom = format(new Date(now.getFullYear() - 1, now.getMonth(), 1), "yyyy-MM-dd");
+    const prevYearTo = format(new Date(now.getFullYear() - 1, now.getMonth() + 1, 0), "yyyy-MM-dd");
 
     try {
-      const [delRes, payRes, expRes, regRes, pendRes] = await Promise.all([
+      const [delRes, payRes, prevPayRes, expRes, regRes, pendRes] = await Promise.all([
         fetch(`/api/payments/delinquents?schoolId=${schoolId}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(
           `/api/payments?schoolId=${schoolId}&dateFrom=${dateFrom}&dateTo=${dateTo}&limit=500`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        ),
+        fetch(
+          `/api/payments?schoolId=${schoolId}&dateFrom=${prevYearFrom}&dateTo=${prevYearTo}&limit=500`,
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         fetch(`/api/expenses?schoolId=${schoolId}&limit=200`, {
@@ -130,6 +138,10 @@ export function DashboardStats({ schoolId, getToken }: DashboardStatsProps) {
       if (payRes.ok) {
         const p = await payRes.json();
         setPaymentsMonth(p.payments ?? []);
+      }
+      if (prevPayRes.ok) {
+        const p = await prevPayRes.json();
+        setPaymentsPrevYear(p.payments ?? []);
       }
       if (expRes.ok) {
         const e = await expRes.json();
@@ -169,6 +181,17 @@ export function DashboardStats({ schoolId, getToken }: DashboardStatsProps) {
   const approvedPayments = paymentsMonth.filter((p) => p.status === "approved");
   const totalCobrado = approvedPayments.reduce((s, p) => s + (p.amount ?? 0), 0);
   const cantidadPagos = approvedPayments.length;
+  const prevYearApproved = paymentsPrevYear.filter((p) => p.status === "approved");
+  const totalPrevYear = prevYearApproved.reduce((s, p) => s + (p.amount ?? 0), 0);
+  const currency = approvedPayments[0]?.currency ?? "ARS";
+
+  // Notificar totales al padre una vez cargados
+  React.useEffect(() => {
+    if (!loading && onTotals) {
+      onTotals(totalCobrado, totalPrevYear, currency);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, totalCobrado, totalPrevYear]);
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
