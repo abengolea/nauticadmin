@@ -59,13 +59,12 @@ export function ClientSelectCombobox({
     onChange(playerId);
     setOpen(false);
     setQuery("");
+    inputRef.current?.blur();
   };
 
-  const openList = () => {
-    if (disabled) return;
-    setOpen(true);
-    setQuery("");
-  };
+  const closeList = React.useCallback(() => {
+    setOpen(false);
+  }, []);
 
   React.useEffect(() => {
     if (!open) return;
@@ -73,17 +72,14 @@ export function ClientSelectCombobox({
       const el = rootRef.current;
       if (!el) return;
       if (e.target instanceof Node && !el.contains(e.target)) {
-        setOpen(false);
-        setQuery("");
+        closeList();
       }
     };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("pointerdown", onPointerDown);
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [open]);
+  }, [open, closeList]);
 
   const inputValue = open ? query : selectedPlayer?.displayName ?? "";
 
@@ -104,8 +100,13 @@ export function ClientSelectCombobox({
           autoComplete="off"
           placeholder={open || !selectedPlayer ? searchPlaceholder : placeholder}
           value={inputValue}
-          onFocus={openList}
-          onClick={openList}
+          onClick={() => {
+            if (disabled) return;
+            if (!open) {
+              setQuery("");
+              setOpen(true);
+            }
+          }}
           onChange={(e) => {
             setOpen(true);
             setQuery(e.target.value);
@@ -117,6 +118,15 @@ export function ClientSelectCombobox({
               setOpen(false);
               setQuery("");
               inputRef.current?.blur();
+              return;
+            }
+            if (e.key === "Tab") {
+              setOpen(false);
+              return;
+            }
+            if (e.key === "ArrowDown" && !open) {
+              e.preventDefault();
+              setOpen(true);
               return;
             }
             if (e.key === "Enter" && open && filtered.length === 1) {

@@ -859,7 +859,15 @@ export function PaymentsTab({
           setManualOpen(open);
         }}
       >
-        <DialogContent className="overflow-visible sm:max-w-lg">
+        <DialogContent
+          className="overflow-visible sm:max-w-lg"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            requestAnimationFrame(() => {
+              document.getElementById("manual-player")?.focus();
+            });
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Registrar cobro manual</DialogTitle>
             <DialogDescription>
@@ -882,11 +890,11 @@ export function PaymentsTab({
             </div>
             <div>
               <Label htmlFor="manual-charge-type">Qué se cobra</Label>
-              <Select value={manualChargeType} onValueChange={handleChargeTypeChange}>
+              <Select modal={false} value={manualChargeType} onValueChange={handleChargeTypeChange}>
                 <SelectTrigger id="manual-charge-type" className="mt-1">
                   <SelectValue placeholder="Elegí el concepto de cobro" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent onCloseAutoFocus={(e) => e.preventDefault()}>
                   {MANUAL_CHARGE_TYPE_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
@@ -975,6 +983,7 @@ export function PaymentsTab({
                   <div>
                     <Label>Mes</Label>
                     <Select
+                      modal={false}
                       value={manualPeriod.slice(5, 7) || String(new Date().getMonth() + 1).padStart(2, "0")}
                       onValueChange={(month) => {
                         const year = manualPeriod.slice(0, 4) || String(new Date().getFullYear());
@@ -984,7 +993,7 @@ export function PaymentsTab({
                       <SelectTrigger className="mt-1">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent onCloseAutoFocus={(e) => e.preventDefault()}>
                         {MONTHS.map((m) => (
                           <SelectItem key={m.value} value={m.value}>
                             {m.label}
@@ -996,6 +1005,7 @@ export function PaymentsTab({
                   <div>
                     <Label>Año</Label>
                     <Select
+                      modal={false}
                       value={manualPeriod.slice(0, 4) || String(new Date().getFullYear())}
                       onValueChange={(year) => {
                         const month =
@@ -1006,7 +1016,7 @@ export function PaymentsTab({
                       <SelectTrigger className="mt-1">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent onCloseAutoFocus={(e) => e.preventDefault()}>
                         {getYears().map((y) => (
                           <SelectItem key={y} value={String(y)}>
                             {y}
@@ -1030,11 +1040,11 @@ export function PaymentsTab({
             </div>
             <div>
               <Label htmlFor="manual-method">Medio de pago</Label>
-              <Select value={manualMethod} onValueChange={setManualMethod}>
+              <Select modal={false} value={manualMethod} onValueChange={setManualMethod}>
                 <SelectTrigger id="manual-method" className="mt-1">
                   <SelectValue placeholder="Elegí el medio de pago" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent onCloseAutoFocus={(e) => e.preventDefault()}>
                   {REGISTER_PAYMENT_METHODS.map((k) => (
                     <SelectItem key={k} value={k}>
                       {PAYMENT_METHOD_LABELS[k]}
