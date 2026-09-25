@@ -64,6 +64,56 @@ function condicionIVAtoAfipId(condicionIVA: string | undefined): number {
   return 5; // Consumidor Final por defecto
 }
 
+/** Pseudo-CUIT 20-DNI-0 no es CUIT real en AFIP; va como DocTipo 96 (DNI). */
+function isPseudoCuitFromDni(digits: string): boolean {
+  return /^20\d{8}0$/.test(digits);
+}
+
+function resolveReceptorDocument(
+  playerData: { cuit?: string; dni?: string } | null,
+  simulation: boolean
+):
+  | { docDisplay: string; docTipo: number; docNro: number }
+  | { error: 'missing' | 'invalid' } {
+  const cuitDigits = String(playerData?.cuit ?? '').replace(/\D/g, '');
+  const dniDigits = String(playerData?.dni ?? '').replace(/\D/g, '');
+
+  if (cuitDigits.length === 11 && !isPseudoCuitFromDni(cuitDigits)) {
+    return {
+      docDisplay: String(playerData?.cuit ?? cuitDigits),
+      docTipo: 80,
+      docNro: parseInt(cuitDigits, 10),
+    };
+  }
+
+  if (dniDigits.length === 8) {
+    return {
+      docDisplay: simulation ? '20-00000000-0' : `20-${dniDigits}-0`,
+      docTipo: 96,
+      docNro: parseInt(dniDigits, 10),
+    };
+  }
+
+  if (cuitDigits.length === 11 && isPseudoCuitFromDni(cuitDigits)) {
+    const dniFromPseudo = cuitDigits.slice(2, 10);
+    return {
+      docDisplay: String(playerData?.cuit ?? `20-${dniFromPseudo}-0`),
+      docTipo: 96,
+      docNro: parseInt(dniFromPseudo, 10),
+    };
+  }
+
+  if (simulation) {
+    return { docDisplay: '20-00000000-0', docTipo: 96, docNro: 0 };
+  }
+
+  if (cuitDigits.length > 0 || dniDigits.length > 0) {
+    return { error: 'invalid' };
+  }
+
+  return { error: 'missing' };
+}
+
 export async function POST(request: Request) {
   try {
     const auth = await verifyIdToken(request.headers.get('Authorization'));
@@ -206,25 +256,19 @@ export async function POST(request: Request) {
           continue;
         }
 
-        let docReceptor = playerData?.cuit;
-        let tipoDocReceptor = 80;
-        if (!docReceptor && playerData?.dni) {
-          const dniNum = String(playerData.dni).replace(/\D/g, '').padStart(8, '0');
-          docReceptor = simulation ? '20-00000000-0' : (dniNum.length === 8 ? `20-${dniNum}-0` : '');
-          tipoDocReceptor = 96;
-        }
-        if (!docReceptor) {
-          docReceptor = simulation ? '20-00000000-0' : '';
-        }
-
-        if (!simulation && !playerData?.cuit && !playerData?.dni) {
+        const receptorDoc = resolveReceptorDocument(playerData, simulation);
+        if ('error' in receptorDoc) {
           results.push({
             paymentId,
             ok: false,
-            error: `${playerName} no tiene CUIT/DNI cargado. Agregá el CUIT en el perfil del cliente.`,
+            error:
+              receptorDoc.error === 'missing'
+                ? `${playerName} no tiene CUIT/DNI cargado. Agregá el CUIT en el perfil del cliente.`
+                : `CUIT (11 dígitos) o DNI (8 dígitos) inválido para ${playerName}`,
           });
           continue;
         }
+        const { docDisplay: docReceptor, docTipo: tipoDocReceptor, docNro } = receptorDoc;
 
         // Monto pagado es IVA incluido: total = neto + IVA 21%
         const impTotal = amount;
@@ -240,19 +284,6 @@ export async function POST(request: Request) {
           cae = `SIM-${Date.now()}-${paymentId.slice(0, 6)}`;
           caeVto = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
         } else {
-          const docStr = String(docReceptor).replace(/\D/g, '');
-          const docNro = parseInt(docStr, 10);
-          const isCuit = docStr.length === 11;
-          const isDni = docStr.length === 8;
-          if (isNaN(docNro) || (!isCuit && !isDni)) {
-            results.push({
-              paymentId,
-              ok: false,
-              error: `CUIT (11 dígitos) o DNI (8 dígitos) inválido para ${playerName}`,
-            });
-            continue;
-          }
-
           const condIvaReceptor = condicionIVAtoAfipId(playerData?.condicionIVA);
 
           const result = await runWithAfipSession(afipSession, () =>
@@ -260,7 +291,7 @@ export async function POST(request: Request) {
               PtoVta: ptoVta,
               CbteTipo: cbteTipo,
               Concepto: 2,
-              DocTipo: isCuit ? 80 : 96,
+              DocTipo: tipoDocReceptor,
               DocNro: docNro,
               CbteFch: cbteFch,
               ImpTotal: impTotal,
