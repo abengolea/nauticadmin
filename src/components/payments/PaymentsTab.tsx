@@ -39,6 +39,7 @@ import { useCollection } from "@/firebase";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Payment, Player } from "@/lib/types";
+import { formatPlayerName, playerNameSearchText } from "@/lib/format-player-name";
 import {
   getPaymentMethodLabel,
   PAYMENT_METHOD_LABELS,
@@ -219,10 +220,8 @@ export function PaymentsTab({
         .filter((p) => !p.archived)
         .map((p) => ({
           id: p.id,
-          displayName:
-            [p.firstName, p.lastName].filter(Boolean).join(" ").trim() ||
-            p.email ||
-            p.id,
+          displayName: formatPlayerName(p) || p.email || p.id,
+          searchText: playerNameSearchText(p),
         })),
     [players]
   );

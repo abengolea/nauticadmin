@@ -26,6 +26,7 @@ import { Camera, FileText, ImagePlus, Loader2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { compressImageForUpload } from '@/lib/image-compress';
 import type { ParsedPaymentReceipt } from '@/ai/flows/parse-payment-receipt';
+import { formatPlayerName } from '@/lib/format-player-name';
 
 const RECEIPT_TYPE_LABELS: Record<string, string> = {
   cheque: 'Cheque',
@@ -328,7 +329,7 @@ export function ManualPaymentDialog({
                 <SelectContent>
                   {activePlayers.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {[p.firstName, p.lastName].filter(Boolean).join(' ')}
+                      {formatPlayerName(p)}
                     </SelectItem>
                   ))}
                 </SelectContent>

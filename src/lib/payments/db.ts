@@ -11,6 +11,14 @@ import { inferPaymentMethod } from './payment-method';
 import type { Payment, PaymentIntent, PaymentConfig, DelinquentInfo, MercadoPagoConnection } from '@/lib/types/payments';
 import type { Player } from '@/lib/types';
 import { getCategoryLabel } from '@/lib/utils';
+import { formatPlayerName } from '@/lib/format-player-name';
+
+function nameFromPlayerDoc(d: Record<string, unknown>): string {
+  return formatPlayerName({
+    firstName: String(d.firstName ?? d.first_name ?? ''),
+    lastName: String(d.lastName ?? d.last_name ?? ''),
+  });
+}
 
 type Firestore = admin.firestore.Firestore;
 type DocumentSnapshot = admin.firestore.DocumentSnapshot;
@@ -471,9 +479,7 @@ export async function getPlayerNames(
       const id = batch[idx];
       if (snap.exists) {
         const d = snap.data()!;
-        const first = d.firstName ?? (d as Record<string, unknown>).first_name ?? '';
-        const last = d.lastName ?? (d as Record<string, unknown>).last_name ?? '';
-        const name = `${first} ${last}`.trim();
+        const name = nameFromPlayerDoc(d as Record<string, unknown>);
         map.set(id, name || id);
       } else {
         map.set(id, id);
@@ -490,9 +496,7 @@ export async function getPlayerNames(
       const snap = await ref.get();
       if (snap.exists) {
         const d = snap.data()!;
-        const first = d.firstName ?? (d as Record<string, unknown>).first_name ?? '';
-        const last = d.lastName ?? (d as Record<string, unknown>).last_name ?? '';
-        const name = `${first} ${last}`.trim();
+        const name = nameFromPlayerDoc(d as Record<string, unknown>);
         if (name) map.set(id, name);
         break;
       }
@@ -540,9 +544,7 @@ export async function getPlayerNames(
       }
       if (playerSnap?.exists) {
         const d = playerSnap.data()!;
-        const first = d.firstName ?? (d as Record<string, unknown>).first_name ?? '';
-        const last = d.lastName ?? (d as Record<string, unknown>).last_name ?? '';
-        const name = `${first} ${last}`.trim();
+        const name = nameFromPlayerDoc(d as Record<string, unknown>);
         if (name) map.set(id, name);
       } else {
         // 4) Último recurso: usar displayName del usuario de Auth si existe (p. ej. "Gregorio Bengolea")
@@ -778,7 +780,7 @@ export async function computeDelinquents(
       const daysOverdue = dueDate <= now ? Math.floor((now.getTime() - dueDate.getTime()) / (24 * 60 * 60 * 1000)) : 0;
       delinquents.push({
         playerId: player.id,
-        playerName: `${player.firstName} ${player.lastName}`.trim(),
+        playerName: formatPlayerName(player),
         playerEmail: player.email,
         tutorContact: player.tutorContact,
         schoolId,
@@ -827,7 +829,7 @@ export async function computeDelinquents(
       const daysOverdue = Math.floor((now.getTime() - regDate.getTime()) / (24 * 60 * 60 * 1000));
       delinquents.push({
         playerId: player.id,
-        playerName: `${player.firstName} ${player.lastName}`.trim(),
+        playerName: formatPlayerName(player),
         playerEmail: player.email,
         tutorContact: player.tutorContact,
         schoolId,

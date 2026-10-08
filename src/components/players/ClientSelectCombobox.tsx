@@ -9,6 +9,8 @@ import { normalizeString } from "@/lib/text-normalize";
 export type ClientSelectOption = {
   id: string;
   displayName: string;
+  /** Texto extra para buscar en ambos órdenes (apellido+nombre y nombre+apellido). */
+  searchText?: string;
 };
 
 type ClientSelectComboboxProps = {
@@ -72,7 +74,9 @@ export function ClientSelectCombobox({
     const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
     const matches: ClientSelectOption[] = [];
     for (const p of players) {
-      const name = normalizeString(p.displayName);
+      const name = normalizeString(
+        [p.displayName, p.searchText].filter(Boolean).join(" ")
+      );
       if (tokens.every((t) => name.includes(t))) {
         matches.push(p);
         if (matches.length >= MAX_RESULTS) break;
