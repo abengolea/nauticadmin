@@ -177,6 +177,8 @@ export interface Player {
   embarcacionMatricula?: string;
   /** @deprecated Usar embarcaciones[].medidas - Medidas y características (compatibilidad) */
   embarcacionMedidas?: string;
+  /** Titular de la embarcación (texto libre, puede no coincidir con el cliente). */
+  titularEmbarcacion?: string;
   /** Ubicación (amarra, muelle, etc.) - a nivel cliente */
   ubicacion?: string;
   /** Fecha desde que es cliente (string o Date) */

@@ -86,6 +86,7 @@ const playerSchema = z.object({
   // Datos de embarcaciones
   embarcaciones: z.array(embarcacionSchema).default([]),
   serviciosAdicionales: z.array(servicioAdicionalSchema).default([]),
+  titularEmbarcacion: z.string().optional(),
   ubicacion: z.string().optional(),
   clienteDesde: z.string().optional(),
   creditoActivo: z.boolean().optional(),
@@ -119,6 +120,7 @@ export function AddPlayerForm() {
             dni: "",
             embarcaciones: [{ id: crypto.randomUUID(), nombre: "", matricula: "", medidas: "", lona: "", datos: "", claseId: "" }],
             serviciosAdicionales: [],
+            titularEmbarcacion: "",
             ubicacion: "",
             clienteDesde: "",
             creditoActivo: undefined,
@@ -219,6 +221,7 @@ export function AddPlayerForm() {
                 createdBy: profile.uid,
                 ...(embarcaciones.length > 0 && { embarcaciones }),
                 ...(serviciosAdicionales.length > 0 && { serviciosAdicionales }),
+                ...(values.titularEmbarcacion?.trim() && { titularEmbarcacion: values.titularEmbarcacion.trim() }),
                 ...(values.ubicacion?.trim() && { ubicacion: values.ubicacion.trim() }),
                 ...(values.clienteDesde?.trim() && { clienteDesde: values.clienteDesde.trim() }),
                 ...(values.creditoActivo !== undefined && { creditoActivo: values.creditoActivo }),
@@ -669,6 +672,20 @@ export function AddPlayerForm() {
                     </div>
                 )}
                 <div className="grid md:grid-cols-2 gap-6 pt-2 border-t">
+                    <FormField
+                        control={form.control}
+                        name="titularEmbarcacion"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Titular de la embarcación</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Nombre y apellido del titular" {...field} />
+                                </FormControl>
+                                <FormDescription>Nombre del titular de la embarcación. Se completa a mano.</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
                     <FormField
                         control={form.control}
                         name="ubicacion"

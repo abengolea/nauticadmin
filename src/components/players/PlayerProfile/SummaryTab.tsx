@@ -35,6 +35,7 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
     const hasNautico =
       embarcaciones.length > 0 ||
       serviciosAdicionales.length > 0 ||
+      player.titularEmbarcacion ||
       player.ubicacion ||
       player.clienteDesde ||
       player.creditoActivo != null ||
@@ -181,6 +182,12 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                                 )}
                               </React.Fragment>
                             ))}
+                            {player.titularEmbarcacion && (
+                                <TableRow>
+                                    <TableCell className="font-medium text-muted-foreground">Titular de la embarcación</TableCell>
+                                    <TableCell className="text-right">{player.titularEmbarcacion}</TableCell>
+                                </TableRow>
+                            )}
                             {player.ubicacion && (
                                 <TableRow>
                                     <TableCell className="font-medium text-muted-foreground">Ubicación (amarra/muelle)</TableCell>

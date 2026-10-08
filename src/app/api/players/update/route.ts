@@ -32,6 +32,7 @@ type UpdatePayload = {
     embarcacionNombre?: string | null;
     embarcacionMatricula?: string | null;
     embarcacionMedidas?: string | null;
+    titularEmbarcacion?: string | null;
     ubicacion?: string | null;
     clienteDesde?: string | null;
     creditoActivo?: boolean | null;

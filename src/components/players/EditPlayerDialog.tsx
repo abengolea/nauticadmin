@@ -76,6 +76,7 @@ const playerSchema = z.object({
   // Datos náuticos - embarcaciones (una o más)
   embarcaciones: z.array(embarcacionSchema).default([]),
   serviciosAdicionales: z.array(servicioAdicionalSchema).default([]),
+  titularEmbarcacion: z.string().optional(),
   ubicacion: z.string().optional(),
   clienteDesde: z.string().optional(),
   creditoActivo: z.boolean().optional(),
@@ -129,6 +130,7 @@ export function EditPlayerDialog({
       photoUrl: player.photoUrl ?? "",
       embarcaciones: embarcacionesIniciales.length > 0 ? embarcacionesIniciales : [{ id: crypto.randomUUID(), nombre: "", matricula: "", medidas: "", lona: "", datos: "", claseId: "" }],
       serviciosAdicionales: (player as { serviciosAdicionales?: { id: string; claseId: string }[] }).serviciosAdicionales ?? [],
+      titularEmbarcacion: player.titularEmbarcacion ?? "",
       ubicacion: player.ubicacion ?? "",
       clienteDesde: player.clienteDesde ?? "",
       creditoActivo: player.creditoActivo ?? undefined,
@@ -188,6 +190,7 @@ export function EditPlayerDialog({
         photoUrl: player.photoUrl ?? "",
         embarcaciones: emb.length > 0 ? emb : [{ id: crypto.randomUUID(), nombre: "", matricula: "", medidas: "", datos: "", claseId: "" }],
         serviciosAdicionales: (player as { serviciosAdicionales?: { id: string; claseId: string }[] }).serviciosAdicionales ?? [],
+        titularEmbarcacion: player.titularEmbarcacion ?? "",
         ubicacion: player.ubicacion ?? "",
         clienteDesde: player.clienteDesde ?? "",
         creditoActivo: player.creditoActivo ?? undefined,
@@ -239,6 +242,7 @@ export function EditPlayerDialog({
       serviciosAdicionales: (values.serviciosAdicionales ?? []).filter((s) => s.claseId?.trim()).length > 0
         ? (values.serviciosAdicionales ?? []).filter((s) => s.claseId?.trim()).map((s) => ({ id: s.id, claseId: s.claseId!.trim() }))
         : null,
+      titularEmbarcacion: values.titularEmbarcacion?.trim() || null,
       ubicacion: values.ubicacion?.trim() || null,
       clienteDesde: values.clienteDesde?.trim() || null,
       creditoActivo: values.creditoActivo ?? null,
@@ -696,6 +700,20 @@ export function EditPlayerDialog({
                     </div>
                   )}
                   <div className="grid md:grid-cols-2 gap-6 pt-2 border-t">
+                  <FormField
+                    control={form.control}
+                    name="titularEmbarcacion"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Titular de la embarcación</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nombre y apellido del titular" {...field} />
+                        </FormControl>
+                        <FormDescription>Nombre del titular de la embarcación. Se completa a mano.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="ubicacion"
