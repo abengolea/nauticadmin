@@ -633,6 +633,7 @@ export async function listPayments(
       return inferPaymentMethod({
         method: d.method,
         provider: d.provider,
+        metadata: d.metadata,
         chequeDueDate: d.chequeDueDate,
         chequeStatus: d.chequeStatus,
       }) === opts.method;

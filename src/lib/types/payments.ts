@@ -9,7 +9,15 @@ export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'refunded';
 
 export type PaymentProvider = 'mercadopago' | 'dlocal' | 'stripe' | 'transfer' | 'manual' | 'excel_import';
 
-export type PaymentMethod = 'card' | 'transfer' | 'cash' | 'cheque' | 'mercadopago' | 'unknown';
+export type PaymentMethod =
+  | 'card_credit'
+  | 'card_debit'
+  | 'card'
+  | 'transfer'
+  | 'cash'
+  | 'cheque'
+  | 'mercadopago'
+  | 'unknown';
 
 /** Estado de duplicado: none, suspected (en caso abierto), confirmed/ignored (resuelto). */
 export type DuplicateStatus = 'none' | 'suspected' | 'confirmed' | 'ignored';

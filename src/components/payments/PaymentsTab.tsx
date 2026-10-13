@@ -29,13 +29,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, FileText } from "lucide-react";
+import { AlertTriangle, Loader2, FileText } from "lucide-react";
 import { PaymentDocumentoAdjunto } from "@/components/payments/PaymentDocumentoAdjunto";
 import { FacturaDownloadButton } from "@/components/payments/FacturaDownloadButton";
 import { ClientSelectCombobox } from "@/components/players/ClientSelectCombobox";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { useCollection } from "@/firebase";
+import { useCollection, useDoc } from "@/firebase";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Payment, Player } from "@/lib/types";
@@ -52,6 +52,9 @@ import {
   MANUAL_CHARGE_TYPE_REGISTRATION,
   resolveManualCharge,
 } from "@/lib/payments/charge-concepts";
+import type { BoatPricingConfig } from "@/lib/types/boat-pricing";
+import { getDefaultBoatPricingItems } from "@/lib/types/boat-pricing";
+import { calculateClientMonthlyPricing } from "@/lib/payments/client-monthly-pricing";
 
 /** Pago con nombre de jugador enriquecido por la API */
 type PaymentWithPlayerName = Payment & {
@@ -88,6 +91,8 @@ const PAYMENT_METHOD_FILTER_OPTIONS = [
   "cash",
   "cheque",
   "mercadopago",
+  "card_credit",
+  "card_debit",
   "card",
   "excel_import",
   "manual",
@@ -110,6 +115,8 @@ function formatPeriodDisplay(period: string, payment?: PaymentWithPlayerName): s
     return concept ? `${concept} (${monthName} ${y})` : `Servicio (${monthName} ${y})`;
   }
   if (!period || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return period;
+  const concept = (payment?.metadata as { concept?: string } | undefined)?.concept;
+  if (concept) return concept;
   const [y, m] = period.split("-");
   const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
   const monthName = format(date, "MMMM", { locale: es }).toUpperCase();
@@ -125,6 +132,14 @@ const MONTHS: { value: string; label: string }[] = [
 
 const currentPeriod = () =>
   `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+
+const currentDate = () => format(new Date(), "yyyy-MM-dd");
+
+function defaultMonthlyConcept(period: string): string {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return "Cuota mensual";
+  const [year, month] = period.split("-").map(Number);
+  return `Cuota mensual — ${format(new Date(year, month - 1, 1), "MMMM yyyy", { locale: es })}`;
+}
 
 /** Años desde 2026 en adelante (y los próximos años) */
 function getYears(): number[] {
@@ -161,7 +176,11 @@ export function PaymentsTab({
   const [manualChargeType, setManualChargeType] = useState(MANUAL_CHARGE_TYPE_MONTHLY);
   const [manualConceptCustom, setManualConceptCustom] = useState("");
   const [manualPeriod, setManualPeriod] = useState(currentPeriod());
-  const [manualAmount, setManualAmount] = useState("15000");
+  const [manualMonthlyConcept, setManualMonthlyConcept] = useState(
+    defaultMonthlyConcept(currentPeriod())
+  );
+  const [manualPaidAt, setManualPaidAt] = useState(currentDate());
+  const [manualAmount, setManualAmount] = useState("");
   const [manualMethod, setManualMethod] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [unpaidPeriods, setUnpaidPeriods] = useState<{ period: string; amount: number; currency: string; label: string }[]>([]);
@@ -181,15 +200,28 @@ export function PaymentsTab({
   const applyChargeTypeDefaults = useCallback(
     (
       chargeType: string,
-      unpaid: { period: string; amount: number; currency: string; label: string }[]
+      unpaid: { period: string; amount: number; currency: string; label: string }[],
+      suggestedMonthlyAmount?: number
     ) => {
       if (chargeType === MANUAL_CHARGE_TYPE_MONTHLY) {
         const firstMonthly = unpaid.find((u) => /^\d{4}-(0[1-9]|1[0-2])$/.test(u.period));
         if (firstMonthly) {
           setManualPeriod(firstMonthly.period);
-          setManualAmount(String(firstMonthly.amount));
+          setManualMonthlyConcept(defaultMonthlyConcept(firstMonthly.period));
+          setManualAmount(
+            suggestedMonthlyAmount === undefined
+              ? String(firstMonthly.amount)
+              : suggestedMonthlyAmount > 0
+                ? String(suggestedMonthlyAmount)
+                : ""
+          );
         } else {
-          setManualPeriod(currentPeriod());
+          const period = currentPeriod();
+          setManualPeriod(period);
+          setManualMonthlyConcept(defaultMonthlyConcept(period));
+          if (suggestedMonthlyAmount !== undefined) {
+            setManualAmount(suggestedMonthlyAmount > 0 ? String(suggestedMonthlyAmount) : "");
+          }
         }
         return;
       }
@@ -214,6 +246,29 @@ export function PaymentsTab({
     schoolId ? `schools/${schoolId}/players` : "",
     { orderBy: ["lastName", "asc"] }
   );
+  const { data: boatPricing } = useDoc<BoatPricingConfig>(
+    schoolId ? `schools/${schoolId}/boatPricingConfig/default` : ""
+  );
+  const pricingItems = useMemo(
+    () =>
+      boatPricing?.items?.length
+        ? boatPricing.items
+        : getDefaultBoatPricingItems(),
+    [boatPricing]
+  );
+  const pricingByPlayer = useMemo(
+    () =>
+      new Map(
+        (players ?? []).map((player) => [
+          player.id,
+          calculateClientMonthlyPricing(player, pricingItems),
+        ])
+      ),
+    [players, pricingItems]
+  );
+  const selectedMonthlyPricing = manualPlayerId
+    ? pricingByPlayer.get(manualPlayerId)
+    : undefined;
   const playerOptions = useMemo(
     () =>
       (players ?? [])
@@ -222,8 +277,14 @@ export function PaymentsTab({
           id: p.id,
           displayName: formatPlayerName(p) || p.email || p.id,
           searchText: playerNameSearchText(p),
+          secondaryText: (() => {
+            const pricing = pricingByPlayer.get(p.id);
+            if (!pricing || pricing.total <= 0) return "Sin precio asignado";
+            const warning = pricing.missing.length > 0 ? " · incompleto" : "";
+            return `ARS ${pricing.total.toLocaleString("es-AR")}/mes${warning}`;
+          })(),
         })),
-    [players]
+    [players, pricingByPlayer]
   );
 
   const fetchPayments = useCallback(async () => {
@@ -288,7 +349,11 @@ export function PaymentsTab({
           manualChargeTypeRef.current === MANUAL_CHARGE_TYPE_MONTHLY ||
           manualChargeTypeRef.current === MANUAL_CHARGE_TYPE_REGISTRATION
         ) {
-          applyChargeTypeDefaults(manualChargeTypeRef.current, unpaid);
+          applyChargeTypeDefaults(
+            manualChargeTypeRef.current,
+            unpaid,
+            selectedMonthlyPricing?.total ?? 0
+          );
         }
       } else {
         setUnpaidPeriods([]);
@@ -298,11 +363,30 @@ export function PaymentsTab({
     } finally {
       setUnpaidLoading(false);
     }
-  }, [manualPlayerId, schoolId, getToken, applyChargeTypeDefaults]);
+  }, [
+    manualPlayerId,
+    schoolId,
+    getToken,
+    applyChargeTypeDefaults,
+    selectedMonthlyPricing?.total,
+  ]);
 
   useEffect(() => {
     fetchUnpaidForPlayer();
   }, [fetchUnpaidForPlayer]);
+
+  useEffect(() => {
+    if (
+      manualChargeType === MANUAL_CHARGE_TYPE_MONTHLY &&
+      manualPlayerId
+    ) {
+      setManualAmount(
+        selectedMonthlyPricing && selectedMonthlyPricing.total > 0
+          ? String(selectedMonthlyPricing.total)
+          : ""
+      );
+    }
+  }, [manualPlayerId, selectedMonthlyPricing?.total, manualChargeType]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -471,15 +555,18 @@ export function PaymentsTab({
     setManualPlayerId("");
     setManualChargeType(MANUAL_CHARGE_TYPE_MONTHLY);
     setManualConceptCustom("");
-    setManualPeriod(currentPeriod());
-    setManualAmount("15000");
+    const period = currentPeriod();
+    setManualPeriod(period);
+    setManualMonthlyConcept(defaultMonthlyConcept(period));
+    setManualPaidAt(currentDate());
+    setManualAmount("");
     setManualMethod("");
     setUnpaidPeriods([]);
   };
 
   const handleChargeTypeChange = (value: string) => {
     setManualChargeType(value);
-    applyChargeTypeDefaults(value, unpaidPeriods);
+    applyChargeTypeDefaults(value, unpaidPeriods, selectedMonthlyPricing?.total ?? 0);
   };
 
   const handleManualPayment = async () => {
@@ -495,6 +582,16 @@ export function PaymentsTab({
     }
     if (resolved.kind === "monthly" && !manualPeriod) {
       toast({ variant: "destructive", title: "Completá el período para la cuota mensual." });
+      return;
+    }
+    if (
+      resolved.kind === "monthly" &&
+      (!manualPaidAt || !manualMonthlyConcept.trim())
+    ) {
+      toast({
+        variant: "destructive",
+        title: "Completá la fecha de pago y el concepto.",
+      });
       return;
     }
     if (!manualMethod) {
@@ -540,6 +637,12 @@ export function PaymentsTab({
                 amount,
                 currency: "ARS",
                 method: manualMethod,
+                ...(resolved.kind === "monthly"
+                  ? {
+                      paidAt: manualPaidAt,
+                      concept: manualMonthlyConcept.trim(),
+                    }
+                  : {}),
               }),
             });
       const data = await res.json().catch(() => ({}));
@@ -553,7 +656,7 @@ export function PaymentsTab({
             ? `Concepto: ${resolved.concept}`
             : resolved.kind === "registration"
               ? "Imputado a inscripción"
-              : undefined,
+              : manualMonthlyConcept.trim(),
       });
       setManualOpen(false);
       resetManualForm();
@@ -772,7 +875,7 @@ export function PaymentsTab({
                     onCheckedChange={(c) => toggleSelectAll(c === true)}
                   />
                 </TableHead>
-                <TableHead className="text-xs sm:text-sm whitespace-nowrap">Período</TableHead>
+                <TableHead className="text-xs sm:text-sm whitespace-nowrap">Concepto / período</TableHead>
                 <TableHead className="text-xs sm:text-sm">Cliente</TableHead>
                 <TableHead className="text-xs sm:text-sm">Monto</TableHead>
                 <TableHead className="text-xs sm:text-sm whitespace-nowrap">Medio de pago</TableHead>
@@ -917,10 +1020,41 @@ export function PaymentsTab({
                   searchPlaceholder="Escribí apellido o nombre…"
                 />
               </div>
+              {selectedMonthlyPricing && (
+                <div className="mt-2 rounded-md border bg-muted/30 p-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium">Costo mensual asignado</span>
+                    <span className="font-semibold">
+                      ARS {selectedMonthlyPricing.total.toLocaleString("es-AR")}
+                    </span>
+                  </div>
+                  {selectedMonthlyPricing.lines.length > 0 && (
+                    <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      {selectedMonthlyPricing.lines.map((line) => (
+                        <li key={line.id} className="flex justify-between gap-3">
+                          <span>{line.label}</span>
+                          <span className="shrink-0">
+                            ARS {line.amount.toLocaleString("es-AR")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {selectedMonthlyPricing.missing.length > 0 && (
+                    <div className="mt-2 flex gap-2 text-xs text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        {selectedMonthlyPricing.missing.join(". ")}. Podés ingresar
+                        el monto manualmente.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <Label htmlFor="manual-charge-type">Qué se cobra</Label>
-              <Select modal={false} value={manualChargeType} onValueChange={handleChargeTypeChange}>
+              <Select value={manualChargeType} onValueChange={handleChargeTypeChange}>
                 <SelectTrigger id="manual-charge-type" className="mt-1">
                   <SelectValue placeholder="Elegí el concepto de cobro" />
                 </SelectTrigger>
@@ -973,13 +1107,20 @@ export function PaymentsTab({
                           checked={manualPeriod === u.period}
                           onChange={() => {
                             setManualPeriod(u.period);
-                            setManualAmount(String(u.amount));
+                            setManualMonthlyConcept(defaultMonthlyConcept(u.period));
+                            setManualAmount(
+                              selectedMonthlyPricing && selectedMonthlyPricing.total > 0
+                                ? String(selectedMonthlyPricing.total)
+                                : ""
+                            );
                           }}
                           className="sr-only"
                         />
                         <span className="font-medium">{u.label}</span>
                         <span className="text-sm text-muted-foreground">
-                          {u.currency} {u.amount.toLocaleString("es-AR")}
+                          {selectedMonthlyPricing && selectedMonthlyPricing.total > 0
+                            ? `ARS ${selectedMonthlyPricing.total.toLocaleString("es-AR")}`
+                            : "Ingresar importe"}
                         </span>
                       </label>
                     ))}
@@ -994,7 +1135,10 @@ export function PaymentsTab({
                   <Input
                     id="manual-period"
                     value={manualPeriod}
-                    onChange={(e) => setManualPeriod(e.target.value)}
+                    onChange={(e) => {
+                      setManualPeriod(e.target.value);
+                      setManualMonthlyConcept(defaultMonthlyConcept(e.target.value));
+                    }}
                     placeholder="2026-02"
                     className="mt-1"
                   />
@@ -1013,7 +1157,6 @@ export function PaymentsTab({
                   <div>
                     <Label>Mes</Label>
                     <Select
-                      modal={false}
                       value={manualPeriod.slice(5, 7) || String(new Date().getMonth() + 1).padStart(2, "0")}
                       onValueChange={(month) => {
                         const year = manualPeriod.slice(0, 4) || String(new Date().getFullYear());
@@ -1035,7 +1178,6 @@ export function PaymentsTab({
                   <div>
                     <Label>Año</Label>
                     <Select
-                      modal={false}
                       value={manualPeriod.slice(0, 4) || String(new Date().getFullYear())}
                       onValueChange={(year) => {
                         const month =
@@ -1057,6 +1199,31 @@ export function PaymentsTab({
                   </div>
                 </div>
               )}
+            {manualChargeType === MANUAL_CHARGE_TYPE_MONTHLY && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="manual-paid-at">Fecha de pago</Label>
+                  <Input
+                    id="manual-paid-at"
+                    type="date"
+                    value={manualPaidAt}
+                    onChange={(e) => setManualPaidAt(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="manual-monthly-concept">Concepto</Label>
+                  <Input
+                    id="manual-monthly-concept"
+                    value={manualMonthlyConcept}
+                    onChange={(e) => setManualMonthlyConcept(e.target.value)}
+                    placeholder="Cuota mensual"
+                    maxLength={200}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            )}
             <div>
               <Label htmlFor="manual-amount">Monto (ARS)</Label>
               <Input
@@ -1064,13 +1231,13 @@ export function PaymentsTab({
                 type="number"
                 value={manualAmount}
                 onChange={(e) => setManualAmount(e.target.value)}
-                placeholder="15000"
+                placeholder="Ingresá el importe"
                 className="mt-1"
               />
             </div>
             <div>
               <Label htmlFor="manual-method">Medio de pago</Label>
-              <Select modal={false} value={manualMethod} onValueChange={setManualMethod}>
+              <Select value={manualMethod} onValueChange={setManualMethod}>
                 <SelectTrigger id="manual-method" className="mt-1">
                   <SelectValue placeholder="Elegí el medio de pago" />
                 </SelectTrigger>

@@ -11,6 +11,8 @@ export type ClientSelectOption = {
   displayName: string;
   /** Texto extra para buscar en ambos órdenes (apellido+nombre y nombre+apellido). */
   searchText?: string;
+  /** Dato complementario visible en los resultados, por ejemplo el costo mensual. */
+  secondaryText?: string;
 };
 
 type ClientSelectComboboxProps = {
@@ -187,7 +189,12 @@ export function ClientSelectCombobox({
                           selected ? "opacity-100" : "opacity-0"
                         )}
                       />
-                      <span className="truncate">{p.displayName}</span>
+                      <span className="min-w-0 flex-1 truncate">{p.displayName}</span>
+                      {p.secondaryText && (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {p.secondaryText}
+                        </span>
+                      )}
                     </button>
                   </li>
                 );

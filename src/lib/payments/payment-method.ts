@@ -8,6 +8,8 @@ export const PAYMENT_METHOD_VALUES = [
   "cash",
   "cheque",
   "mercadopago",
+  "card_credit",
+  "card_debit",
   "card",
   "excel_import",
   "manual",
@@ -22,7 +24,8 @@ export const REGISTER_PAYMENT_METHODS = [
   "cash",
   "cheque",
   "mercadopago",
-  "card",
+  "card_credit",
+  "card_debit",
 ] as const;
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -30,7 +33,9 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: "Efectivo",
   cheque: "Cheque",
   mercadopago: "Mercado Pago",
-  card: "Tarjeta",
+  card_credit: "Tarjeta de crédito",
+  card_debit: "Tarjeta de débito",
+  card: "Tarjeta (sin especificar)",
   excel_import: "Excel",
   excel: "Excel",
   manual: "Manual",
@@ -40,6 +45,8 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
 };
 
 export const PAYMENT_METHOD_ENUM = [
+  "card_credit",
+  "card_debit",
   "card",
   "transfer",
   "cash",
@@ -51,6 +58,7 @@ export const PAYMENT_METHOD_ENUM = [
 type PaymentMethodSource = {
   method?: string | null;
   provider?: string | null;
+  metadata?: { paymentMethod?: unknown } | Record<string, unknown> | null;
   chequeDueDate?: string | null;
   chequeStatus?: string | null;
 };
@@ -58,7 +66,6 @@ type PaymentMethodSource = {
 /** Infiere el medio de cobro a mostrar. Nunca usa el nombre de quien cargó el pago. */
 export function inferPaymentMethod(p: PaymentMethodSource): PaymentMethodKey {
   if (p.provider === "mercadopago") return "mercadopago";
-  if (p.provider === "excel_import") return "excel_import";
   if (p.provider === "dlocal") return "dlocal";
 
   const method = p.method?.trim();
@@ -66,6 +73,11 @@ export function inferPaymentMethod(p: PaymentMethodSource): PaymentMethodKey {
     if (method === "excel" || method === "excel_import") return "excel_import";
     if (method in PAYMENT_METHOD_LABELS) return method as PaymentMethodKey;
   }
+
+  const importedMethod = p.metadata?.paymentMethod;
+  if (importedMethod === "credit") return "card_credit";
+  if (importedMethod === "debit") return "card_debit";
+  if (p.provider === "excel_import") return "excel_import";
 
   if (p.chequeDueDate || p.chequeStatus) return "cheque";
   if (p.provider === "transfer") return "transfer";

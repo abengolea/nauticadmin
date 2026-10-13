@@ -337,6 +337,7 @@ export async function POST(request: Request) {
         provider: 'excel_import',
         status: 'approved',
         paidAt: now,
+        method: paymentMethod === 'credit' ? 'card_credit' : 'card_debit',
         metadata: {
           paymentMethod,
           usuarioId: usuarioId || undefined,

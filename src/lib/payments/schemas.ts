@@ -5,10 +5,24 @@
 import { z } from 'zod';
 
 const PERIOD_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
+const DATE_REGEX = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const CLOTHING_PERIOD_REGEX = /^ropa-\d+$/;
 /** Período para conceptos esporádicos: extra-YYYYMM-timestamp (generado en servidor) */
 const EXTRA_PERIOD_REGEX = /^extra-\d{6}-\d+$/;
 export const REGISTRATION_PERIOD = 'inscripcion';
+
+const paymentDateSchema = z
+  .string()
+  .regex(DATE_REGEX, 'Fecha inválida')
+  .refine((value) => {
+    const [year, month, day] = value.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    );
+  }, 'Fecha inválida');
 
 const periodSchema = z.string().refine(
   (v) =>
@@ -19,7 +33,16 @@ const periodSchema = z.string().refine(
   { message: 'Período: YYYY-MM, inscripcion, ropa-N o extra-YYYYMM-timestamp' }
 );
 
-const paymentMethodSchema = z.enum(['card', 'transfer', 'cash', 'cheque', 'mercadopago', 'unknown']);
+const paymentMethodSchema = z.enum([
+  'card_credit',
+  'card_debit',
+  'card',
+  'transfer',
+  'cash',
+  'cheque',
+  'mercadopago',
+  'unknown',
+]);
 
 export const serviceChargeSchema = z.object({
   playerId: z.string().min(1, 'Cliente requerido'),
@@ -49,6 +72,10 @@ export const markManualPaymentSchema = z.object({
   amount: z.number().positive(),
   currency: z.string().min(1).default('ARS'),
   method: paymentMethodSchema.optional(),
+  /** Fecha local del cobro (YYYY-MM-DD). */
+  paidAt: paymentDateSchema.optional(),
+  /** Descripción visible del cobro, independiente del período imputado. */
+  concept: z.string().trim().min(1, 'Concepto requerido').max(200).optional(),
 });
 
 export const listPaymentsSchema = z.object({
@@ -60,7 +87,18 @@ export const listPaymentsSchema = z.object({
     status: z.enum(['pending', 'approved', 'rejected', 'refunded']).optional(),
     period: periodSchema.optional(),
     provider: z.enum(['mercadopago', 'dlocal', 'manual', 'excel_import']).optional(),
-    method: z.enum(['transfer', 'cash', 'cheque', 'mercadopago', 'card', 'excel_import', 'manual', 'dlocal']).optional(),
+    method: z.enum([
+      'transfer',
+      'cash',
+      'cheque',
+      'mercadopago',
+      'card_credit',
+      'card_debit',
+      'card',
+      'excel_import',
+      'manual',
+      'dlocal',
+    ]).optional(),
     /** 'yes' = solo facturados, 'no' = solo no facturados, omitir = todos */
     facturado: z.enum(['yes', 'no']).optional(),
   }).optional(),

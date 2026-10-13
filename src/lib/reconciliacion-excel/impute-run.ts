@@ -247,6 +247,7 @@ export async function runImputePlan(
         provider: "excel_import",
         status: "approved",
         paidAt: now,
+        method: item.sourceKind === "credit" ? "card_credit" : "card_debit",
         metadata: {
           paymentMethod: item.sourceKind,
           nroTarjeta: item.cardLast4,

@@ -16,6 +16,20 @@ import { sendEmailEvent } from '@/lib/payments/email-events';
 import { verifyIdToken } from '@/lib/auth-server';
 import type admin from 'firebase-admin';
 
+function parsePaymentDate(value?: string): Date {
+  if (!value) return new Date();
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    throw new Error('Fecha de pago inválida');
+  }
+  return date;
+}
+
 export async function POST(request: Request) {
   try {
     const auth = await verifyIdToken(request.headers.get('Authorization'));
@@ -32,7 +46,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { playerId, schoolId, period, amount, currency, method } = parsed.data;
+    const { playerId, schoolId, period, amount, currency, method, paidAt, concept } = parsed.data;
     const db = getAdminFirestore();
 
     // Regla: solo crear pago si el cliente existe en esta náutica (así el nombre siempre se resuelve)
@@ -67,7 +81,7 @@ export async function POST(request: Request) {
       if (displayName) collectedByDisplayName = displayName;
     }
 
-    const now = new Date();
+    const paymentDate = parsePaymentDate(paidAt);
     const payment = await createPayment(db, {
       playerId,
       schoolId,
@@ -76,12 +90,13 @@ export async function POST(request: Request) {
       currency,
       provider: 'manual',
       status: 'approved',
-      paidAt: now,
+      paidAt: paymentDate,
       method: method ?? 'unknown',
       metadata: {
         collectedByUid: auth.uid,
         collectedByEmail: auth.email ?? '',
         collectedByDisplayName,
+        ...(concept ? { concept } : {}),
       },
     });
 
@@ -111,7 +126,7 @@ export async function POST(request: Request) {
         playerName,
         amount,
         currency,
-        paidAt: now,
+        paidAt: paymentDate,
       });
     }
 
