@@ -13,17 +13,43 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { Player } from "@/lib/types";
 import { formatPlayerName, playerNameSearchText } from "@/lib/format-player-name";
-import { getPlayerEmbarcaciones } from "@/lib/utils";
+import { getPlayerEmbarcaciones, isOperationalClient } from "@/lib/utils";
+import { normalizeString } from "@/lib/text-normalize";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCollection, useUserProfile } from "@/firebase";
 import { Skeleton } from "../ui/skeleton";
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { FileDown, CreditCard, CheckCircle, Loader2, Search, Mail, FileX, FileCheck, TrendingUp } from "lucide-react";
+import { FileDown, CreditCard, CheckCircle, Loader2, Search, Mail, FileX, FileCheck, TrendingUp, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useClientSearch } from "@/context/ClientSearchContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import * as XLSX from "xlsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type DelinquentInfo = {
   playerId: string;
@@ -34,6 +60,20 @@ type DelinquentInfo = {
 };
 
 type ClothingPendingItem = { period: string; amount: number; installmentIndex: number; totalInstallments: number };
+
+function sortPlayersByName(list: Player[]): Player[] {
+  return [...list].sort((a, b) => {
+    const ln = (a.lastName ?? "").toLowerCase().localeCompare((b.lastName ?? "").toLowerCase());
+    if (ln !== 0) return ln;
+    return (a.firstName ?? "").toLowerCase().localeCompare((b.firstName ?? "").toLowerCase());
+  });
+}
+
+function playerStatusLabel(status?: string): string {
+  if (status === "inactive") return "Desactivado";
+  if (status === "suspended") return "Mora";
+  return "Activo";
+}
 
 export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   const router = useRouter();
@@ -51,6 +91,8 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   const [inviting, setInviting] = useState(false);
   const [updatingFactura, setUpdatingFactura] = useState(false);
   const [statusUpdatingByPlayerId, setStatusUpdatingByPlayerId] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
+  const [deactivatePlayer, setDeactivatePlayer] = useState<Player | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<{
     delinquents: (DelinquentInfo & { dueDate: string })[];
     clothingPendingByPlayer: Record<string, ClothingPendingItem[]>;
@@ -106,9 +148,10 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
         toast({
           title: newStatus === "active" ? "Cliente activado" : "Cliente desactivado",
           description: newStatus === "active"
-            ? "El cliente ya puede ingresar al panel."
-            : "El cliente ya no puede ingresar al panel.",
+            ? "Volvió a la lista operativa: puede generar deudas y cobros."
+            : "No aparece en deudas ni en cobros. Si vuelve, activalo de nuevo.",
         });
+        setDeactivatePlayer(null);
       } catch (e) {
         toast({
           variant: "destructive",
@@ -126,54 +169,53 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     [user, schoolId, canToggleStatus, toast]
   );
 
-  const posicionLabel: Record<string, string> = {
-    arquero: "Arquero",
-    delantero: "Delantero",
-    mediocampo: "Mediocampo",
-    defensor: "Defensor",
-  };
-
   const { data: players, loading, error } = useCollection<Player>(
     isReady && schoolId && canListPlayers ? `schools/${schoolId}/players` : '',
     { orderBy: ['lastName', 'asc'] }
   );
 
   const activePlayers = useMemo(() => (players ?? []).filter((p) => !p.archived), [players]);
+  const operationalCount = useMemo(
+    () => activePlayers.filter((p) => isOperationalClient(p)).length,
+    [activePlayers]
+  );
+  const inactiveCount = activePlayers.length - operationalCount;
 
-  const sortedAndFilteredPlayers = useMemo(() => {
-    if (!activePlayers.length) return [];
-    return [...activePlayers].sort((a, b) => {
-      const lnA = (a.lastName ?? "").toLowerCase();
-      const lnB = (b.lastName ?? "").toLowerCase();
-      const cmp = lnA.localeCompare(lnB);
-      if (cmp !== 0) return cmp;
-      const fnA = (a.firstName ?? "").toLowerCase();
-      const fnB = (b.firstName ?? "").toLowerCase();
-      return fnA.localeCompare(fnB);
-    });
-  }, [activePlayers]);
+  const listedPlayers = useMemo(() => {
+    if (statusFilter === "inactive") {
+      return activePlayers.filter((p) => (p.status ?? "active") === "inactive");
+    }
+    if (statusFilter === "all") return activePlayers;
+    return activePlayers.filter((p) => isOperationalClient(p));
+  }, [activePlayers, statusFilter]);
+
+  const sortedAndFilteredPlayers = useMemo(
+    () => (listedPlayers.length ? sortPlayersByName(listedPlayers) : []),
+    [listedPlayers]
+  );
 
   const filteredBySearch = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = normalizeString(searchQuery);
     if (!q) return sortedAndFilteredPlayers;
+    const tokens = q.split(/\s+/).filter(Boolean);
     return sortedAndFilteredPlayers.filter((p) => {
       const embarcaciones = getPlayerEmbarcaciones(p);
-      const embarcacionText = embarcaciones.map((e) => [e.nombre, e.matricula].filter(Boolean).join(" ")).join(" ").toLowerCase();
-      const fullName = playerNameSearchText(p);
-      const ubicacion = (p.ubicacion ?? "").toLowerCase();
-      const dni = (p.dni ?? "").toLowerCase();
-      const email = (p.email ?? "").toLowerCase();
-      const tutorName = (p.tutorContact?.name ?? "").toLowerCase();
-      const observations = (p.observations ?? "").toLowerCase();
-      return (
-        fullName.includes(q) ||
-        embarcacionText.includes(q) ||
-        ubicacion.includes(q) ||
-        dni.includes(q) ||
-        email.includes(q) ||
-        tutorName.includes(q) ||
-        observations.includes(q)
+      const haystack = normalizeString(
+        [
+          playerNameSearchText(p),
+          formatPlayerName(p),
+          p.ubicacion,
+          p.dni,
+          p.cuit,
+          p.email,
+          p.tutorContact?.name,
+          p.observations,
+          ...embarcaciones.flatMap((e) => [e.nombre, e.matricula]),
+        ]
+          .filter(Boolean)
+          .join(" ")
       );
+      return tokens.every((t) => haystack.includes(t));
     });
   }, [sortedAndFilteredPlayers, searchQuery]);
 
@@ -294,57 +336,54 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
     }
   };
 
-  const handleExportCsv = () => {
-    const cols = [
-      "Nombre",
-      "Apellido",
-      "Nombre de Embarcación",
-      "Matrícula",
-      "Ubicación",
-      "Género",
-      "DNI",
-      "Obra social",
-      "Email",
-      "Teléfono tutor",
-      "Nombre tutor",
-      "Posición",
-      "Estado",
-      "Observaciones",
-    ];
-    const escape = (v: string | number | undefined) => {
-      if (v == null || v === "") return "";
-      const s = String(v);
-      return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const rows = filteredBySearch.map((player) => {
+  const exportListado = (scope: "active" | "inactive" | "all" | "current") => {
+    const date = new Date().toISOString().slice(0, 10);
+    let list: Player[];
+    let slug: string;
+    if (scope === "current") {
+      list = filteredBySearch;
+      slug =
+        statusFilter === "inactive"
+          ? "desactivados"
+          : statusFilter === "all"
+            ? "todos"
+            : "activos";
+      if (searchQuery.trim()) slug += "-busqueda";
+    } else if (scope === "inactive") {
+      list = sortPlayersByName(
+        activePlayers.filter((p) => (p.status ?? "active") === "inactive")
+      );
+      slug = "desactivados";
+    } else if (scope === "all") {
+      list = sortPlayersByName(activePlayers);
+      slug = "todos";
+    } else {
+      list = sortPlayersByName(activePlayers.filter((p) => isOperationalClient(p)));
+      slug = "activos";
+    }
+
+    const rows = list.map((player) => {
       const emb = getPlayerEmbarcaciones(player);
-      const nombresEmb = emb.map((e) => e.nombre).filter(Boolean).join("; ");
-      const matriculasEmb = emb.map((e) => e.matricula).filter(Boolean).join("; ");
-      return [
-      escape(player.firstName),
-      escape(player.lastName),
-      escape(nombresEmb || (player as { embarcacionNombre?: string }).embarcacionNombre),
-      escape(matriculasEmb || (player as { embarcacionMatricula?: string }).embarcacionMatricula),
-      escape(player.ubicacion),
-      escape(player.genero === "masculino" ? "Masculino" : player.genero === "femenino" ? "Femenino" : ""),
-      escape(player.dni),
-      escape(player.healthInsurance),
-      escape(player.email),
-      escape(player.tutorContact?.phone),
-      escape(player.tutorContact?.name),
-      escape(player.posicion_preferida ? posicionLabel[player.posicion_preferida] ?? player.posicion_preferida : ""),
-      escape(player.status === "active" ? "Activo" : player.status === "suspended" ? "Mora" : "Inactivo"),
-      escape(player.observations),
-    ];
+      return {
+        Apellido: player.lastName ?? "",
+        Nombre: player.firstName ?? "",
+        Estado: playerStatusLabel(player.status),
+        Embarcación: emb.map((e) => e.nombre).filter(Boolean).join("; ") || (player as { embarcacionNombre?: string }).embarcacionNombre || "",
+        Matrícula: emb.map((e) => e.matricula).filter(Boolean).join("; ") || (player as { embarcacionMatricula?: string }).embarcacionMatricula || "",
+        Ubicación: player.ubicacion ?? "",
+        DNI: player.dni ?? "",
+        CUIT: player.cuit ?? "",
+        Email: player.email ?? "",
+        Teléfono: player.tutorContact?.phone ?? "",
+        Contacto: player.tutorContact?.name ?? "",
+        Observaciones: player.observations ?? "",
+      };
     });
-    const csv = [cols.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+    XLSX.writeFile(wb, `listado-clientes-${slug}-${date}.xlsx`);
   };
 
   const hasInviteColumn = canInviteAccess;
@@ -385,6 +424,24 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
             className="pl-9"
           />
         </div>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as "active" | "inactive" | "all")}
+        >
+          <SelectTrigger className="w-[180px] shrink-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Activos ({operationalCount})</SelectItem>
+            <SelectItem value="inactive">Desactivados ({inactiveCount})</SelectItem>
+            <SelectItem value="all">Todos ({activePlayers.length})</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground whitespace-nowrap">
+          {searchQuery.trim()
+            ? `${filteredBySearch.length} de ${listedPlayers.length}`
+            : `${filteredBySearch.length} clientes`}
+        </p>
         {canListPlayers && (
           <>
             {hasInviteColumn && (
@@ -431,16 +488,33 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                 </Button>
               </>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              disabled={filteredBySearch.length === 0}
-              className="ml-auto shrink-0"
-            >
-              <FileDown className="h-4 w-4 mr-2" />
-              Exportar CSV
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="ml-auto shrink-0" disabled={activePlayers.length === 0}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Exportar listado
+                  <ChevronDown className="h-4 w-4 ml-1 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => exportListado("active")}>
+                  Activos ({operationalCount})
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => exportListado("inactive")}>
+                  Desactivados ({inactiveCount})
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => exportListado("all")}>
+                  Todos ({activePlayers.length})
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => exportListado("current")}
+                  disabled={filteredBySearch.length === 0}
+                >
+                  Vista actual ({filteredBySearch.length})
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         )}
       </div>
@@ -531,28 +605,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                 {player.ubicacion || '-'}
               </TableCell>
               <TableCell className="py-2 sm:py-3" onClick={(e) => e.stopPropagation()}>
-                {canToggleStatus && (player.status === "active" || player.status === "inactive") ? (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleStatus(player.id, player.status ?? "active")}
-                    disabled={statusUpdatingByPlayerId.has(player.id)}
-                    className="inline-flex items-center"
-                  >
-                    <Badge
-                      variant="secondary"
-                      className={`capitalize text-[10px] sm:text-xs whitespace-nowrap cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${
-                        player.status === "active"
-                          ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400"
-                          : "border-red-600/50 bg-red-500/10 text-red-700 dark:text-red-400"
-                      }`}
-                    >
-                      {statusUpdatingByPlayerId.has(player.id) ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-0.5 inline" />
-                      ) : null}
-                      {player.status === "active" ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </button>
-                ) : (
+                <div className="flex flex-col items-start gap-1">
                   <Badge
                     variant={
                       player.status === "suspended"
@@ -571,13 +624,33 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
                       ? "Activo"
                       : player.status === "suspended"
                       ? "Mora"
-                      : "Inactivo"}
+                      : "Desactivado"}
                   </Badge>
-                )}
+                  {canToggleStatus && (player.status === "active" || player.status === "inactive") && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      disabled={statusUpdatingByPlayerId.has(player.id)}
+                      onClick={() => {
+                        if (player.status === "active") setDeactivatePlayer(player);
+                        else handleToggleStatus(player.id, "inactive");
+                      }}
+                    >
+                      {statusUpdatingByPlayerId.has(player.id) ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : null}
+                      {player.status === "active" ? "Desactivar" : "Activar"}
+                    </Button>
+                  )}
+                </div>
               </TableCell>
               {canSeePaymentStatus && (
                 <TableCell className="py-2 sm:py-3" onClick={(e) => e.stopPropagation()}>
-                  {paymentStatusLoading ? (
+                  {player.status === "inactive" ? (
+                    <span className="text-xs text-muted-foreground">Sin deudas</span>
+                  ) : paymentStatusLoading ? (
                     <Skeleton className="h-6 w-16" />
                   ) : hasPending ? (
                     <Button variant="outline" size="sm" className="h-7 text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-600 dark:hover:bg-amber-950/50" asChild>
@@ -611,6 +684,27 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
         </TableBody>
       </Table>
     </div>
+    <AlertDialog open={!!deactivatePlayer} onOpenChange={(open) => { if (!open) setDeactivatePlayer(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Desactivar a {deactivatePlayer ? formatPlayerName(deactivatePlayer) : "este cliente"}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Deja de ser cliente activo: no aparece en deudas, cobros ni listados operativos.
+            La ficha se conserva. Si vuelve, lo activás de nuevo.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (deactivatePlayer) handleToggleStatus(deactivatePlayer.id, "active");
+            }}
+          >
+            Desactivar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </div>
   );
 }

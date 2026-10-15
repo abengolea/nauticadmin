@@ -28,7 +28,7 @@ type ClientSelectComboboxProps = {
 };
 
 const MIN_QUERY_CHARS = 2;
-const MAX_RESULTS = 50;
+const MAX_RESULTS = 150;
 
 /**
  * Selector de cliente con búsqueda inline (sin Popover).
@@ -71,20 +71,28 @@ export function ClientSelectCombobox({
   const normalizedQuery = normalizeString(query);
   const canSearch = normalizedQuery.length >= MIN_QUERY_CHARS;
 
-  const filtered = React.useMemo(() => {
-    if (!canSearch) return [];
+  const { filtered, totalMatches } = React.useMemo(() => {
+    if (!canSearch) return { filtered: [] as ClientSelectOption[], totalMatches: 0 };
     const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
-    const matches: ClientSelectOption[] = [];
+    const firstToken = tokens[0] ?? "";
+    const scored: { p: ClientSelectOption; score: number }[] = [];
     for (const p of players) {
-      const name = normalizeString(
+      const haystack = normalizeString(
         [p.displayName, p.searchText].filter(Boolean).join(" ")
       );
-      if (tokens.every((t) => name.includes(t))) {
-        matches.push(p);
-        if (matches.length >= MAX_RESULTS) break;
-      }
+      if (!tokens.every((t) => haystack.includes(t))) continue;
+      const display = normalizeString(p.displayName);
+      let score = 100;
+      if (display.startsWith(normalizedQuery)) score += 400;
+      else if (display.split(/\s+/).some((part) => part.startsWith(firstToken))) score += 250;
+      score -= Math.min(display.length, 80);
+      scored.push({ p, score });
     }
-    return matches;
+    scored.sort((a, b) => b.score - a.score);
+    return {
+      filtered: scored.slice(0, MAX_RESULTS).map((x) => x.p),
+      totalMatches: scored.length,
+    };
   }, [players, normalizedQuery, canSearch]);
 
   const handleSelect = (playerId: string) => {
@@ -168,6 +176,11 @@ export function ClientSelectCombobox({
             </p>
           ) : (
             <ul className="p-1" role="listbox">
+              {totalMatches > filtered.length && (
+                <li className="px-2 py-1.5 text-xs text-muted-foreground">
+                  Mostrando {filtered.length} de {totalMatches}. Seguí escribiendo para acotar.
+                </li>
+              )}
               {filtered.map((p) => {
                 const selected = p.id === value;
                 return (

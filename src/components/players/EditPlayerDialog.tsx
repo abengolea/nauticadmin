@@ -456,10 +456,13 @@ export function EditPlayerDialog({
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="active">Activo</SelectItem>
-                            <SelectItem value="inactive">Inactivo</SelectItem>
+                            <SelectItem value="inactive">Desactivado (no genera deudas)</SelectItem>
                             <SelectItem value="suspended">Suspendido por mora</SelectItem>
                           </SelectContent>
                         </Select>
+                        <FormDescription>
+                          El desactivado no aparece en cobros ni deudas. Si vuelve, pasalo a Activo.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

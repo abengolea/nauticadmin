@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import type { Vessel, VesselType, VesselStatus, Player } from '@/lib/types';
+import { isOperationalClient } from '@/lib/utils';
 import {
   VESSEL_TYPE_LABELS,
   VESSEL_STATUS_LABELS,
@@ -456,7 +457,7 @@ export default function EmbarcacionesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {(players ?? [])
-                    .filter((p) => !p.archived)
+                    .filter((p) => isOperationalClient(p))
                     .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`))
                     .map((p) => (
                       <SelectItem key={p.id} value={p.id}>

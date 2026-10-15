@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, Upload, ExternalLink, CheckCircle, UserX, Loader2, XCircle } from "lucide-react";
 import { useCollection, useUserProfile, useUser, useFirestore, useDoc } from "@/firebase";
 import type { Player, MedicalRecord, School } from "@/lib/types";
-import { isMedicalRecordApproved, isMedicalRecordRejected } from "@/lib/utils";
+import { isMedicalRecordApproved, isMedicalRecordRejected, isOperationalClient } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MedicalRecordField } from "@/components/players/MedicalRecordField";
 import {
@@ -53,7 +53,7 @@ export default function MedicalRecordsPage() {
   );
 
   const activePlayers = useMemo(
-    () => (players ?? []).filter((p) => !p.archived),
+    () => (players ?? []).filter((p) => isOperationalClient(p)),
     [players]
   );
 

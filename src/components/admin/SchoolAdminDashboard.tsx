@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useCollection, useUserProfile, useDoc, useFirebase } from "@/firebase";
 import { getAuth } from "firebase/auth";
 import type { Player, School as SchoolType } from "@/lib/types";
+import { isOperationalClient } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import React, { useState, useMemo, useCallback } from "react";
 import { DashboardStats } from "./DashboardStats";
@@ -37,7 +38,7 @@ export function SchoolAdminDashboard() {
       {}
   );
 
-  const activePlayers = useMemo(() => (players ?? []).filter((p) => !p.archived), [players]);
+  const activePlayers = useMemo(() => (players ?? []).filter((p) => isOperationalClient(p)), [players]);
 
   const isLoading = !isReady || schoolLoading || playersLoading;
 

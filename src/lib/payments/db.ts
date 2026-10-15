@@ -655,10 +655,13 @@ export async function getActivePlayersWithConfig(
     .collection('schools')
     .doc(schoolId)
     .collection('players')
-    .where('status', 'in', ['active', 'suspended'])
     .get();
 
-  const nonArchived = playersSnap.docs.filter((d) => d.data()?.archived !== true);
+  const nonArchived = playersSnap.docs.filter((d) => {
+    const data = d.data();
+    if (data?.archived === true) return false;
+    return (data?.status ?? 'active') !== 'inactive';
+  });
 
   const configSnap = await db
     .collection('schools')
@@ -871,6 +874,10 @@ export async function getUnpaidPeriodsForPlayer(
   const playerRef = db.collection('schools').doc(schoolId).collection('players').doc(playerId);
   const playerSnap = await playerRef.get();
   if (!playerSnap.exists) return [];
+  const playerForUnpaid = playerSnap.data()!;
+  if (playerForUnpaid.archived === true || (playerForUnpaid.status ?? 'active') === 'inactive') {
+    return [];
+  }
 
   const config = await getOrCreatePaymentConfig(db, schoolId);
   const paidMap = approvedPaymentsMap ?? (await getAllApprovedPaymentsForSchool(db, schoolId));

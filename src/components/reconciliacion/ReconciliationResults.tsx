@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useUser, useCollection } from "@/firebase";
 import type { Player } from "@/lib/types";
+import { isOperationalClient } from "@/lib/utils";
 import { ClientSelectCombobox } from "@/components/players/ClientSelectCombobox";
 import { buildPersistedAliasNames } from "@/lib/reconciliacion-excel/save-player-alias";
 import { Button } from "@/components/ui/button";
@@ -214,7 +215,7 @@ export function ReconciliationResults({
   const playerOptions = useMemo(
     () =>
       (players ?? [])
-        .filter((p) => !p.archived)
+        .filter((p) => isOperationalClient(p))
         .map((p) => ({
           id: p.id,
           displayName:

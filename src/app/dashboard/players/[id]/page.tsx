@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { User, Contact, ArrowLeft, UserX, TrendingUp } from "lucide-react";
-import { isPlayerProfileComplete } from "@/lib/utils";
+import { isPlayerProfileComplete, isOperationalClient } from "@/lib/utils";
 import { useDoc, useUserProfile, useCollection, useUser, useFirebase } from "@/firebase";
 import { getAuth } from "firebase/auth";
 import type { Player } from "@/lib/types";
@@ -149,8 +149,8 @@ export default function PlayerProfilePage() {
         title: newStatus === "active" ? "Cliente activado" : "Cliente desactivado",
         description:
           newStatus === "active"
-            ? "El cliente ya puede ingresar al panel."
-            : "El cliente ya no puede ingresar al panel.",
+            ? "Volvió a la lista operativa: puede generar deudas y cobros."
+            : "No aparece en deudas ni en cobros. Si vuelve, activalo de nuevo.",
       });
     } catch (e) {
       toast({
@@ -245,35 +245,12 @@ export default function PlayerProfilePage() {
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          {canToggleStatus ? (
-            <button
-              type="button"
-              onClick={handleToggleStatus}
-              disabled={statusUpdating}
-              className={`mb-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 cursor-pointer ${
-                player.status === "active"
-                  ? "border-green-600/50 bg-green-500/10 text-green-700 hover:bg-green-500/20 dark:text-green-400 dark:hover:bg-green-500/20"
-                  : player.status === "suspended"
-                    ? "border-amber-600/50 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400 dark:hover:bg-amber-500/20"
-                    : "border-red-600/50 bg-red-500/10 text-red-700 hover:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/20"
-              }`}
-            >
-              {statusUpdating
-                ? "…"
-                : player.status === "active"
-                  ? "Activo"
-                  : player.status === "suspended"
-                    ? "Mora"
-                    : "Desactivado"}
-            </button>
-          ) : (
-            <Badge
-              variant={player.status === "active" ? "secondary" : "destructive"}
-              className={`mb-2 capitalize ${player.status === "active" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""} ${player.status === "suspended" ? "border-amber-600/50 bg-amber-500/10 text-amber-800 dark:text-amber-400" : ""}`}
-            >
-              {player.status === "active" ? "Activo" : player.status === "suspended" ? "Mora" : "Desactivado"}
-            </Badge>
-          )}
+          <Badge
+            variant={player.status === "active" ? "secondary" : "destructive"}
+            className={`mb-2 capitalize ${player.status === "active" ? "border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400" : ""} ${player.status === "suspended" ? "border-amber-600/50 bg-amber-500/10 text-amber-800 dark:text-amber-400" : ""}`}
+          >
+            {player.status === "active" ? "Activo" : player.status === "suspended" ? "Mora" : "Desactivado"}
+          </Badge>
           <h1 className="text-4xl font-bold font-headline">{formatPlayerName(player)}</h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
              {player.tutorContact?.name && <div className="flex items-center gap-1"><User className="h-4 w-4" /> Contacto: {player.tutorContact.name}</div>}
@@ -281,6 +258,34 @@ export default function PlayerProfilePage() {
           </div>
         </div>
         <div className="flex flex-wrap items-start gap-2">
+          {canToggleStatus && (player.status === "active" || player.status === "inactive") && (
+            player.status === "active" ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" disabled={statusUpdating}>
+                    Desactivar cliente
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Desactivar a {formatPlayerName(player)}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Deja de ser cliente activo: no aparece en deudas, cobros ni listados operativos.
+                      La ficha se conserva. Si vuelve, lo activás de nuevo.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleToggleStatus}>Desactivar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <Button variant="default" onClick={handleToggleStatus} disabled={statusUpdating}>
+                Activar cliente
+              </Button>
+            )
+          )}
           {!isViewingAsPlayer && schoolId && (
             <Button variant="outline" asChild>
               <Link href={`/dashboard/players/${id}/account?schoolId=${schoolId}`}>
@@ -295,6 +300,15 @@ export default function PlayerProfilePage() {
         </div>
       </header>
 
+      {player.status === "inactive" && !player.archived && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Cliente desactivado</AlertTitle>
+          <AlertDescription>
+            No genera deudas ni aparece en cobros u otros listados operativos. Si vuelve a ser cliente, activalo.
+          </AlertDescription>
+        </Alert>
+      )}
       {player.archived && (
         <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500">
           <Archive className="h-4 w-4 text-amber-600 dark:text-amber-400" />
@@ -357,6 +371,7 @@ export default function PlayerProfilePage() {
             />
           </div>
         )}
+        {isOperationalClient(player) && (
         <div className="mt-4">
           <PlayerPaymentStatusCard
             getToken={getToken}
@@ -365,6 +380,7 @@ export default function PlayerProfilePage() {
             playerName={player ? formatPlayerName(player) : undefined}
           />
         </div>
+        )}
       </div>
 
       {canArchive && (

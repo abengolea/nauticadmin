@@ -47,6 +47,7 @@ import type {
   BerthZone,
   Player,
 } from '@/lib/types';
+import { isOperationalClient } from '@/lib/utils';
 import {
   BERTH_STATUS_LABELS,
   BERTH_ZONE_LABELS,
@@ -560,7 +561,7 @@ export default function AmarrasPage() {
               <SelectContent>
                 <SelectItem value="">— Desasignar —</SelectItem>
                 {(players ?? [])
-                  .filter((p) => !p.archived)
+                  .filter((p) => isOperationalClient(p))
                   .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`))
                   .map((p) => (
                     <SelectItem key={p.id} value={p.id}>

@@ -24,6 +24,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { useStorage, useFirestore } from "@/firebase/provider";
 import { useUser, useCollection, useDoc } from "@/firebase";
 import type { Player, School } from "@/lib/types";
+import { isOperationalClient } from "@/lib/utils";
 import { uploadPlayerVideoWithProgress } from "@/lib/player-videos";
 import { buildEmailHtml, escapeHtml, htmlToPlainText, sendMailDoc } from "@/lib/email";
 import { useToast } from "@/hooks/use-toast";
@@ -85,7 +86,7 @@ export function RecordOrUploadVideoDialog({
   const { data: players } = useCollection<Player>(
     schoolId && !embedded ? `schools/${schoolId}/players` : ""
   );
-  const activePlayers = (players ?? []).filter((p) => !p.archived);
+  const activePlayers = (players ?? []).filter((p) => isOperationalClient(p));
 
   const effectivePlayerId = embedded ? initialPlayerId : playerId;
   const canSubmit =

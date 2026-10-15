@@ -172,3 +172,14 @@ export function getPlayerEmbarcaciones(player: {
   }
   return [];
 }
+
+/**
+ * Cliente operativo de la náutica: no archivado y no desactivado.
+ * Mora (`suspended`) sigue contando (tiene deudas). El desactivado no.
+ */
+export function isOperationalClient(
+  player: { archived?: boolean; status?: string } | null | undefined
+): boolean {
+  if (!player || player.archived) return false;
+  return (player.status ?? "active") !== "inactive";
+}

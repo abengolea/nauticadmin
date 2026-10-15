@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useCollection } from "@/firebase";
 import type { Player } from "@/lib/types";
+import { isOperationalClient } from "@/lib/utils";
 import { ArrowLeft, Search, Send, Copy, Check } from "lucide-react";
 
 type VerifyResult = {
@@ -49,7 +50,7 @@ export default function PaymentsTestPage() {
     schoolId ? `schools/${schoolId}/players` : "",
     { orderBy: ["lastName", "asc"] }
   );
-  const activePlayers = (players ?? []).filter((p) => !p.archived);
+  const activePlayers = (players ?? []).filter((p) => isOperationalClient(p));
 
   const getToken = async () => {
     const auth = getAuth(app);

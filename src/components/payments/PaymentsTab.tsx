@@ -40,6 +40,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Payment, Player } from "@/lib/types";
 import { formatPlayerName, playerNameSearchText } from "@/lib/format-player-name";
+import { getPlayerEmbarcaciones, isOperationalClient } from "@/lib/utils";
 import {
   getPaymentMethodLabel,
   PAYMENT_METHOD_LABELS,
@@ -272,11 +273,19 @@ export function PaymentsTab({
   const playerOptions = useMemo(
     () =>
       (players ?? [])
-        .filter((p) => !p.archived)
+        .filter((p) => isOperationalClient(p))
         .map((p) => ({
           id: p.id,
           displayName: formatPlayerName(p) || p.email || p.id,
-          searchText: playerNameSearchText(p),
+          searchText: [
+            playerNameSearchText(p),
+            p.dni,
+            p.cuit,
+            p.ubicacion,
+            ...getPlayerEmbarcaciones(p).flatMap((e) => [e.nombre, e.matricula]),
+          ]
+            .filter(Boolean)
+            .join(" "),
           secondaryText: (() => {
             const pricing = pricingByPlayer.get(p.id);
             if (!pricing || pricing.total <= 0) return "Sin precio asignado";

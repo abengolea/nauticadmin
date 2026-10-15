@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useFirestore, useCollection, useDoc } from "@/firebase";
 import type { Player, School } from "@/lib/types";
+import { isOperationalClient } from "@/lib/utils";
 import { buildEmailHtml, escapeHtml, htmlToPlainText, sendMailDoc } from "@/lib/email";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ export function NovedadesMailCard({ schoolId, schoolName }: NovedadesMailCardPro
   const { data: playersData, loading: playersLoading } = useCollection<Player>(
     schoolId ? `schools/${schoolId}/players` : ""
   );
-  const players = (playersData ?? []).filter((p) => !p.archived);
+  const players = (playersData ?? []).filter((p) => isOperationalClient(p));
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);

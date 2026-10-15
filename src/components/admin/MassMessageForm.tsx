@@ -28,7 +28,7 @@ import {
   getDefaultBoatPricingItems,
   splitPricingItems,
 } from "@/lib/types/boat-pricing";
-import { getPlayerEmbarcaciones } from "@/lib/utils";
+import { getPlayerEmbarcaciones, isOperationalClient } from "@/lib/utils";
 import { formatPlayerName, playerNameSearchText } from "@/lib/format-player-name";
 import { buildEmailHtml, htmlToPlainText, sendMailDoc } from "@/lib/email";
 import { Mail, Loader2 } from "lucide-react";
@@ -90,7 +90,7 @@ export function MassMessageForm() {
     activeSchoolId ? `schools/${activeSchoolId}/players` : "",
     {}
   );
-  const players = (Array.isArray(playersData) ? playersData : []).filter((p) => !p.archived);
+  const players = (Array.isArray(playersData) ? playersData : []).filter((p) => isOperationalClient(p));
 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");

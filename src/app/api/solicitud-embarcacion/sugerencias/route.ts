@@ -47,8 +47,9 @@ export async function GET(request: Request) {
         embarcacionMatricula?: string;
         embarcaciones?: Array<{ nombre?: string; matricula?: string }>;
         archived?: boolean;
+        status?: string;
       })
-      .filter((p) => !p.archived && (p.firstName || p.lastName));
+      .filter((p) => !p.archived && p.status !== 'inactive' && (p.firstName || p.lastName));
 
     if (tipo === 'nombre') {
       const nombres = new Set<string>();

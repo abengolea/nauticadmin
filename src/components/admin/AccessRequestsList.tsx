@@ -42,6 +42,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import type { AccessRequest, Player } from "@/lib/types";
+import { isOperationalClient } from "@/lib/utils";
 import { Skeleton } from "../ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Loader2, UserPlus, X } from "lucide-react";
@@ -68,7 +69,7 @@ export function AccessRequestsList() {
     isReady && activeSchoolId ? `schools/${activeSchoolId}/players` : "",
     {}
   );
-  const activePlayers = (players ?? []).filter((p) => !p.archived);
+  const activePlayers = (players ?? []).filter((p) => isOperationalClient(p));
 
   const [actionState, setActionState] = useState<ActionState>(null);
   const [approveDialog, setApproveDialog] = useState<{
