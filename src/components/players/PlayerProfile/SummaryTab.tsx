@@ -9,6 +9,7 @@ import { EditCoachFeedbackDialog } from "@/components/players/EditCoachFeedbackD
 import type { Player } from "@/lib/types";
 import { formatPlayerName } from "@/lib/format-player-name";
 import { getPlayerEmbarcaciones } from "@/lib/utils";
+import { formatPhonesDisplay } from "@/lib/contact-phones";
 import { useDoc } from "@/firebase";
 import type { BoatPricingConfig } from "@/lib/types/boat-pricing";
 import { getDefaultBoatPricingItems } from "@/lib/types/boat-pricing";
@@ -95,10 +96,10 @@ export function SummaryTab({ player, lastCoachComment, canEditCoachFeedback, sch
                                   {player.status === "active" ? "Activo" : player.status === "suspended" ? "Mora" : "Inactivo"}
                                 </TableCell>
                             </TableRow>
-                             {(player.tutorContact?.phone?.trim()) ? (
+                             {formatPhonesDisplay(player.tutorContact) ? (
                             <TableRow>
                                 <TableCell className="font-medium text-muted-foreground">Teléfono</TableCell>
-                                <TableCell className="text-right">{player.tutorContact.phone}</TableCell>
+                                <TableCell className="text-right">{formatPhonesDisplay(player.tutorContact)}</TableCell>
                             </TableRow>
                             ) : null}
                         </TableBody>

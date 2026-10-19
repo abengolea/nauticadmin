@@ -147,6 +147,7 @@ export async function PATCH(
         cuit: updates.cuit,
         ivaCondition: updates.ivaCondition,
         phone: updates.phone,
+        phones: updates.phones,
         email: updates.email,
         address: updates.address,
         cuentaCorrienteHabilitada: updates.cuentaCorrienteHabilitada ?? true,

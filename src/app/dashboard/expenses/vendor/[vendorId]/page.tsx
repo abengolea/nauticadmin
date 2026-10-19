@@ -21,6 +21,12 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { VendorPaymentDialog } from '@/components/expenses/VendorPaymentDialog';
+import { PhonesInput } from '@/components/contact/PhonesInput';
+import {
+  buildVendorPhonesPayload,
+  formatPhonesDisplay,
+  phonesForForm,
+} from '@/lib/contact-phones';
 import type { VendorAccountEntry } from '@/lib/expenses/types';
 import type { ExpenseVendor } from '@/lib/expenses/types';
 
@@ -198,10 +204,19 @@ const IVA_CONDITIONS = [
   'Monotributista',
 ] as const;
 
-type VendorForm = Partial<Pick<
-  ExpenseVendor,
-  'name' | 'cuit' | 'ivaCondition' | 'phone' | 'email' | 'address' | 'cuentaCorrienteHabilitada' | 'notes'
->>;
+type VendorForm = Partial<
+  Omit<
+    Pick<
+      ExpenseVendor,
+      'name' | 'cuit' | 'ivaCondition' | 'phone' | 'phones' | 'email' | 'address' | 'cuentaCorrienteHabilitada' | 'notes'
+    >,
+    'phone'
+  >
+> & {
+  phone?: string | null;
+  /** Valores del formulario de teléfonos (incluye vacíos mientras se edita). */
+  phonesDraft?: string[];
+};
 
 export default function VendorAccountPage() {
   const params = useParams();
@@ -270,6 +285,8 @@ export default function VendorAccountPage() {
             cuit: v.cuit ?? '',
             ivaCondition: v.ivaCondition ?? '',
             phone: v.phone ?? '',
+            phones: v.phones,
+            phonesDraft: phonesForForm(v),
             email: v.email ?? '',
             address: v.address ?? '',
             cuentaCorrienteHabilitada: v.cuentaCorrienteHabilitada ?? true,
@@ -309,7 +326,7 @@ export default function VendorAccountPage() {
           name: form.name?.trim() || undefined,
           cuit: form.cuit?.trim() || undefined,
           ivaCondition: form.ivaCondition?.trim() || undefined,
-          phone: form.phone?.trim() || undefined,
+          ...buildVendorPhonesPayload(form.phonesDraft ?? form.phones ?? form.phone),
           email: form.email?.trim() || undefined,
           address: form.address?.trim() || undefined,
           cuentaCorrienteHabilitada: form.cuentaCorrienteHabilitada ?? true,
@@ -322,10 +339,18 @@ export default function VendorAccountPage() {
         throw new Error(err.error ?? 'Error al guardar');
       }
 
+      const phonesPayload = buildVendorPhonesPayload(form.phonesDraft ?? form.phones ?? form.phone);
+      const nextForm: VendorForm = {
+        ...form,
+        phone: phonesPayload.phone,
+        phones: phonesPayload.phones,
+        phonesDraft: phonesForForm(phonesPayload),
+      };
       toast({ title: 'Proveedor guardado correctamente' });
       setEditMode(false);
       setFromExpenseVendors(true);
-      setVendor(form);
+      setForm(nextForm);
+      setVendor(nextForm);
     } catch (e) {
       toast({
         title: 'Error al guardar',
@@ -417,12 +442,13 @@ export default function VendorAccountPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Teléfono</Label>
-              <Input
-                value={form.phone ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+            <div className="space-y-2 sm:col-span-2">
+              <PhonesInput
+                id="vendor-phones"
+                label="Teléfono"
                 placeholder="+54 11 1234-5678"
+                value={form.phonesDraft?.length ? form.phonesDraft : phonesForForm(form)}
+                onChange={(phonesDraft) => setForm((f) => ({ ...f, phonesDraft }))}
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
@@ -478,7 +504,7 @@ export default function VendorAccountPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Teléfono:</span>{' '}
-              {form.phone || vendor?.phone || '-'}
+              {formatPhonesDisplay(form) || formatPhonesDisplay(vendor) || '-'}
             </div>
             <div>
               <span className="text-muted-foreground">Email:</span>{' '}

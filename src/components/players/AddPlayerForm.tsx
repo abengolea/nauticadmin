@@ -35,7 +35,9 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getFirebaseConfig } from "@/firebase/config";
 import { PlayerPhotoField } from "./PlayerPhotoField";
+import { PhonesInput } from "@/components/contact/PhonesInput";
 import { uploadPlayerPhoto } from "@/lib/player-photo";
+import { buildTutorContact, normalizePhones } from "@/lib/contact-phones";
 import { updateDoc } from "firebase/firestore";
 import { useDoc } from "@/firebase";
 import type { BoatPricingConfig } from "@/lib/types/boat-pricing";
@@ -79,7 +81,7 @@ const playerSchema = z.object({
     .optional()
     .transform((v) => v ?? "")
     .refine((v) => v.length === 0 || v.length >= 6, "Mínimo 6 caracteres."),
-  tutorPhone: z.string().optional(),
+  tutorPhones: z.array(z.string()).default([""]),
   status: z.enum(["active", "inactive"]),
   observations: z.string().optional(),
   photoUrl: z.string().optional().or(z.literal("")),
@@ -113,7 +115,7 @@ export function AddPlayerForm() {
             lastName: "",
             email: "",
             initialPassword: "",
-            tutorPhone: "",
+            tutorPhones: [""],
             status: "active",
             photoUrl: "",
             observations: "",
@@ -210,10 +212,10 @@ export function AddPlayerForm() {
                 lastName: values.lastName,
                 dni: values.dni,
                 ...(emailNorm && { email: emailNorm }),
-                tutorContact: {
-                    name: `${values.firstName} ${values.lastName}`.trim() || "Sin datos",
-                    phone: values.tutorPhone ?? "",
-                },
+                tutorContact: buildTutorContact(
+                    `${values.firstName} ${values.lastName}`.trim() || "Sin datos",
+                    values.tutorPhones
+                ),
                 status: values.status,
                 photoUrl: values.photoUrl,
                 observations: values.observations,
@@ -293,16 +295,19 @@ export function AddPlayerForm() {
                 });
             }
 
-            if (values.tutorPhone?.trim()) {
+            const phonesToRegister = normalizePhones(values.tutorPhones);
+            if (phonesToRegister.length > 0) {
               mainAuth.currentUser?.getIdToken().then((token) => {
-                fetch(`/api/admin/schools/${activeSchoolId}/register-whatsapp-phone`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({ phone: values.tutorPhone!.trim() }),
-                }).catch(() => {});
+                for (const phone of phonesToRegister) {
+                  fetch(`/api/admin/schools/${activeSchoolId}/register-whatsapp-phone`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ phone }),
+                  }).catch(() => {});
+                }
               });
             }
 
@@ -424,12 +429,18 @@ export function AddPlayerForm() {
                 <FiscalProfileFields control={form.control} />
                  <FormField
                     control={form.control}
-                    name="tutorPhone"
+                    name="tutorPhones"
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>Teléfono de contacto (Opcional)</FormLabel>
                         <FormControl>
-                        <Input placeholder="+54 9 ..." {...field} />
+                          <PhonesInput
+                            id="add-tutor-phones"
+                            hideLabel
+                            value={field.value?.length ? field.value : [""]}
+                            onChange={field.onChange}
+                            placeholder="+54 9 ..."
+                          />
                         </FormControl>
                         <FormMessage />
                     </FormItem>

@@ -1,7 +1,7 @@
 /**
  * POST /api/admin/schools/[schoolId]/sync-whatsapp-memberships
  *
- * Sincroniza los teléfonos de clientes (tutorContact.phone) a la colección
+ * Sincroniza los teléfonos de clientes (tutorContact.phone / phones) a la colección
  * user_memberships de NotificasHub, para que WhatsApp identifique clientes activos.
  *
  * Requiere: super_admin o school_admin
@@ -10,6 +10,7 @@
 
 import { NextResponse } from 'next/server';
 import { getAdminFirestore } from '@/lib/firebase-admin';
+import { getContactPhones } from '@/lib/contact-phones';
 import { isNotificasHubConfigured, upsertUserMembership } from '@/lib/whatsapp/user-memberships';
 import { toWaId } from '@/lib/whatsapp/phone-utils';
 
@@ -65,17 +66,20 @@ export async function POST(
     const membershipsByPhone = new Map<string, Set<string>>();
 
     for (const doc of playersSnap.docs) {
-      const data = doc.data() as { tutorContact?: { phone?: string }; status?: string } | undefined;
-      const phone = data?.tutorContact?.phone?.trim();
-      if (!phone) continue;
+      const data = doc.data() as {
+        tutorContact?: { phone?: string; phones?: string[] };
+        status?: string;
+      } | undefined;
+      const phones = getContactPhones(data?.tutorContact);
+      for (const phone of phones) {
+        const waId = toWaId(phone);
+        if (!waId) continue;
 
-      const waId = toWaId(phone);
-      if (!waId) continue;
-
-      if (!membershipsByPhone.has(waId)) {
-        membershipsByPhone.set(waId, new Set());
+        if (!membershipsByPhone.has(waId)) {
+          membershipsByPhone.set(waId, new Set());
+        }
+        membershipsByPhone.get(waId)!.add(schoolId);
       }
-      membershipsByPhone.get(waId)!.add(schoolId);
     }
 
     let updated = 0;

@@ -81,15 +81,20 @@ export async function POST(request: Request) {
       const d = doc.data() as {
         firstName?: string;
         lastName?: string;
-        tutorContact?: { name?: string; phone?: string };
+        tutorContact?: { name?: string; phone?: string; phones?: string[] };
       };
       const fullName = (d.tutorContact?.name ?? `${d.lastName ?? ''} ${d.firstName ?? ''}`.trim()).trim();
       const altName = `${d.lastName ?? ''} ${d.firstName ?? ''}`.trim();
-      const phone = (d.tutorContact?.phone ?? '').trim().replace(/\D/g, '');
+      const phones = [
+        ...(d.tutorContact?.phones ?? []),
+        d.tutorContact?.phone ?? '',
+      ]
+        .map((p) => String(p).trim().replace(/\D/g, ''))
+        .filter(Boolean);
 
       if (fullName) byNormalizedName.set(normalize(fullName), doc);
       if (altName && altName !== fullName) byNormalizedName.set(normalize(altName), doc);
-      if (phone) byPhone.set(phone, doc);
+      for (const phone of phones) byPhone.set(phone, doc);
     }
 
     let updated = 0;

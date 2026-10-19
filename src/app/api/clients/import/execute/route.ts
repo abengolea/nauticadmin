@@ -151,10 +151,14 @@ export async function POST(request: Request) {
       const playerData: Record<string, unknown> = {
         firstName,
         lastName,
-        tutorContact: {
-          name: apellidoNombres || 'Sin datos',
-          phone: (data.telefono as string)?.trim() || '',
-        },
+        tutorContact: (() => {
+          const phone = (data.telefono as string)?.trim() || '';
+          return {
+            name: apellidoNombres || 'Sin datos',
+            phone,
+            ...(phone ? { phones: [phone] } : { phones: [] as string[] }),
+          };
+        })(),
         status: 'active',
         createdAt: Timestamp.now(),
         createdBy: uid,

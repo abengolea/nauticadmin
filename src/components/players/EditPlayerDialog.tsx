@@ -33,8 +33,10 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { getMissingProfileFieldLabels } from "@/lib/utils";
+import { buildTutorContact, normalizePhones, phonesForForm } from "@/lib/contact-phones";
 import { useUser } from "@/firebase";
 import { PlayerPhotoField } from "./PlayerPhotoField";
+import { PhonesInput } from "@/components/contact/PhonesInput";
 import { Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -69,7 +71,7 @@ const playerSchema = z.object({
   lastName: z.string().min(1, "El apellido es requerido."),
   dni: z.string().optional(),
   email: z.string().email("Debe ser un email válido.").optional().or(z.literal("")),
-  tutorPhone: z.string().optional(),
+  tutorPhones: z.array(z.string()).default([""]),
   status: z.enum(["active", "inactive", "suspended"]),
   observations: z.string().optional(),
   photoUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
@@ -124,7 +126,7 @@ export function EditPlayerDialog({
       lastName: player.lastName ?? "",
       dni: player.dni ?? "",
       email: player.email ?? "",
-      tutorPhone: player.tutorContact?.phone ?? "",
+      tutorPhones: phonesForForm(player.tutorContact),
       status: player.status ?? "active",
       observations: player.observations ?? "",
       photoUrl: player.photoUrl ?? "",
@@ -184,7 +186,7 @@ export function EditPlayerDialog({
         lastName: player.lastName ?? "",
         dni: player.dni ?? "",
         email: player.email ?? "",
-        tutorPhone: player.tutorContact?.phone ?? "",
+        tutorPhones: phonesForForm(player.tutorContact),
         status: player.status ?? "active",
         observations: player.observations ?? "",
         photoUrl: player.photoUrl ?? "",
@@ -231,10 +233,10 @@ export function EditPlayerDialog({
       lastName: values.lastName,
       dni: values.dni || null,
       email: values.email?.trim() ? values.email.trim().toLowerCase() : null,
-      tutorContact: {
-        name: `${values.firstName} ${values.lastName}`.trim() || "Sin datos",
-        phone: values.tutorPhone ?? "",
-      },
+      tutorContact: buildTutorContact(
+        `${values.firstName} ${values.lastName}`.trim() || "Sin datos",
+        values.tutorPhones
+      ),
       status: values.status,
       photoUrl: values.photoUrl || null,
       observations: values.observations || null,
@@ -270,7 +272,7 @@ export function EditPlayerDialog({
         const missing = getMissingProfileFieldLabels({
           firstName: values.firstName,
           lastName: values.lastName,
-          tutorPhone: values.tutorPhone,
+          tutorPhone: normalizePhones(values.tutorPhones)[0],
           email: values.email,
           photoUrl: values.photoUrl,
         });
@@ -323,14 +325,14 @@ export function EditPlayerDialog({
         throw new Error(data.error || data.detail || "Error al guardar");
       }
       showSuccess();
-      if (values.tutorPhone?.trim()) {
+      for (const phone of normalizePhones(values.tutorPhones)) {
         fetch(`/api/admin/schools/${schoolId}/register-whatsapp-phone`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ phone: values.tutorPhone.trim() }),
+          body: JSON.stringify({ phone }),
         }).catch(() => {});
       }
     } catch (err) {
@@ -413,12 +415,18 @@ export function EditPlayerDialog({
                   <FiscalProfileFields control={form.control} showRequiereFactura={!isPlayerEditing} />
                   <FormField
                     control={form.control}
-                    name="tutorPhone"
+                    name="tutorPhones"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Teléfono de contacto (Opcional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="+54 9 ..." {...field} />
+                          <PhonesInput
+                            id="edit-tutor-phones"
+                            hideLabel
+                            value={field.value?.length ? field.value : [""]}
+                            onChange={field.onChange}
+                            placeholder="+54 9 ..."
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
