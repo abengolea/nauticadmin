@@ -110,8 +110,10 @@ export interface ExpenseVendor {
   cuit?: string;
   /** Condición frente al IVA (ej: IVA Responsable Inscripto, Monotributista) */
   ivaCondition?: IvaCondition;
-  /** Teléfono de contacto */
+  /** Teléfono de contacto principal (primer número). Se mantiene por compatibilidad. */
   phone?: string;
+  /** Todos los teléfonos de contacto (incluye el principal). */
+  phones?: string[];
   /** Email de contacto */
   email?: string;
   /** Dirección fiscal o de contacto */

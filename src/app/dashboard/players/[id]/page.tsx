@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { User, Contact, ArrowLeft, UserX, TrendingUp } from "lucide-react";
 import { isPlayerProfileComplete, isOperationalClient } from "@/lib/utils";
+import { formatPhonesDisplay } from "@/lib/contact-phones";
 import { useDoc, useUserProfile, useCollection, useUser, useFirebase } from "@/firebase";
 import { getAuth } from "firebase/auth";
 import type { Player } from "@/lib/types";
@@ -254,7 +255,12 @@ export default function PlayerProfilePage() {
           <h1 className="text-4xl font-bold font-headline">{formatPlayerName(player)}</h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
              {player.tutorContact?.name && <div className="flex items-center gap-1"><User className="h-4 w-4" /> Contacto: {player.tutorContact.name}</div>}
-             {player.tutorContact?.phone?.trim() && <div className="flex items-center gap-1"><Contact className="h-4 w-4" /> {player.tutorContact.phone}</div>}
+             {formatPhonesDisplay(player.tutorContact) && (
+               <div className="flex items-center gap-1">
+                 <Contact className="h-4 w-4" />
+                 {formatPhonesDisplay(player.tutorContact)}
+               </div>
+             )}
           </div>
         </div>
         <div className="flex flex-wrap items-start gap-2">

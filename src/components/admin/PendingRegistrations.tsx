@@ -37,6 +37,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import type { PendingPlayer } from "@/lib/types";
+import { formatPhonesDisplay } from "@/lib/contact-phones";
 import { Skeleton } from "../ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Loader2, User, X } from "lucide-react";
@@ -394,7 +395,7 @@ export function PendingRegistrations() {
                 )}
                 {player.dni && <p><strong>DNI:</strong> {player.dni}</p>}
                 <p><strong>Contacto:</strong> {player.tutorContact.name}</p>
-                <p><strong>Tel. contacto:</strong> {player.tutorContact.phone}</p>
+                <p><strong>Tel. contacto:</strong> {formatPhonesDisplay(player.tutorContact) || '-'}</p>
             </CardContent>
             <CardFooter className="flex gap-2">
               <Button

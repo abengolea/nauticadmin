@@ -18,7 +18,7 @@ type UpdatePayload = {
     dni: string | null;
     healthInsurance: string | null;
     email: string | null;
-    tutorContact: { name: string; phone: string };
+    tutorContact: { name: string; phone: string; phones?: string[] };
     status: string;
     photoUrl: string | null;
     observations: string | null;
