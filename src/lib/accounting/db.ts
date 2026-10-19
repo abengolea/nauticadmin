@@ -16,6 +16,7 @@ import type {
   ClientAccountBalance,
   VendorAccountBalance,
 } from './types';
+import { playerMatchesSearch } from '@/lib/player-search';
 
 type Firestore = admin.firestore.Firestore;
 
@@ -285,7 +286,7 @@ export async function listClientAccountBalances(
   const schoolRef = db.collection('schools').doc(schoolId);
   const archivedIds = await getArchivedPlayerIds(db, schoolId);
   const playersSnap = await schoolRef.collection('players').get();
-  const query = q?.trim().toLowerCase() ?? '';
+  const query = q?.trim() ?? '';
 
   const results = await Promise.all(
     playersSnap.docs
@@ -296,7 +297,7 @@ export async function listClientAccountBalances(
         const lastName = (data.lastName as string) ?? '';
         const name = `${lastName} ${firstName}`.trim() || playerDoc.id;
 
-        if (query && !name.toLowerCase().includes(query)) return null;
+        if (query && !playerMatchesSearch(data, query)) return null;
 
         const entriesSnap = await schoolRef
           .collection('clientAccounts')

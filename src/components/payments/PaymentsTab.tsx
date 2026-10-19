@@ -39,8 +39,9 @@ import { useCollection, useDoc } from "@/firebase";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Payment, Player } from "@/lib/types";
-import { formatPlayerName, playerNameSearchText } from "@/lib/format-player-name";
-import { getPlayerEmbarcaciones, isOperationalClient } from "@/lib/utils";
+import { formatPlayerName } from "@/lib/format-player-name";
+import { playerSearchHaystack } from "@/lib/player-search";
+import { isOperationalClient } from "@/lib/utils";
 import {
   getPaymentMethodLabel,
   PAYMENT_METHOD_LABELS,
@@ -277,15 +278,7 @@ export function PaymentsTab({
         .map((p) => ({
           id: p.id,
           displayName: formatPlayerName(p) || p.email || p.id,
-          searchText: [
-            playerNameSearchText(p),
-            p.dni,
-            p.cuit,
-            p.ubicacion,
-            ...getPlayerEmbarcaciones(p).flatMap((e) => [e.nombre, e.matricula]),
-          ]
-            .filter(Boolean)
-            .join(" "),
+          searchText: playerSearchHaystack(p),
           secondaryText: (() => {
             const pricing = pricingByPlayer.get(p.id);
             if (!pricing || pricing.total <= 0) return "Sin precio asignado";
@@ -1026,7 +1019,7 @@ export function PaymentsTab({
                   onChange={setManualPlayerId}
                   players={playerOptions}
                   placeholder="Elegí un cliente"
-                  searchPlaceholder="Escribí apellido o nombre…"
+                  searchPlaceholder="Nombre, mail, matrícula o embarcación…"
                 />
               </div>
               {selectedMonthlyPricing && (

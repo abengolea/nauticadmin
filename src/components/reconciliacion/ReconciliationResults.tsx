@@ -4,6 +4,7 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useUser, useCollection } from "@/firebase";
 import type { Player } from "@/lib/types";
 import { isOperationalClient } from "@/lib/utils";
+import { playerSearchHaystack } from "@/lib/player-search";
 import { ClientSelectCombobox } from "@/components/players/ClientSelectCombobox";
 import { buildPersistedAliasNames } from "@/lib/reconciliacion-excel/save-player-alias";
 import { Button } from "@/components/ui/button";
@@ -222,6 +223,7 @@ export function ReconciliationResults({
             [p.lastName, p.firstName].filter(Boolean).join(", ").trim() ||
             p.email ||
             p.id,
+          searchText: playerSearchHaystack(p),
         })),
     [players]
   );
@@ -1021,7 +1023,7 @@ export function ReconciliationResults({
                                     ? row.suggestedPlayerName ?? "Buscar cliente…"
                                     : "Buscar cliente…"
                                 }
-                                searchPlaceholder="Apellido o nombre…"
+                                searchPlaceholder="Nombre, mail, matrícula o embarcación…"
                                 fullWidth
                               />
                             </TableCell>

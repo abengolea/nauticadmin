@@ -522,7 +522,7 @@ export default function AccountingPage() {
           <div className="relative max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar cliente..."
+              placeholder="Buscar por nombre, mail, matrícula, embarcación..."
               value={ccSearch}
               onChange={(e) => setCcSearch(e.target.value)}
               className="pl-9"
