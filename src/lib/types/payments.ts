@@ -194,7 +194,7 @@ export interface DelinquentInfo {
   playerId: string;
   playerName: string;
   playerEmail?: string;
-  tutorContact: { name: string; phone: string };
+  tutorContact: { name: string; phone: string; phones?: string[] };
   schoolId: string;
   period: string; // YYYY-MM o "inscripcion"
   dueDate: Date;

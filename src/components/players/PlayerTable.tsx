@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import type { Player } from "@/lib/types";
 import { formatPlayerName, playerNameSearchText } from "@/lib/format-player-name";
 import { getPlayerEmbarcaciones, isOperationalClient } from "@/lib/utils";
+import { formatPhonesDisplay } from "@/lib/contact-phones";
 import { normalizeString } from "@/lib/text-normalize";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -374,7 +375,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
         DNI: player.dni ?? "",
         CUIT: player.cuit ?? "",
         Email: player.email ?? "",
-        Teléfono: player.tutorContact?.phone ?? "",
+        Teléfono: formatPhonesDisplay(player.tutorContact),
         Contacto: player.tutorContact?.name ?? "",
         Observaciones: player.observations ?? "",
       };

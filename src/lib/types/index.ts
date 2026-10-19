@@ -132,7 +132,10 @@ export interface Player {
   email?: string;
   tutorContact: {
     name: string;
+    /** Teléfono principal (primer número). Se mantiene por compatibilidad. */
     phone: string;
+    /** Todos los teléfonos de contacto (incluye el principal). */
+    phones?: string[];
   };
   status: 'active' | 'inactive' | 'suspended';
   photoUrl?: string;
@@ -234,6 +237,7 @@ export interface PendingPlayer {
   tutorContact: {
     name: string;
     phone: string;
+    phones?: string[];
   };
   submittedAt: Date;
   /** UID del usuario Auth que completó el registro. */

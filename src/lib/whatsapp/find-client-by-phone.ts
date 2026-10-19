@@ -4,6 +4,7 @@
  */
 
 import { getAdminFirestore } from '@/lib/firebase-admin';
+import { getContactPhones } from '@/lib/contact-phones';
 import { toWaId } from '@/lib/whatsapp/phone-utils';
 
 export interface ClientMatch {
@@ -12,8 +13,8 @@ export interface ClientMatch {
 }
 
 /**
- * Busca clientes/clientes cuya tutorContact.phone coincida con el wa_id.
- * Para náuticas: los clientes están en schools/{schoolId}/players con tutorContact.phone.
+ * Busca clientes cuya tutorContact.phone / phones coincida con el wa_id.
+ * Para náuticas: los clientes están en schools/{schoolId}/players con tutorContact.
  */
 export async function findClientsByPhone(
   schoolId: string,
@@ -32,16 +33,21 @@ export async function findClientsByPhone(
   const matches: ClientMatch[] = [];
   for (const doc of playersSnap.docs) {
     const d = doc.data();
-    const tutorPhone = (d.tutorContact as { phone?: string } | undefined)?.phone?.trim();
-    if (!tutorPhone) continue;
-    const playerWaId = toWaId(tutorPhone);
-    if (playerWaId === digits || playerWaId === waId) {
-      const firstName = d.firstName ?? '';
-      const lastName = d.lastName ?? '';
-      const tutorName = (d.tutorContact as { name?: string })?.name ?? '';
-      const name = tutorName.trim() || `${firstName} ${lastName}`.trim() || 'Sin nombre';
-      matches.push({ id: doc.id, name });
-    }
+    const tutorContact = d.tutorContact as
+      | { name?: string; phone?: string; phones?: string[] }
+      | undefined;
+    const phones = getContactPhones(tutorContact);
+    const matchesPhone = phones.some((phone) => {
+      const playerWaId = toWaId(phone);
+      return playerWaId === digits || playerWaId === waId;
+    });
+    if (!matchesPhone) continue;
+
+    const firstName = d.firstName ?? '';
+    const lastName = d.lastName ?? '';
+    const tutorName = tutorContact?.name ?? '';
+    const name = tutorName.trim() || `${firstName} ${lastName}`.trim() || 'Sin nombre';
+    matches.push({ id: doc.id, name });
   }
   return matches;
 }
