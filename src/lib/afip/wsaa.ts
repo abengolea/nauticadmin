@@ -140,13 +140,19 @@ export class WsaaError extends Error {
   }
 }
 
+/** Argentina no usa DST: ART = UTC-3 todo el año. */
+const AFIP_ART_OFFSET_MS = 3 * 60 * 60 * 1000;
+
 /**
- * Formatea fecha ISO para AFIP: yyyy-mm-ddThh:mm:ss.sss-03:00
+ * Formatea fecha ISO para AFIP WSAA: yyyy-mm-ddThh:mm:ss.sss-03:00
+ * Siempre en hora Argentina, independiente de la TZ del servidor (App Hosting es UTC).
+ * Usar getters locales + offset fijo `-03:00` hace que AFIP lea generationTime "en el futuro".
  */
-function formatAfipDate(d: Date): string {
+export function formatAfipDate(d: Date): string {
+  const art = new Date(d.getTime() - AFIP_ART_OFFSET_MS);
   const pad = (n: number) => String(n).padStart(2, '0');
-  const ms = String(d.getMilliseconds()).padStart(3, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${ms}-03:00`;
+  const ms = String(art.getUTCMilliseconds()).padStart(3, '0');
+  return `${art.getUTCFullYear()}-${pad(art.getUTCMonth() + 1)}-${pad(art.getUTCDate())}T${pad(art.getUTCHours())}:${pad(art.getUTCMinutes())}:${pad(art.getUTCSeconds())}.${ms}-03:00`;
 }
 
 /**
@@ -255,14 +261,17 @@ async function signWithOpenSSL(
 }
 
 /**
- * Decodifica entidades HTML en el XML devuelto por AFIP (loginCmsReturn viene HTML-encoded)
+ * Decodifica entidades HTML en el XML/faultstring de AFIP
+ * (loginCmsReturn y acentos: inv&#xE1;lido, m&#xE1;s, etc.)
  */
-function decodeHtmlEntities(str: string): string {
+export function decodeHtmlEntities(str: string): string {
   return str
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
     .replace(/&amp;/g, '&');
 }
 
@@ -289,7 +298,7 @@ export function parseLoginCmsResponse(xml: string): { token: string; sign: strin
 
   if (!tokenMatch) {
     const errMatch = xml.match(/<faultstring>([^<]*)<\/faultstring>/);
-    const msg = errMatch ? errMatch[1] : 'No se encontró token en la respuesta';
+    const msg = errMatch ? decodeHtmlEntities(errMatch[1]) : 'No se encontró token en la respuesta';
     throw new WsaaError(`Error SOAP: ${msg}`, 'SOAP_ERROR', { xml: xml.slice(0, 500) });
   }
   if (!signMatch) {
@@ -390,7 +399,8 @@ export async function getAfipToken(): Promise<{ token: string; sign: string }> {
           { response: responseData.slice(0, 500) }
         );
       }
-      const fault = responseData.match(/<faultstring[^>]*>([^<]*)<\/faultstring>/i)?.[1];
+      const faultRaw = responseData.match(/<faultstring[^>]*>([^<]*)<\/faultstring>/i)?.[1];
+      const fault = faultRaw ? decodeHtmlEntities(faultRaw) : undefined;
       console.error('[WSAA] Error de conexión:', fault ?? responseData.slice(0, 300));
       throw new WsaaError(
         fault
@@ -409,10 +419,9 @@ export async function getAfipToken(): Promise<{ token: string; sign: string }> {
 
   const result = { token: parsed.token, sign: parsed.sign };
 
-  // expirationTime: AFIP lo devuelve en la respuesta; si no, usamos 12h por defecto
+  // expirationTime: AFIP lo devuelve en la respuesta; si no, usamos 12h por defecto (hora ART)
   const expirationTime =
-    parsed.expirationTime ??
-    new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString().replace('Z', '-03:00');
+    parsed.expirationTime ?? formatAfipDate(new Date(Date.now() + 12 * 60 * 60 * 1000));
 
   const ta: TaCache = {
     token: parsed.token,

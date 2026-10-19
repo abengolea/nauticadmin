@@ -5,6 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   axiosErrorBody,
+  decodeHtmlEntities,
+  formatAfipDate,
   isAlreadyAuthenticatedFault,
   parseLoginCmsResponse,
 } from '../../../lib/afip/wsaa';
@@ -61,6 +63,32 @@ describe('parseLoginCmsResponse', () => {
 
     expect(result.token).toBe('a&b');
     expect(result.sign).toBe('x"y');
+  });
+});
+
+describe('formatAfipDate', () => {
+  it('formatea siempre en hora Argentina (UTC-3), no en la TZ del servidor', () => {
+    // 20:03:00.123 UTC = 17:03:00.123 ART — el caso de App Hosting (UTC)
+    const d = new Date('2026-10-16T20:03:00.123Z');
+    expect(formatAfipDate(d)).toBe('2026-10-16T17:03:00.123-03:00');
+  });
+
+  it('cruza medianoche ART al día anterior', () => {
+    // 02:00 UTC = 23:00 ART del día anterior
+    const d = new Date('2026-10-16T02:00:00.000Z');
+    expect(formatAfipDate(d)).toBe('2026-10-15T23:00:00.000-03:00');
+  });
+});
+
+describe('decodeHtmlEntities', () => {
+  it('decodifica acentos hexadecimales del faultstring de AFIP', () => {
+    expect(
+      decodeHtmlEntities(
+        'generationTime posee formato o dato inv&#xE1;lido (ej: en el futuro o m&#xE1;s de 24 horas de antig&#xFC;edad)'
+      )
+    ).toBe(
+      'generationTime posee formato o dato inválido (ej: en el futuro o más de 24 horas de antigüedad)'
+    );
   });
 });
 
