@@ -12,10 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { Player } from "@/lib/types";
-import { formatPlayerName, playerNameSearchText } from "@/lib/format-player-name";
+import { formatPlayerName } from "@/lib/format-player-name";
 import { getPlayerEmbarcaciones, isOperationalClient } from "@/lib/utils";
 import { formatPhonesDisplay } from "@/lib/contact-phones";
-import { normalizeString } from "@/lib/text-normalize";
+import { playerMatchesSearch, playerSearchPlaceholder } from "@/lib/player-search";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCollection, useUserProfile } from "@/firebase";
@@ -196,28 +196,8 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
   );
 
   const filteredBySearch = useMemo(() => {
-    const q = normalizeString(searchQuery);
-    if (!q) return sortedAndFilteredPlayers;
-    const tokens = q.split(/\s+/).filter(Boolean);
-    return sortedAndFilteredPlayers.filter((p) => {
-      const embarcaciones = getPlayerEmbarcaciones(p);
-      const haystack = normalizeString(
-        [
-          playerNameSearchText(p),
-          formatPlayerName(p),
-          p.ubicacion,
-          p.dni,
-          p.cuit,
-          p.email,
-          p.tutorContact?.name,
-          p.observations,
-          ...embarcaciones.flatMap((e) => [e.nombre, e.matricula]),
-        ]
-          .filter(Boolean)
-          .join(" ")
-      );
-      return tokens.every((t) => haystack.includes(t));
-    });
+    if (!searchQuery.trim()) return sortedAndFilteredPlayers;
+    return sortedAndFilteredPlayers.filter((p) => playerMatchesSearch(p, searchQuery));
   }, [sortedAndFilteredPlayers, searchQuery]);
 
   const playersWithEmail = useMemo(
@@ -419,7 +399,7 @@ export function PlayerTable({ schoolId: propSchoolId }: { schoolId?: string }) {
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, embarcación, matrícula, ubicación..."
+            placeholder={playerSearchPlaceholder()}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"

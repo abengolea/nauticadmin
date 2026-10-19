@@ -39,7 +39,7 @@ export function ClientSelectCombobox({
   onChange,
   players,
   placeholder = "Elegí un cliente",
-  searchPlaceholder = "Escribí apellido o nombre…",
+  searchPlaceholder = "Nombre, mail, matrícula o embarcación…",
   disabled,
   id,
   className,

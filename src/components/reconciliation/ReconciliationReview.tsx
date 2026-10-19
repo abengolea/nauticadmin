@@ -86,7 +86,9 @@ function ClientSelectCombobox({
   const filtered = React.useMemo(() => {
     const q = normForSearch(query);
     if (!q) return players;
-    return players.filter((p) => normForSearch(p.displayName).includes(q));
+    return players.filter((p) =>
+      normForSearch([p.displayName, p.searchText].filter(Boolean).join(" ")).includes(q)
+    );
   }, [players, query]);
 
   const handleSelect = (playerId: string) => {
@@ -122,7 +124,7 @@ function ClientSelectCombobox({
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               ref={inputRef}
-              placeholder="Buscar cliente…"
+              placeholder="Nombre, mail, matrícula o embarcación…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-8 h-9"
@@ -154,7 +156,7 @@ function ClientSelectCombobox({
 }
 
 type PendingAlias = { id: string; pagador_raw: string; cliente_raw: string; created_at: string };
-type PlayerOption = { id: string; displayName: string };
+type PlayerOption = { id: string; displayName: string; searchText?: string };
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: "auto", label: "Auto-imputados", icon: CheckCircle2 },

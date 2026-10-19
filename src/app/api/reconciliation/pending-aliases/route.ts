@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { getAdminFirestore } from '@/lib/firebase-admin';
 import { verifyIdToken } from '@/lib/auth-server';
 import { REC_COLLECTIONS } from '@/lib/reconciliation';
+import { playerSearchHaystack } from '@/lib/player-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,7 +73,7 @@ export async function GET(request: Request) {
       const fullName =
         (data.tutorContact?.name ?? `${data.lastName ?? ''} ${data.firstName ?? ''}`.trim()).trim() ||
         `${data.lastName ?? ''} ${data.firstName ?? ''}`.trim();
-      return { id: d.id, displayName: fullName || d.id };
+      return { id: d.id, displayName: fullName || d.id, searchText: playerSearchHaystack(data) };
     });
     players.sort((a, b) => a.displayName.localeCompare(b.displayName));
 

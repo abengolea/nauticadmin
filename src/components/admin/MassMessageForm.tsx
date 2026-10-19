@@ -29,7 +29,8 @@ import {
   splitPricingItems,
 } from "@/lib/types/boat-pricing";
 import { getPlayerEmbarcaciones, isOperationalClient } from "@/lib/utils";
-import { formatPlayerName, playerNameSearchText } from "@/lib/format-player-name";
+import { formatPlayerName } from "@/lib/format-player-name";
+import { playerMatchesSearch } from "@/lib/player-search";
 import { buildEmailHtml, htmlToPlainText, sendMailDoc } from "@/lib/email";
 import { Mail, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -186,13 +187,8 @@ export function MassMessageForm() {
   }, [audience, withEmail, delinquentIds, boatGroup, itemsById, selectedIds]);
 
   const searchableClients = useMemo(() => {
-    const q = clientSearch.trim().toLowerCase();
-    if (!q) return withEmail;
-    return withEmail.filter((p) => {
-      const name = playerNameSearchText(p);
-      const email = (p.email ?? "").toLowerCase();
-      return name.includes(q) || email.includes(q);
-    });
+    if (!clientSearch.trim()) return withEmail;
+    return withEmail.filter((p) => playerMatchesSearch(p, clientSearch));
   }, [withEmail, clientSearch]);
 
   const toggleClient = (id: string) => {
@@ -357,7 +353,7 @@ export function MassMessageForm() {
             <div className="space-y-3 rounded-md border p-3 max-w-lg">
               <div className="flex flex-wrap items-center gap-2">
                 <Input
-                  placeholder="Buscar por nombre o email…"
+                  placeholder="Nombre, mail, matrícula o embarcación…"
                   value={clientSearch}
                   onChange={(e) => setClientSearch(e.target.value)}
                   className="flex-1 min-w-[180px]"
