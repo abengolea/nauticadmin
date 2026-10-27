@@ -29,7 +29,11 @@ import {
   isCotizacionNotFoundError,
 } from '../../../lib/fiscal/currency';
 import { buildAfipQrUrl } from '../../../lib/fiscal/qr';
-import { buildFecaDetRequestXml, parseFecaSolicitarResponse } from '../../../lib/afip/wsfe';
+import {
+  buildFecaDetRequestXml,
+  parseFecaSolicitarResponse,
+  parseCondicionIvaReceptorXml,
+} from '../../../lib/afip/wsfe';
 import { validateCuitChecksum } from '../../../lib/fiscal/cuit';
 import type { AuthorizedInvoiceData } from '../../../lib/fiscal/authorized-invoice';
 import { buildSimulationAuthorized } from '../../../lib/fiscal/simulation';
@@ -94,6 +98,14 @@ describe('determineVoucherType', () => {
       receptorCondicionId: CONDICION_IVA_RECEPTOR.CONSUMIDOR_FINAL,
     });
     expect(r).toMatchObject({ cbteTipo: CBTE_TIPO.FACTURA_B, clase: 'B' });
+  });
+
+  it('RI emisor a monotributista emite Factura A (Cmp_Clase A/M/C)', () => {
+    const r = determineVoucherType({
+      emisorCondicion: CONDICION_IVA_EMISOR.RESPONSABLE_INSCRIPTO,
+      receptorCondicionId: CONDICION_IVA_RECEPTOR.RESPONSABLE_MONOTRIBUTO,
+    });
+    expect(r).toMatchObject({ cbteTipo: CBTE_TIPO.FACTURA_A, clase: 'A' });
   });
 
   it('3. Factura C ARS sin IVA discriminado', () => {
@@ -164,6 +176,21 @@ describe('condicion IVA receptor / RG 5616', () => {
 
   it('RI en clase A permitido', () => {
     const v = validateCondicionForVoucherClass(1, 'A', PARAM_TABLE);
+    expect(v.ok).toBe(true);
+  });
+
+  it('CF con filas duplicadas C luego B es válida para Factura B', () => {
+    const v = validateCondicionForVoucherClass(5, 'B', [
+      { Id: 5, Desc: 'Consumidor Final', Cmp_Clase: 'C' },
+      { Id: 5, Desc: 'Consumidor Final', Cmp_Clase: 'B' },
+    ]);
+    expect(v.ok).toBe(true);
+  });
+
+  it('CF con Cmp_Clase incompleto C sigue válida para B (oficial B/C)', () => {
+    const v = validateCondicionForVoucherClass(5, 'B', [
+      { Id: 5, Desc: 'Consumidor Final', Cmp_Clase: 'C' },
+    ]);
     expect(v.ok).toBe(true);
   });
 });
@@ -507,5 +534,28 @@ describe('parseEmisorCondicionFromConfig', () => {
 describe('getCondicionIvaLabel', () => {
   it('retorna etiqueta ARCA', () => {
     expect(getCondicionIvaLabel(CONDICION_IVA_RECEPTOR.IVA_NO_ALCANZADO)).toContain('No Alcanzado');
+  });
+});
+
+describe('parseCondicionIvaReceptorXml', () => {
+  it('no cruza Cmp_Clase entre elementos', () => {
+    const xml = `
+      <ResultGet>
+        <CondicionIvaReceptor>
+          <Id>1</Id>
+          <Desc>IVA Responsable Inscripto</Desc>
+          <Cmp_Clase>A/M/C</Cmp_Clase>
+        </CondicionIvaReceptor>
+        <CondicionIvaReceptor>
+          <Id>5</Id>
+          <Desc>Consumidor Final</Desc>
+          <Cmp_Clase>B/C</Cmp_Clase>
+        </CondicionIvaReceptor>
+      </ResultGet>`;
+    const rows = parseCondicionIvaReceptorXml(xml);
+    expect(rows).toEqual([
+      { Id: 1, Desc: 'IVA Responsable Inscripto', Cmp_Clase: 'A/M/C' },
+      { Id: 5, Desc: 'Consumidor Final', Cmp_Clase: 'B/C' },
+    ]);
   });
 });

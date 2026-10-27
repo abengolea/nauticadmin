@@ -12,7 +12,10 @@ import {
 } from '@/lib/afip/wsfe';
 import type { DocumentReference, Firestore } from 'firebase-admin/firestore';
 import { withVoucherLock } from './voucher-lock';
-import { getCondicionIvaReceptorTable } from './condicion-iva-cache';
+import {
+  getCondicionIvaReceptorTable,
+  getCondicionIvaReceptorTableForClass,
+} from './condicion-iva-cache';
 import {
   validateCondicionForVoucherClass,
   voucherClassFromCbteTipo,
@@ -104,7 +107,13 @@ function buildWsfeParams(
 
 export async function emitVoucherFiscal(input: EmitVoucherInput): Promise<EmitVoucherOutput> {
   const voucherClass = voucherClassFromCbteTipo(input.cbteTipo);
-  const paramTable = await getCondicionIvaReceptorTable();
+  let classTable: Awaited<ReturnType<typeof getCondicionIvaReceptorTableForClass>> = [];
+  try {
+    classTable = await getCondicionIvaReceptorTableForClass(voucherClass);
+  } catch (err) {
+    console.warn('[emit] FEParamGetCondicionIvaReceptor clase', voucherClass, err);
+  }
+  const paramTable = classTable.length > 0 ? classTable : await getCondicionIvaReceptorTable();
   const condValidation = validateCondicionForVoucherClass(
     input.condicionIVAReceptorId,
     voucherClass,

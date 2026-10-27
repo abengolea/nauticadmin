@@ -113,17 +113,30 @@ export interface CondicionIvaReceptorRow {
   Cmp_Clase?: string;
 }
 
+/** Parsea FEParamGetCondicionIvaReceptor bloque por bloque (no cruza elementos). */
+export function parseCondicionIvaReceptorXml(xml: string): CondicionIvaReceptorRow[] {
+  const items: CondicionIvaReceptorRow[] = [];
+  const blockRe = /<CondicionIvaReceptor>([\s\S]*?)<\/CondicionIvaReceptor>/gi;
+  let block: RegExpExecArray | null;
+  while ((block = blockRe.exec(xml)) !== null) {
+    const inner = block[1] ?? '';
+    const idMatch = inner.match(/<Id>(\d+)<\/Id>/i);
+    if (!idMatch) continue;
+    const descMatch = inner.match(/<Desc>([^<]*)<\/Desc>/i);
+    const claseMatch = inner.match(/<Cmp_Clase>([^<]*)<\/Cmp_Clase>/i);
+    items.push({
+      Id: parseInt(idMatch[1]!, 10),
+      Desc: descMatch?.[1] ?? '',
+      Cmp_Clase: claseMatch?.[1],
+    });
+  }
+  return items;
+}
+
 export async function getCondicionIvaReceptor(claseCmp?: string): Promise<CondicionIvaReceptorRow[]> {
   const content = claseCmp ? `<ClaseCmp>${escapeXml(claseCmp)}</ClaseCmp>` : '';
   const resultXml = await executeSoap('FEParamGetCondicionIvaReceptor', content);
-  const items: CondicionIvaReceptorRow[] = [];
-  const regex =
-    /<CondicionIvaReceptor>[\s\S]*?<Id>(\d+)<\/Id>[\s\S]*?<Desc>([^<]*)<\/Desc>(?:[\s\S]*?<Cmp_Clase>([^<]*)<\/Cmp_Clase>)?/g;
-  let m;
-  while ((m = regex.exec(resultXml)) !== null) {
-    items.push({ Id: parseInt(m[1], 10), Desc: m[2], Cmp_Clase: m[3] });
-  }
-  return items;
+  return parseCondicionIvaReceptorXml(resultXml);
 }
 
 export async function getCotizacion(monId: string, monFecha?: string): Promise<number> {

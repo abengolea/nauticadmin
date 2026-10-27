@@ -7,12 +7,11 @@
 import {
   CBTE_TIPO,
   CONDICION_IVA_EMISOR,
-  CONDICION_IVA_RECEPTOR,
   type CondicionIvaEmisor,
   type CondicionIvaReceptorId,
   type CbteTipo,
 } from './constants';
-import { type CondicionIvaReceptorParam } from './iva-receptor';
+import { allowedClassesForCondicion, type CondicionIvaReceptorParam } from './iva-receptor';
 
 export interface VoucherTypeInput {
   emisorCondicion: CondicionIvaEmisor;
@@ -40,10 +39,11 @@ export function parseEmisorCondicionFromConfig(raw: string | undefined): Condici
 
 /**
  * Determina el comprobante permitido según emisor y receptor.
- * RI → RI = Factura A; RI → otros = Factura B; Monotributo/Exento emisor = Factura C.
+ * Monotributo/Exento emisor = Factura C.
+ * RI emisor: Factura A si el receptor admite A (RI, monotributo); Factura B si admite B (CF, exento).
  */
 export function determineVoucherType(input: VoucherTypeInput): VoucherTypeResult | { error: string } {
-  const { emisorCondicion, receptorCondicionId } = input;
+  const { emisorCondicion, receptorCondicionId, paramTable } = input;
 
   if (
     emisorCondicion === CONDICION_IVA_EMISOR.MONOTRIBUTISTA ||
@@ -52,12 +52,17 @@ export function determineVoucherType(input: VoucherTypeInput): VoucherTypeResult
     return { cbteTipo: CBTE_TIPO.FACTURA_C, clase: 'C', label: 'FACTURA C' };
   }
 
-  // Emisor Responsable Inscripto
-  if (receptorCondicionId === CONDICION_IVA_RECEPTOR.IVA_RESPONSABLE_INSCRIPTO) {
+  const classes = allowedClassesForCondicion(receptorCondicionId, paramTable);
+  if (classes.includes('A')) {
     return { cbteTipo: CBTE_TIPO.FACTURA_A, clase: 'A', label: 'FACTURA A' };
   }
+  if (classes.includes('B')) {
+    return { cbteTipo: CBTE_TIPO.FACTURA_B, clase: 'B', label: 'FACTURA B' };
+  }
 
-  return { cbteTipo: CBTE_TIPO.FACTURA_B, clase: 'B', label: 'FACTURA B' };
+  return {
+    error: `No hay tipo de comprobante compatible para la condición IVA del cliente (id ${receptorCondicionId}). Clases ARCA: ${classes.join(', ') || 'ninguna'}`,
+  };
 }
 
 /**
